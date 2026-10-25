@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1040" viewBox="0 0 1200 1040" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Workspace lock sequence</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #1d2733; }
+    .lb { fill: #ffffff; }
+    .life { stroke: #5b6777; stroke-width: 1.2; stroke-dasharray: 4 4; }
+    .note { fill: #fffde7; stroke: #b59a00; stroke-width: 1; }
+  </style>
+  <defs>
+    <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="m5s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6a3fb4"/></marker>
+    <marker id="m5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+  </defs>
+  <rect width="1200" height="1040" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Workspace lock: two tasks on one agent</text>
+  <text x="32" y="66" class="st">Reference scenario: Anna's task waits for plan approval without holding the lock, so Ben's task runs in between.</text>
+  <line class="life" x1="110" y1="134" x2="110" y2="970"/>
+  <rect x="15" y="86" width="190" height="48" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+  <text x="110" y="107" class="h" text-anchor="middle">Agent API (UI)</text>
+  <text x="110" y="125" class="d" text-anchor="middle">Anna, Ben</text>
+  <line class="life" x1="340" y1="134" x2="340" y2="970"/>
+  <rect x="245" y="86" width="190" height="48" rx="10" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="340" y="107" class="h" text-anchor="middle">TaskWorkflow A</text>
+  <text x="340" y="125" class="d" text-anchor="middle">Anna · approval = plan</text>
+  <line class="life" x1="600" y1="134" x2="600" y2="970"/>
+  <rect x="505" y="86" width="190" height="48" rx="10" fill="#f4f6fa" stroke="#5b6777" stroke-width="1.5"/>
+  <text x="600" y="107" class="h" text-anchor="middle">AgentWorkflow</text>
+  <text x="600" y="125" class="d" text-anchor="middle">agent-&lt;id&gt; · lock manager</text>
+  <line class="life" x1="860" y1="134" x2="860" y2="970"/>
+  <rect x="765" y="86" width="190" height="48" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="860" y="107" class="h" text-anchor="middle">TaskWorkflow B</text>
+  <text x="860" y="125" class="d" text-anchor="middle">Ben · approval = none</text>
+  <line class="life" x1="1080" y1="134" x2="1080" y2="970"/>
+  <rect x="985" y="86" width="190" height="48" rx="10" fill="#fff3e0" stroke="#e65100" stroke-width="1.5"/>
+  <text x="1080" y="107" class="h" text-anchor="middle">Activities</text>
+  <text x="1080" y="125" class="d" text-anchor="middle">runAgentStep → Harness</text>
+  <rect x="594" y="256" width="12" height="120" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="614" y="322" class="d" font-weight="600" fill="#1f5fad">lock: A</text>
+  <rect x="594" y="550" width="12" height="120" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="614" y="616" class="d" font-weight="600" fill="#00796b">lock: B</text>
+  <rect x="594" y="836" width="12" height="120" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="614" y="902" class="d" font-weight="600" fill="#1f5fad">lock: A</text>
+  <path d="M110,176 H338" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m5)"/>
+  <rect class="lb" x="151" y="159" width="148" height="14"/>
+  <text x="225" y="170" class="l" text-anchor="middle">1  start TaskWorkflow A</text>
+  <path d="M340,216 H598" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="405" y="199" width="130" height="14"/>
+  <text x="470" y="210" class="l" text-anchor="middle">2  signal acquire(A)</text>
+  <path d="M600,256 H342" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="405" y="239" width="130" height="14"/>
+  <text x="470" y="250" class="l" text-anchor="middle">3  signal granted(A)</text>
+  <path d="M340,296 H1078" fill="none" stroke="#1f5fad" stroke-width="1.5" marker-end="url(#m5a)"/>
+  <rect class="lb" x="662" y="279" width="136" height="14"/>
+  <text x="730" y="290" class="l" text-anchor="middle">4  runAgentStep(plan)</text>
+  <path d="M1080,336 H342" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m5)"/>
+  <rect class="lb" x="674" y="319" width="112" height="14"/>
+  <text x="730" y="330" class="l" text-anchor="middle">5  plan committed</text>
+  <path d="M340,376 H598" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="405" y="359" width="130" height="14"/>
+  <text x="470" y="370" class="l" text-anchor="middle">6  signal release(A)</text>
+  <rect class="note" x="200" y="392" width="320" height="48" rx="6"/>
+  <text x="212" y="411" class="d">A: awaiting_approval — no lock held;</text>
+  <text x="212" y="429" class="d">waits for update "decide" (reminder 4 h, expiry 7 d)</text>
+  <rect class="note" x="660" y="392" width="510" height="48" rx="6"/>
+  <text x="672" y="411" class="d">AgentWorkflow: FIFO queue of acquire requests; stale-lock check every 5 min</text>
+  <text x="672" y="429" class="d">(local activity isWorkflowRunning); continue-as-new carries queue and holder.</text>
+  <path d="M110,470 H858" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m5)"/>
+  <rect class="lb" x="396" y="453" width="148" height="14"/>
+  <text x="470" y="464" class="l" text-anchor="middle">7  start TaskWorkflow B</text>
+  <path d="M860,510 H602" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="665" y="493" width="130" height="14"/>
+  <text x="730" y="504" class="l" text-anchor="middle">8  signal acquire(B)</text>
+  <path d="M600,550 H858" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="665" y="533" width="130" height="14"/>
+  <text x="730" y="544" class="l" text-anchor="middle">9  signal granted(B)</text>
+  <path d="M860,590 H1078" fill="none" stroke="#1f5fad" stroke-width="1.5" marker-end="url(#m5a)"/>
+  <rect class="lb" x="872" y="573" width="196" height="14"/>
+  <text x="970" y="584" class="l" text-anchor="middle">10  plan, run, verify, finalize</text>
+  <path d="M1080,630 H862" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m5)"/>
+  <rect class="lb" x="920" y="613" width="100" height="14"/>
+  <text x="970" y="624" class="l" text-anchor="middle">11  B completed</text>
+  <path d="M860,670 H602" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="662" y="653" width="136" height="14"/>
+  <text x="730" y="664" class="l" text-anchor="middle">12  signal release(B)</text>
+  <rect class="note" x="660" y="686" width="510" height="30" rx="6"/>
+  <text x="672" y="706" class="d">Drawn compressed: every step of B acquires and releases the lock on its own.</text>
+  <path d="M110,756 H338" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m5)"/>
+  <rect class="lb" x="142" y="739" width="166" height="14"/>
+  <text x="225" y="750" class="l" text-anchor="middle">13  update decide(approve)</text>
+  <path d="M340,796 H598" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="402" y="779" width="136" height="14"/>
+  <text x="470" y="790" class="l" text-anchor="middle">14  signal acquire(A)</text>
+  <path d="M600,836 H342" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="402" y="819" width="136" height="14"/>
+  <text x="470" y="830" class="l" text-anchor="middle">15  signal granted(A)</text>
+  <path d="M340,876 H1078" fill="none" stroke="#1f5fad" stroke-width="1.5" marker-end="url(#m5a)"/>
+  <rect class="lb" x="662" y="859" width="136" height="14"/>
+  <text x="730" y="870" class="l" text-anchor="middle">16  runAgentStep(run)</text>
+  <path d="M1080,916 H342" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m5)"/>
+  <rect class="lb" x="674" y="899" width="112" height="14"/>
+  <text x="730" y="910" class="l" text-anchor="middle">17  run committed</text>
+  <path d="M340,956 H598" fill="none" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+  <rect class="lb" x="402" y="939" width="136" height="14"/>
+  <text x="470" y="950" class="l" text-anchor="middle">18  signal release(A)</text>
+  <text x="332" y="964" class="d" text-anchor="end">… then verifying</text>
+  <g transform="translate(32,1000)">
+    <line x1="0" y1="8" x2="36" y2="8" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m5)"/>
+    <text x="44" y="12" class="d">client call (start workflow / update)</text>
+    <line x1="270" y1="8" x2="306" y2="8" stroke="#6a3fb4" stroke-width="1.5" marker-end="url(#m5s)"/>
+    <text x="314" y="12" class="d">Temporal signal</text>
+    <line x1="430" y1="8" x2="466" y2="8" stroke="#1f5fad" stroke-width="1.5" marker-end="url(#m5a)"/>
+    <text x="474" y="12" class="d">activity (under the lock)</text>
+    <line x1="640" y1="8" x2="676" y2="8" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m5)"/>
+    <text x="684" y="12" class="d">activity result</text>
+    <rect x="800" y="0" width="12" height="16" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+    <text x="820" y="12" class="d">lock held (by A / B)</text>
+  </g>
+</svg>

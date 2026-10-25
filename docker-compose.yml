@@ -1,0 +1,192 @@
+# Local environment on Docker Desktop. Start with `pnpm stack:up` (or `node scripts/stack.mjs up`),
+# which creates .env with fresh secrets, builds all images (including the agent image that the
+# admin console uses to spin up agents) and starts this stack.
+#
+#   http://${PUBLIC_HOST:-localhost}:8080  admin console (in the "temporal" container)
+#   http://${PUBLIC_HOST:-localhost}:8233  Temporal Web UI
+#   http://${PUBLIC_HOST:-localhost}:9000  OAuth / OpenID Connect server
+#   http://${PUBLIC_HOST:-localhost}:81xx  agents (created from the admin console)
+#
+# Internal only: mcp-gateway (7400), mcp-demo (7500), keyvault (Lowkey Vault, 8443 TLS + 8080 token endpoint).
+
+name: coworking
+
+x-build: &build
+  context: .
+  dockerfile: infra/docker/Dockerfile
+
+services:
+  temporal:
+    build: { <<: *build, target: control-plane }
+    image: coworking/control-plane:local
+    container_name: cw-temporal
+    hostname: temporal
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080" # admin console
+      - "127.0.0.1:8233:8233" # Temporal Web UI
+      - "127.0.0.1:7233:7233" # Temporal gRPC (CLI access from the host)
+    volumes:
+      - control-plane-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - keyvault-certs:/certs:ro
+    depends_on:
+      keyvault: { condition: service_started }
+    environment:
+      PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8080
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-agent-dev}
+      TEMPORAL_UI_PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8233
+      PAYLOAD_CODEC_KEYS: ${PAYLOAD_CODEC_KEYS:?run scripts/stack.mjs to create .env}
+      OAUTH_ISSUER: http://${PUBLIC_HOST:-localhost}:9000
+      OAUTH_INTERNAL_URL: http://oauth:9000
+      OAUTH_ADMIN_TOKEN: ${OAUTH_ADMIN_TOKEN:?}
+      ADMIN_CLIENT_SECRET: ${ADMIN_CLIENT_SECRET:?}
+      SESSION_SECRET: ${ADMIN_SESSION_SECRET:?}
+      DOCKER_NETWORK: coworking
+      AGENT_PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      AGENT_IMAGE: ${AGENT_IMAGE:-coworking/agent:local}
+      AGENT_TEMPORAL_ADDRESS: temporal:7233
+      AGENT_OIDC_INTERNAL_URL: http://oauth:9000
+      AI_GATEWAY_BASE_URL: ${AI_GATEWAY_BASE_URL:-http://mock-llm:4010/v1}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-mock-key}
+      AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL:-mock-large}
+      APPROVAL_REMINDER_AFTER: ${APPROVAL_REMINDER_AFTER:-4h}
+      APPROVAL_EXPIRE_AFTER: ${APPROVAL_EXPIRE_AFTER:-7d}
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:?run scripts/stack.mjs to add GATEWAY_TOKEN}
+      MCP_GATEWAY_URL: http://mcp-gateway:7400
+      AGENT_CONTROL_PLANE_URL: http://temporal:8080
+      DEMO_UPSTREAM_URL: http://mcp-demo:7500/mcp
+      MCP_DEMO_TOKEN: ${MCP_DEMO_TOKEN:?}
+      # Agent portraits (taken from the host environment, never written to .env)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      KEYVAULT_URL: https://keyvault:8443
+      KEYVAULT_EMULATOR: "true"
+      AZURE_POD_IDENTITY_AUTHORITY_HOST: http://keyvault:8080
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks: [coworking]
+
+  oauth:
+    build: { <<: *build, target: oauth }
+    image: coworking/oauth:local
+    container_name: cw-oauth
+    hostname: oauth
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - oauth-data:/data
+    environment:
+      OAUTH_ISSUER: http://${PUBLIC_HOST:-localhost}:9000
+      OAUTH_ADMIN_TOKEN: ${OAUTH_ADMIN_TOKEN:?}
+      ADMIN_CLIENT_SECRET: ${ADMIN_CLIENT_SECRET:?}
+      ADMIN_PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8080
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-true}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-Welcome-2026!}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [coworking]
+
+  mock-llm:
+    build: { <<: *build, target: mock-llm }
+    image: coworking/mock-llm:local
+    container_name: cw-mock-llm
+    hostname: mock-llm
+    restart: unless-stopped
+    environment:
+      MOCK_CHUNK_DELAY_MS: ${MOCK_CHUNK_DELAY_MS:-40}
+    networks: [coworking]
+
+  mcp-gateway:
+    build: { <<: *build, target: mcp-gateway }
+    image: coworking/mcp-gateway:local
+    container_name: cw-mcp-gateway
+    hostname: mcp-gateway
+    restart: unless-stopped
+    volumes:
+      - mcp-gateway-data:/data
+      - keyvault-certs:/certs:ro
+    environment:
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:?}
+      CONTROL_PLANE_URL: http://temporal:8080
+      KEYVAULT_URL: https://keyvault:8443
+      KEYVAULT_EMULATOR: "true"
+      AZURE_POD_IDENTITY_AUTHORITY_HOST: http://keyvault:8080
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      keyvault: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7400/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [coworking]
+
+  mcp-demo:
+    build: { <<: *build, target: mcp-demo }
+    image: coworking/mcp-demo:local
+    container_name: cw-mcp-demo
+    hostname: mcp-demo
+    restart: unless-stopped
+    environment:
+      DEMO_TOKEN: ${MCP_DEMO_TOKEN:?}
+    networks: [coworking]
+
+  # Azure Key Vault emulator (ADR-0024). TLS with a local CA created by keyvault-certs.
+  keyvault-certs:
+    image: alpine:3.22
+    container_name: cw-keyvault-certs
+    volumes:
+      - keyvault-certs:/certs
+      - ./infra/keyvault/gen-certs.sh:/gen-certs.sh:ro
+    command: ["sh", "/gen-certs.sh"]
+    restart: "no"
+
+  keyvault:
+    image: nagyesta/lowkey-vault:7.3.127
+    container_name: cw-keyvault
+    hostname: keyvault
+    restart: unless-stopped
+    volumes:
+      - keyvault-certs:/certs:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        exec java -jar /lowkey-vault.jar
+        --server.ssl.key-store=/certs/keyvault.p12
+        --server.ssl.key-store-type=PKCS12
+        --server.ssl.key-store-password="$$(cat /certs/keyvault.pass)"
+        --LOWKEY_VAULT_RELAXED_PORTS=true
+        "--LOWKEY_VAULT_ALIASES=localhost=keyvault:<port>"
+    depends_on:
+      keyvault-certs: { condition: service_completed_successfully }
+    networks: [coworking]
+
+  # Not started: only built so that the admin console can create agent containers from it.
+  agent-image:
+    build: { <<: *build, target: agent }
+    image: ${AGENT_IMAGE:-coworking/agent:local}
+    profiles: ["build"]
+
+networks:
+  coworking:
+    name: coworking
+
+volumes:
+  control-plane-data:
+  oauth-data:
+  mcp-gateway-data:
+  keyvault-certs:

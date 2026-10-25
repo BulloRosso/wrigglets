@@ -1,0 +1,36 @@
+{
+  "name": "@cw/admin-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Control plane running in the Temporal container: supervises the Temporal dev server, provisions agent containers, administers the OAuth server, serves the admin UI and the codec endpoint.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cw/auth-rp": "workspace:*",
+    "@cw/codec": "workspace:*",
+    "@cw/secrets": "workspace:*",
+    "@cw/shared": "workspace:*",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/common": "1.24.0",
+    "cookie-parser": "1.4.7",
+    "dockerode": "5.0.1",
+    "express": "5.3.0",
+    "jose": "6.2.13",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "1.4.10",
+    "@types/dockerode": "4.0.2",
+    "@types/express": "5.0.6",
+    "tsx": "4.23.15",
+    "vitest": "5.0.5"
+  }
+}

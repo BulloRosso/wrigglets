@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Agent provisioning</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .n { font-size: 12px; font-weight: 700; fill: #ffffff; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+    .ui { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .stp { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .boot { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .env { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ok { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  </style>
+  <defs>
+    <marker id="arr7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="880" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Agent provisioning ("New agent" in the admin console)</text>
+  <text x="32" y="66" class="st">Desired state → identity → runtime, then the agent bootstraps itself. Re-deploy repeats 1–3; the /home volume survives.</text>
+  <rect class="ui" x="30" y="100" width="230" height="230" rx="10"/>
+  <text x="46" y="127" class="h">Admin console</text>
+  <text x="46" y="150" class="d">"New agent" form (Platform.Admin):</text>
+  <text x="46" y="168" class="d">agent id, e.g. max</text>
+  <text x="46" y="186" class="d">display name, model</text>
+  <text x="46" y="204" class="d">image coworking/agent:local</text>
+  <text x="46" y="222" class="d">CPU / memory limits</text>
+  <text x="46" y="240" class="d">start immediately?</text>
+  <rect class="ui" x="330" y="100" width="230" height="230" rx="10"/>
+  <text x="346" y="127" class="h">Admin server</text>
+  <text x="346" y="150" class="d">POST /api/agents</text>
+  <text x="346" y="168" class="d">AgentService.create()</text>
+  <text x="346" y="186" class="d">runtime: DockerRuntime</text>
+  <text x="346" y="204" class="d">(Azure: AzureAppServiceRuntime)</text>
+  <text x="346" y="222" class="d">logs every action to the</text>
+  <text x="346" y="240" class="d">admin audit log</text>
+  <path class="ln" d="M260,215 H328" marker-end="url(#arr7)"/>
+  <rect class="stp" x="640" y="100" width="530" height="70" rx="10"/>
+  <circle cx="662" cy="122" r="11" fill="#6a3fb4"/>
+  <text x="662" y="126" class="n" text-anchor="middle">1</text>
+  <text x="682" y="127" class="h">Registry: put spec + generated secrets</text>
+  <text x="656" y="150" class="d">/data/admin/agents.json — OIDC client secret, session secret, free host port 81xx</text>
+  <rect class="stp" x="640" y="180" width="530" height="70" rx="10"/>
+  <circle cx="662" cy="202" r="11" fill="#6a3fb4"/>
+  <text x="662" y="206" class="n" text-anchor="middle">2</text>
+  <text x="682" y="207" class="h">OAuth management API: upsert client agent-&lt;id&gt;</text>
+  <text x="656" y="230" class="d">oauth:9000/admin/api (bearer) · redirect URI http://localhost:81xx/auth/callback</text>
+  <rect class="stp" x="640" y="260" width="530" height="88" rx="10"/>
+  <circle cx="662" cy="282" r="11" fill="#6a3fb4"/>
+  <text x="662" y="286" class="n" text-anchor="middle">3</text>
+  <text x="682" y="287" class="h">Docker Engine via /var/run/docker.sock</text>
+  <text x="656" y="310" class="d">create volume cw-agent-&lt;id&gt;-home (if missing) · (re)create container cw-agent-&lt;id&gt;</text>
+  <text x="656" y="328" class="d">network coworking · 127.0.0.1:81xx → 8080 · health check · start</text>
+  <path class="ln" d="M560,135 H638" marker-end="url(#arr7)"/>
+  <path class="ln" d="M560,215 H638" marker-end="url(#arr7)"/>
+  <path class="ln" d="M560,295 H638" marker-end="url(#arr7)"/>
+  <rect class="env" x="30" y="360" width="590" height="100" rx="10"/>
+  <text x="46" y="387" class="h">Container environment (set by the admin server)</text>
+  <text x="46" y="410" class="d">AGENT_ID · TEMPORAL_ADDRESS=temporal:7233 · TEMPORAL_NAMESPACE · PAYLOAD_CODEC_KEYS</text>
+  <text x="46" y="428" class="d">OIDC_ISSUER · OIDC_INTERNAL_URL · OIDC_CLIENT_ID / _SECRET · SESSION_SECRET</text>
+  <text x="46" y="446" class="d">AI_GATEWAY_BASE_URL · AI_GATEWAY_API_KEY · AI_GATEWAY_MODEL · approval timers</text>
+  <rect class="bnd" x="30" y="490" width="1140" height="292" rx="12"/>
+  <text x="200" y="512" class="bl">Boot sequence inside cw-agent-&lt;id&gt; (agent-server main.ts)</text>
+  <path class="ln" d="M905,348 V472 H175 V528" marker-end="url(#arr7)"/>
+  <rect class="lb" x="600" y="465" width="110" height="14"/>
+  <text x="655" y="476" class="l" text-anchor="middle">container starts</text>
+  <rect class="boot" x="50" y="530" width="260" height="92" rx="10"/>
+  <circle cx="72" cy="552" r="11" fill="#00796b"/>
+  <text x="72" y="556" class="n" text-anchor="middle">4</text>
+  <text x="92" y="557" class="h">Prepare /home</text>
+  <text x="66" y="580" class="d">workspace/, artifacts/, staging/</text>
+  <text x="66" y="598" class="d">git init + git config</text>
+  <rect class="boot" x="330" y="530" width="260" height="92" rx="10"/>
+  <circle cx="352" cy="552" r="11" fill="#00796b"/>
+  <text x="352" y="556" class="n" text-anchor="middle">5</text>
+  <text x="372" y="557" class="h">Write harness config</text>
+  <text x="346" y="580" class="d">opencode config outside the</text>
+  <text x="346" y="598" class="d">workspace · provider AI_GATEWAY_*</text>
+  <rect class="boot" x="610" y="530" width="260" height="92" rx="10"/>
+  <circle cx="632" cy="552" r="11" fill="#00796b"/>
+  <text x="632" y="556" class="n" text-anchor="middle">6</text>
+  <text x="652" y="557" class="h">Start Agent Harness</text>
+  <text x="626" y="580" class="d">opencode serve 127.0.0.1:4096</text>
+  <text x="626" y="598" class="d">wait until healthy (≤ 60 s)</text>
+  <rect class="boot" x="890" y="530" width="260" height="92" rx="10"/>
+  <circle cx="912" cy="552" r="11" fill="#00796b"/>
+  <text x="912" y="556" class="n" text-anchor="middle">7</text>
+  <text x="932" y="557" class="h">Connect to Temporal</text>
+  <text x="906" y="580" class="d">temporal:7233 · namespace</text>
+  <text x="906" y="598" class="d">payload codec (AES-256-GCM)</text>
+  <rect class="boot" x="890" y="670" width="260" height="92" rx="10"/>
+  <circle cx="912" cy="692" r="11" fill="#00796b"/>
+  <text x="912" y="696" class="n" text-anchor="middle">8</text>
+  <text x="932" y="697" class="h">Ensure AgentWorkflow</text>
+  <text x="906" y="720" class="d">workflow id agent-&lt;id&gt; (lock</text>
+  <text x="906" y="738" class="d">manager) · USE_EXISTING</text>
+  <rect class="boot" x="610" y="670" width="260" height="92" rx="10"/>
+  <circle cx="632" cy="692" r="11" fill="#00796b"/>
+  <text x="632" y="696" class="n" text-anchor="middle">9</text>
+  <text x="652" y="697" class="h">Ensure system schedules</text>
+  <text x="626" y="720" class="d">git gc Sun 03:10 · backup 02:40</text>
+  <text x="626" y="738" class="d">transcript cleanup 03:40 (Berlin)</text>
+  <rect class="boot" x="330" y="670" width="260" height="92" rx="10"/>
+  <circle cx="352" cy="692" r="11" fill="#00796b"/>
+  <text x="352" y="696" class="n" text-anchor="middle">10</text>
+  <text x="372" y="697" class="h">Start HTTP server :8080</text>
+  <text x="346" y="720" class="d">API/BFF, agent web UI,</text>
+  <text x="346" y="738" class="d">/health for Docker</text>
+  <rect class="boot" x="50" y="670" width="260" height="92" rx="10"/>
+  <circle cx="72" cy="692" r="11" fill="#00796b"/>
+  <text x="72" y="696" class="n" text-anchor="middle">11</text>
+  <text x="92" y="697" class="h">Run the Temporal worker</text>
+  <text x="66" y="720" class="d">polls task queue agent-&lt;id&gt;</text>
+  <text x="66" y="738" class="d">workflows + activities</text>
+  <path class="ln" d="M310,576 H328" marker-end="url(#arr7)"/>
+  <path class="ln" d="M890,716 H872" marker-end="url(#arr7)"/>
+  <path class="ln" d="M590,576 H608" marker-end="url(#arr7)"/>
+  <path class="ln" d="M610,716 H592" marker-end="url(#arr7)"/>
+  <path class="ln" d="M870,576 H888" marker-end="url(#arr7)"/>
+  <path class="ln" d="M330,716 H312" marker-end="url(#arr7)"/>
+  <path class="ln" d="M1020,622 V668" marker-end="url(#arr7)"/>
+  <rect class="ok" x="50" y="806" width="560" height="56" rx="10"/>
+  <text x="66" y="833" class="h">Agent running</text>
+  <text x="170" y="833" class="d">UI on http://localhost:81xx · admin console shows health, logs, stats</text>
+  <path class="ln" d="M180,762 V804" marker-end="url(#arr7)"/>
+  <g transform="translate(660,822)">
+    <rect x="0" y="0" width="16" height="16" rx="4" class="ui"/>
+    <text x="24" y="13" class="d">control plane</text>
+    <rect x="130" y="0" width="16" height="16" rx="4" class="stp"/>
+    <text x="154" y="13" class="d">provisioning step</text>
+    <rect x="290" y="0" width="16" height="16" rx="4" class="boot"/>
+    <text x="314" y="13" class="d">agent boot step</text>
+  </g>
+</svg>

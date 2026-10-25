@@ -1,0 +1,27 @@
+{
+  "name": "@cw/mcp-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP gateway: the single tool endpoint of all agents (upstream MCP servers, A2A delegation tools), enforcing allow-lists, the kill switch, limits and audit. Azure: API Management (ADR-0021).",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "1.3.0",
+    "@cw/secrets": "workspace:*",
+    "@cw/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "express": "5.3.0",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "vitest": "5.0.5"
+  }
+}

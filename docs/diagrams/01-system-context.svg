@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>System context — coworking AI colleagues</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+  </style>
+  <defs>
+    <marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+    <g id="person1">
+      <circle cx="0" cy="-14" r="9" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+      <path d="M-15,14 Q-15,-3 0,-3 Q15,-3 15,14 Z" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    </g>
+  </defs>
+  <rect width="1200" height="660" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">System context</text>
+  <text x="32" y="66" class="st">Who uses the platform, what it consists of at the highest level, and the one external system it depends on.</text>
+
+  <!-- People -->
+  <g>
+    <rect x="30" y="128" width="206" height="64" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    <use href="#person1" x="58" y="162"/>
+    <text x="82" y="155" class="h">Anna</text>
+    <text x="82" y="173" class="d">Requester · Agent.User</text>
+
+    <rect x="30" y="208" width="206" height="64" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    <use href="#person1" x="58" y="242"/>
+    <text x="82" y="235" class="h">Ben</text>
+    <text x="82" y="253" class="d">Approver · Agent.Approver</text>
+
+    <rect x="30" y="308" width="206" height="64" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    <use href="#person1" x="58" y="342"/>
+    <text x="82" y="335" class="h">Clara</text>
+    <text x="82" y="353" class="d">Auditor · Agent.User</text>
+
+    <rect x="30" y="468" width="206" height="64" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    <use href="#person1" x="58" y="502"/>
+    <text x="82" y="495" class="h">Platform admin</text>
+    <text x="82" y="513" class="d">Platform.Admin</text>
+  </g>
+
+  <!-- Platform boundary -->
+  <rect x="330" y="90" width="624" height="500" rx="12" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="346" y="114" class="bl">Docker Desktop (local) — coworking platform</text>
+
+  <!-- Column A -->
+  <rect x="420" y="130" width="230" height="130" rx="10" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="434" y="156" class="h">Agent web UI (per agent)</text>
+  <text x="434" y="180" class="d">one per colleague (Max, Eva …)</text>
+  <text x="434" y="198" class="d">submit tasks, approve plans,</text>
+  <text x="434" y="216" class="d">watch live progress,</text>
+  <text x="434" y="234" class="d">read the audit trail</text>
+
+  <rect x="420" y="300" width="230" height="80" rx="10" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="434" y="326" class="h">Temporal Web UI</text>
+  <text x="434" y="348" class="d">workflow histories, timers,</text>
+  <text x="434" y="366" class="d">payloads decoded via /codec</text>
+
+  <rect x="420" y="440" width="230" height="120" rx="10" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="434" y="466" class="h">Admin console</text>
+  <text x="434" y="490" class="d">create / start / stop agents,</text>
+  <text x="434" y="508" class="d">users and roles, schedules,</text>
+  <text x="434" y="526" class="d">health, logs, force-release lock</text>
+
+  <!-- Column B -->
+  <rect x="700" y="130" width="210" height="130" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="716" y="156" class="h">AI colleague runtime</text>
+  <text x="716" y="180" class="d">API/BFF + Temporal worker</text>
+  <text x="716" y="198" class="d">Agent Harness (opencode)</text>
+  <text x="716" y="216" class="d">Git workspace on /home</text>
+  <text x="716" y="234" class="d">one container per agent</text>
+
+  <rect x="700" y="300" width="210" height="80" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="716" y="326" class="h">Temporal server</text>
+  <text x="716" y="348" class="d">durable workflows,</text>
+  <text x="716" y="366" class="d">event history (90 days)</text>
+
+  <rect x="700" y="440" width="210" height="120" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="716" y="466" class="h">OAuth / OIDC server</text>
+  <text x="716" y="490" class="d">sign-in pages, users,</text>
+  <text x="716" y="508" class="d">per-agent roles</text>
+  <text x="716" y="526" class="d">(Entra ID on Azure)</text>
+
+  <!-- External -->
+  <rect x="990" y="110" width="180" height="110" rx="10" fill="#fff3e0" stroke="#e65100" stroke-width="1.5"/>
+  <text x="1006" y="136" class="h">AI gateway</text>
+  <text x="1006" y="158" class="d">external model provider</text>
+  <text x="1006" y="180" class="d">locally replaced by</text>
+  <text x="1006" y="198" class="d">mock-llm (OpenAI API)</text>
+
+  <!-- People arrows -->
+  <path class="ln" d="M236,160 H418" marker-end="url(#arr1)"/>
+  <rect class="lb" x="243" y="143" width="82" height="13"/>
+  <text x="284" y="153" class="l" text-anchor="middle">submits tasks</text>
+
+  <path class="ln" d="M236,230 H418" marker-end="url(#arr1)"/>
+  <rect class="lb" x="236" y="213" width="96" height="13"/>
+  <text x="284" y="223" class="l" text-anchor="middle">approves / rejects</text>
+
+  <path class="ln" d="M236,340 H418" marker-end="url(#arr1)"/>
+  <rect class="lb" x="240" y="345" width="88" height="13"/>
+  <text x="284" y="355" class="l" text-anchor="middle">reviews history</text>
+
+  <path class="ln" d="M236,322 H392 V250 H418" marker-end="url(#arr1)"/>
+  <rect class="lb" x="254" y="305" width="60" height="13"/>
+  <text x="284" y="315" class="l" text-anchor="middle">audit trail</text>
+
+  <path class="ln" d="M236,500 H418" marker-end="url(#arr1)"/>
+  <rect class="lb" x="236" y="483" width="96" height="13"/>
+  <text x="284" y="493" class="l" text-anchor="middle">operates</text>
+
+  <!-- Internal arrows -->
+  <path class="ln" d="M650,195 H698" marker-end="url(#arr1)"/>
+  <rect class="lb" x="660" y="178" width="28" height="13"/>
+  <text x="674" y="188" class="l" text-anchor="middle">API</text>
+
+  <path class="ln" d="M650,340 H698" marker-end="url(#arr1)"/>
+  <rect class="lb" x="655" y="323" width="38" height="13"/>
+  <text x="674" y="333" class="l" text-anchor="middle">gRPC</text>
+
+  <path class="ln" d="M650,500 H698" marker-end="url(#arr1)"/>
+  <rect class="lb" x="655" y="483" width="38" height="13"/>
+  <text x="674" y="493" class="l" text-anchor="middle">users</text>
+
+  <path class="ln" d="M805,260 V298" marker-end="url(#arr1)"/>
+  <rect class="lb" x="812" y="272" width="64" height="13"/>
+  <text x="814" y="282" class="l">gRPC 7233</text>
+
+  <path class="ln" d="M910,232 H932 V520 H912" marker-end="url(#arr1)"/>
+  <g transform="translate(932,410) rotate(-90)">
+    <rect class="lb" x="-46" y="-8" width="92" height="14"/>
+    <text x="0" y="3" class="l" text-anchor="middle">OIDC sign-in</text>
+  </g>
+
+  <path class="ln" d="M910,160 H988" marker-end="url(#arr1)"/>
+  <rect class="lb" x="926" y="143" width="50" height="13"/>
+  <text x="951" y="153" class="l" text-anchor="middle">LLM API</text>
+
+  <!-- Legend -->
+  <g transform="translate(36,612)">
+    <rect x="0" y="0" width="16" height="16" rx="4" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+    <text x="24" y="13" class="d">people (roles)</text>
+    <rect x="140" y="0" width="16" height="16" rx="4" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+    <text x="164" y="13" class="d">user interfaces</text>
+    <rect x="290" y="0" width="16" height="16" rx="4" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+    <text x="314" y="13" class="d">platform services</text>
+    <rect x="450" y="0" width="16" height="16" rx="4" fill="#fff3e0" stroke="#e65100" stroke-width="1.5"/>
+    <text x="474" y="13" class="d">external system</text>
+    <rect x="600" y="0" width="28" height="16" rx="3" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="636" y="13" class="d">deployment boundary</text>
+  </g>
+</svg>

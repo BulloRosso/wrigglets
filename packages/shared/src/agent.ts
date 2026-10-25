@@ -1,0 +1,39 @@
+import type { Identity } from './identity.js';
+import type { KillLevel } from './killswitch.js';
+
+export interface LockHolder {
+  taskId: string;
+  since: string;
+  purpose?: 'cleanup' | 'resume';
+}
+
+export interface AgentState {
+  agentId: string;
+  holder?: LockHolder;
+  waiting: Array<{ taskId: string; requestedAt: string; purpose?: 'cleanup' | 'resume' }>;
+  stats: { grantsTotal: number; forcedReleases: number; suspensions?: number };
+  lastForceRelease?: { taskId: string; by: Identity; at: string };
+  /** Effective kill-switch level of this agent (set by the control plane, ADR-0022). */
+  killSwitch?: { level: KillLevel; reason?: string; by: string; at: string };
+}
+
+export type AgentStatus = Pick<AgentState, 'holder' | 'waiting' | 'stats' | 'killSwitch'>;
+
+export interface HealthReport {
+  status: 'ok' | 'degraded' | 'down';
+  version: string;
+  agentId: string;
+  displayName: string;
+  harness: { state: 'starting' | 'up' | 'down'; version?: string; downSince?: string; restarts: number };
+  temporal: { state: 'up' | 'down'; namespace: string; checkedAt?: string; error?: string };
+}
+
+export interface AgentStatusResponse {
+  agentId: string;
+  displayName: string;
+  holder?: LockHolder & { title?: string };
+  waiting: Array<{ taskId: string; requestedAt: string; title?: string }>;
+  stats: { grantsTotal: number };
+  killSwitch?: AgentState['killSwitch'];
+  health: HealthReport;
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@cw/codec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AES-256-GCM Temporal payload codec with key rotation and a Temporal Web UI codec-server handler.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@temporalio/common": "1.24.0",
+    "@temporalio/proto": "1.24.0"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

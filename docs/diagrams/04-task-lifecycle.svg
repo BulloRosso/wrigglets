@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="840" viewBox="0 0 1200 840" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Task lifecycle (TaskWorkflow)</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+    .lock { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .wait { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .idle { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ok { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.5; }
+    .term { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  </style>
+  <defs>
+    <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="840" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Task lifecycle (TaskWorkflow)</text>
+  <text x="32" y="66" class="st">Status values as stored in the workflow state. The workspace lock is held only inside steps — never while a human decides.</text>
+
+  <!-- initial pseudo state -->
+  <circle cx="90" cy="112" r="7" fill="#5b6777"/>
+  <path class="ln" d="M90,119 V138" marker-end="url(#arr4)"/>
+
+  <!-- Row A -->
+  <rect class="idle" x="30" y="140" width="120" height="56" rx="10"/>
+  <text x="90" y="173" class="h" text-anchor="middle">queued</text>
+
+  <rect class="lock" x="220" y="140" width="150" height="56" rx="10"/>
+  <text x="295" y="164" class="h" text-anchor="middle">planning</text>
+  <text x="295" y="183" class="d" text-anchor="middle">plan step</text>
+
+  <rect class="wait" x="480" y="140" width="240" height="56" rx="10"/>
+  <text x="600" y="164" class="h" text-anchor="middle">awaiting_approval (plan)</text>
+  <text x="600" y="183" class="d" text-anchor="middle">reminder 4 h · expires 7 d</text>
+
+  <rect class="lock" x="840" y="140" width="150" height="56" rx="10"/>
+  <text x="915" y="164" class="h" text-anchor="middle">running</text>
+  <text x="915" y="183" class="d" text-anchor="middle">run step</text>
+
+  <!-- Row B -->
+  <rect class="ok" x="30" y="330" width="120" height="56" rx="10"/>
+  <rect x="34" y="334" width="112" height="48" rx="8" fill="none" stroke="#2e7d32" stroke-width="1.2"/>
+  <text x="90" y="363" class="h" text-anchor="middle">completed</text>
+
+  <rect class="lock" x="220" y="330" width="150" height="56" rx="10"/>
+  <text x="295" y="354" class="h" text-anchor="middle">finalizing</text>
+  <text x="295" y="373" class="d" text-anchor="middle">commit + audit export</text>
+
+  <rect class="wait" x="480" y="330" width="240" height="56" rx="10"/>
+  <text x="600" y="354" class="h" text-anchor="middle">awaiting_approval (deviation)</text>
+  <text x="600" y="373" class="d" text-anchor="middle">reminder 4 h · expires 7 d</text>
+
+  <rect class="lock" x="840" y="330" width="150" height="56" rx="10"/>
+  <text x="915" y="354" class="h" text-anchor="middle">verifying</text>
+  <text x="915" y="373" class="d" text-anchor="middle">verify activity</text>
+
+  <!-- Row C -->
+  <rect class="lock" x="840" y="480" width="150" height="56" rx="10"/>
+  <text x="915" y="504" class="h" text-anchor="middle">fixing</text>
+  <text x="915" y="523" class="d" text-anchor="middle">fix step</text>
+
+  <!-- Transitions -->
+  <path class="ln" d="M150,168 H218" marker-end="url(#arr4)"/>
+  <rect class="lb" x="166" y="151" width="36" height="13"/>
+  <text x="184" y="161" class="l" text-anchor="middle">start</text>
+
+  <path class="ln" d="M370,160 H478" marker-end="url(#arr4)"/>
+  <rect class="lb" x="378" y="143" width="92" height="13"/>
+  <text x="424" y="153" class="l" text-anchor="middle">approval = plan</text>
+
+  <path class="ln" d="M540,196 V236 H320 V198" marker-end="url(#arr4)"/>
+  <rect class="lb" x="362" y="229" width="136" height="14"/>
+  <text x="430" y="240" class="l" text-anchor="middle">revise (max 3 times)</text>
+
+  <path class="ln" d="M720,168 H838" marker-end="url(#arr4)"/>
+  <rect class="lb" x="752" y="151" width="54" height="13"/>
+  <text x="779" y="161" class="l" text-anchor="middle">approve</text>
+
+  <path class="ln" d="M270,140 V112 H940 V138" marker-end="url(#arr4)"/>
+  <rect class="lb" x="500" y="105" width="200" height="14"/>
+  <text x="600" y="116" class="l" text-anchor="middle">approval = none / deviation</text>
+
+  <path class="ln" d="M915,196 V328" marker-end="url(#arr4)"/>
+  <rect class="lb" x="922" y="255" width="82" height="13"/>
+  <text x="926" y="265" class="l">run committed</text>
+
+  <path class="ln" d="M880,386 V478" marker-end="url(#arr4)"/>
+  <rect class="lb" x="772" y="419" width="102" height="28"/>
+  <text x="870" y="430" class="l" text-anchor="end">verify failed</text>
+  <text x="870" y="443" class="l" text-anchor="end">(round ≤ 2)</text>
+
+  <path class="ln" d="M950,480 V388" marker-end="url(#arr4)"/>
+  <rect class="lb" x="956" y="426" width="82" height="13"/>
+  <text x="960" y="436" class="l">fix committed</text>
+
+  <path class="ln" d="M840,358 H722" marker-end="url(#arr4)"/>
+  <rect class="lb" x="738" y="337" width="86" height="13"/>
+  <text x="781" y="347" class="l" text-anchor="middle">ok + anomalies</text>
+  <rect class="lb" x="738" y="364" width="86" height="13"/>
+  <text x="781" y="374" class="l" text-anchor="middle">(deviation)</text>
+
+  <path class="ln" d="M860,330 V300 H330 V328" marker-end="url(#arr4)"/>
+  <rect class="lb" x="520" y="293" width="160" height="14"/>
+  <text x="600" y="304" class="l" text-anchor="middle">verify ok, no anomalies</text>
+
+  <path class="ln" d="M480,358 H372" marker-end="url(#arr4)"/>
+  <rect class="lb" x="398" y="341" width="54" height="13"/>
+  <text x="425" y="351" class="l" text-anchor="middle">approve</text>
+
+  <path class="ln" d="M220,358 H152" marker-end="url(#arr4)"/>
+  <rect class="lb" x="160" y="341" width="54" height="13"/>
+  <text x="187" y="351" class="l" text-anchor="middle">done</text>
+
+  <path class="ln" d="M600,386 V508 H838" marker-end="url(#arr4)"/>
+  <rect class="lb" x="640" y="501" width="140" height="14"/>
+  <text x="710" y="512" class="l" text-anchor="middle">revise (with comment)</text>
+
+  <!-- notes -->
+  <text x="30" y="438" class="d">Upload tasks: queued → running (applyUpload) → finalizing → completed.</text>
+  <text x="30" y="458" class="d">Every lock-holding state acquires the lock, runs one activity, releases.</text>
+  <text x="30" y="478" class="d">Verify failing after the 2nd fix round → failed.</text>
+
+  <!-- Terminal states -->
+  <rect class="bnd" x="30" y="574" width="1140" height="182" rx="12"/>
+  <text x="46" y="598" class="bl">Terminal states (cleanup still commits and writes the audit export, then notifies)</text>
+
+  <rect class="term" x="46" y="614" width="212" height="126" rx="10"/>
+  <text x="62" y="640" class="h">rejected</text>
+  <text x="62" y="664" class="d">reject at plan approval</text>
+  <text x="62" y="682" class="d">or at deviation approval;</text>
+  <text x="62" y="700" class="d">deviation reject reverts</text>
+  <text x="62" y="718" class="d">the run/fix commits</text>
+
+  <rect class="term" x="270" y="614" width="212" height="126" rx="10"/>
+  <text x="286" y="640" class="h">cancelled</text>
+  <text x="286" y="664" class="d">cancel from any</text>
+  <text x="286" y="682" class="d">non-terminal state;</text>
+  <text x="286" y="700" class="d">lock released safely</text>
+
+  <rect class="term" x="494" y="614" width="212" height="126" rx="10"/>
+  <text x="510" y="640" class="h">failed</text>
+  <text x="510" y="664" class="d">verify still failing after</text>
+  <text x="510" y="682" class="d">2 fix rounds, or an</text>
+  <text x="510" y="700" class="d">unrecoverable error</text>
+
+  <rect class="term" x="718" y="614" width="212" height="126" rx="10"/>
+  <text x="734" y="640" class="h">budget_exceeded</text>
+  <text x="734" y="664" class="d">token budget exhausted</text>
+  <text x="734" y="682" class="d">during a plan, run or</text>
+  <text x="734" y="700" class="d">fix step</text>
+
+  <rect class="term" x="942" y="614" width="212" height="126" rx="10"/>
+  <text x="958" y="640" class="h">expired</text>
+  <text x="958" y="664" class="d">approval timeout: no</text>
+  <text x="958" y="682" class="d">decision within 7 days</text>
+  <text x="958" y="700" class="d">(reminder after 4 hours)</text>
+
+  <!-- Legend -->
+  <g transform="translate(30,782)">
+    <rect x="0" y="0" width="16" height="16" rx="4" class="idle"/>
+    <text x="24" y="13" class="d">created, not started</text>
+    <rect x="170" y="0" width="16" height="16" rx="4" class="lock"/>
+    <text x="194" y="13" class="d">step under the workspace lock</text>
+    <rect x="400" y="0" width="16" height="16" rx="4" class="wait"/>
+    <text x="424" y="13" class="d">human decision (no lock held)</text>
+    <rect x="630" y="0" width="16" height="16" rx="4" class="ok"/>
+    <text x="654" y="13" class="d">success</text>
+    <rect x="730" y="0" width="16" height="16" rx="4" class="term"/>
+    <text x="754" y="13" class="d">terminal (not successful)</text>
+  </g>
+</svg>

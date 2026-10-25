@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1000" viewBox="0 0 1200 1000" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Local deployment on Docker Desktop</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+    .ctr { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .proc { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .vol { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ext { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  </style>
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="1000" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Local deployment (Docker Desktop)</text>
+  <text x="32" y="66" class="st">Three fixed containers from docker-compose.yml plus agent containers created at runtime by the admin server. Host ports are bound to 127.0.0.1.</text>
+
+  <!-- Host boundary -->
+  <rect class="bnd" x="16" y="84" width="1168" height="900" rx="12"/>
+  <text x="32" y="106" class="bl">Docker Desktop host (developer machine)</text>
+
+  <!-- Browser -->
+  <rect class="usr" x="110" y="118" width="980" height="56" rx="10"/>
+  <text x="126" y="141" class="h">Browser on the host</text>
+  <text x="126" y="161" class="d">localhost:8080 admin console · :8233 Temporal Web UI · :9000 OAuth sign-in · :8101 Max · :8102 Eva   (localhost:7233 for the Temporal CLI)</text>
+
+  <!-- Network boundary -->
+  <rect class="bnd" x="30" y="214" width="1140" height="660" rx="12"/>
+  <text x="96" y="236" class="bl">Docker network "coworking" — DNS names: temporal, oauth, mock-llm, agent-&lt;id&gt;</text>
+
+  <!-- Agent max -->
+  <rect class="ctr" x="110" y="256" width="440" height="220" rx="10"/>
+  <text x="126" y="280" class="h">cw-agent-max</text>
+  <text x="126" y="298" class="d">image coworking/agent · alias agent-max · created by admin server</text>
+  <rect class="proc" x="126" y="310" width="408" height="48" rx="8"/>
+  <text x="140" y="330" class="h2">API/BFF + Temporal worker (Node) :8080</text>
+  <text x="140" y="348" class="d">OIDC relying party · SSE · task queue agent-max</text>
+  <rect class="proc" x="126" y="366" width="408" height="48" rx="8"/>
+  <text x="140" y="386" class="h2">Agent Harness: opencode serve</text>
+  <text x="140" y="404" class="d">127.0.0.1:4096 inside the container only · password auth</text>
+  <rect class="vol" x="126" y="422" width="408" height="40" rx="8"/>
+  <text x="140" y="446" class="d"><tspan font-weight="600">volume cw-agent-max-home → /home</tspan>  workspace, artifacts, staging, .oc</text>
+
+  <!-- Agent eva -->
+  <rect class="ctr" x="590" y="256" width="440" height="220" rx="10"/>
+  <text x="606" y="280" class="h">cw-agent-eva</text>
+  <text x="606" y="298" class="d">image coworking/agent · alias agent-eva · created by admin server</text>
+  <rect class="proc" x="606" y="310" width="408" height="48" rx="8"/>
+  <text x="620" y="330" class="h2">API/BFF + Temporal worker (Node) :8080</text>
+  <text x="620" y="348" class="d">OIDC relying party · SSE · task queue agent-eva</text>
+  <rect class="proc" x="606" y="366" width="408" height="48" rx="8"/>
+  <text x="620" y="386" class="h2">Agent Harness: opencode serve</text>
+  <text x="620" y="404" class="d">127.0.0.1:4096 inside the container only · password auth</text>
+  <rect class="vol" x="606" y="422" width="408" height="40" rx="8"/>
+  <text x="620" y="446" class="d"><tspan font-weight="600">volume cw-agent-eva-home → /home</tspan>  workspace, artifacts, staging, .oc</text>
+
+  <!-- Browser arrows -->
+  <path class="ln" d="M330,174 V254" marker-end="url(#arr2)"/>
+  <rect class="lb" x="262" y="186" width="136" height="14"/>
+  <text x="330" y="197" class="l" text-anchor="middle">127.0.0.1:8101 → 8080</text>
+  <path class="ln" d="M810,174 V254" marker-end="url(#arr2)"/>
+  <rect class="lb" x="742" y="186" width="136" height="14"/>
+  <text x="810" y="197" class="l" text-anchor="middle">127.0.0.1:8102 → 8080</text>
+  <path class="ln" d="M110,146 H70 V574" marker-end="url(#arr2)"/>
+  <g transform="translate(70,520) rotate(-90)">
+    <rect class="lb" x="-62" y="-8" width="124" height="14"/>
+    <text x="0" y="3" class="l" text-anchor="middle">:8080 admin · :8233 UI</text>
+  </g>
+  <path class="ln" d="M1090,146 H1120 V574" marker-end="url(#arr2)"/>
+  <g transform="translate(1120,520) rotate(-90)">
+    <rect class="lb" x="-48" y="-8" width="96" height="14"/>
+    <text x="0" y="3" class="l" text-anchor="middle">:9000 sign-in</text>
+  </g>
+
+  <!-- Bus -->
+  <path d="M220,520 H990" stroke="#00796b" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <rect class="lb" x="430" y="502" width="340" height="14"/>
+  <text x="600" y="513" class="l" text-anchor="middle">container-to-container traffic on "coworking" (by DNS name)</text>
+  <path class="ln" d="M330,476 V520"/>
+  <path class="ln" d="M810,476 V520"/>
+  <path class="ln" d="M250,520 V574" marker-end="url(#arr2)"/>
+  <rect class="lb" x="258" y="532" width="160" height="14"/>
+  <text x="262" y="543" class="l">temporal:7233 (gRPC, worker)</text>
+  <path class="ln" d="M620,520 V574" marker-end="url(#arr2)"/>
+  <rect class="lb" x="628" y="532" width="146" height="14"/>
+  <text x="632" y="543" class="l">mock-llm:4010 (harness)</text>
+  <path class="ln" d="M960,520 V574" marker-end="url(#arr2)"/>
+  <rect class="lb" x="968" y="532" width="140" height="14"/>
+  <text x="972" y="543" class="l">oauth:9000 token, JWKS</text>
+
+  <!-- cw-temporal -->
+  <rect class="ctr" x="40" y="576" width="430" height="240" rx="10"/>
+  <text x="96" y="600" class="h">cw-temporal</text>
+  <text x="96" y="618" class="d">service temporal · image coworking/control-plane</text>
+  <rect class="proc" x="96" y="630" width="358" height="52" rx="8"/>
+  <text x="110" y="651" class="h2">Admin server (Node/TS) :8080</text>
+  <text x="110" y="670" class="d">admin console · /codec · agent runtime · supervisor</text>
+  <rect class="proc" x="96" y="692" width="358" height="52" rx="8"/>
+  <text x="110" y="713" class="h2">Temporal CLI dev server</text>
+  <text x="110" y="732" class="d">gRPC :7233 · Web UI :8233 · SQLite on /data</text>
+  <rect class="vol" x="96" y="754" width="358" height="48" rx="8"/>
+  <text x="110" y="774" class="d"><tspan font-weight="600">volume control-plane-data → /data</tspan></text>
+  <text x="110" y="792" class="d">temporal db · agents.json registry · admin audit log</text>
+
+  <!-- cw-mock-llm -->
+  <rect class="ctr" x="500" y="576" width="250" height="240" rx="10"/>
+  <text x="516" y="600" class="h">cw-mock-llm</text>
+  <text x="516" y="618" class="d">image coworking/mock-llm</text>
+  <rect class="ext" x="516" y="630" width="218" height="84" rx="8"/>
+  <text x="530" y="651" class="h2">Mock model :4010</text>
+  <text x="530" y="670" class="d">OpenAI-compatible,</text>
+  <text x="530" y="688" class="d">scripted responses</text>
+  <text x="530" y="706" class="d">(not published to host)</text>
+  <text x="516" y="742" class="d">stand-in for the</text>
+  <text x="516" y="760" class="d">AI gateway</text>
+  <text x="516" y="778" class="d">(AI_GATEWAY_BASE_URL)</text>
+
+  <!-- cw-oauth -->
+  <rect class="ctr" x="780" y="576" width="370" height="240" rx="10"/>
+  <text x="796" y="600" class="h">cw-oauth</text>
+  <text x="796" y="618" class="d">service oauth · image coworking/oauth</text>
+  <rect class="proc" x="796" y="630" width="300" height="52" rx="8"/>
+  <text x="810" y="651" class="h2">OIDC server :9000</text>
+  <text x="810" y="670" class="d">node-oidc-provider + sign-in pages</text>
+  <rect class="proc" x="796" y="692" width="300" height="52" rx="8"/>
+  <text x="810" y="713" class="h2">Management API /admin/api</text>
+  <text x="810" y="732" class="d">bearer token · admin server only</text>
+  <rect class="vol" x="796" y="754" width="300" height="48" rx="8"/>
+  <text x="810" y="774" class="d"><tspan font-weight="600">volume oauth-data → /data</tspan></text>
+  <text x="810" y="792" class="d">users, OIDC clients, roles</text>
+
+  <!-- admin -> oauth /admin/api -->
+  <path class="ln" d="M440,816 V846 H1020 V818" marker-end="url(#arr2)"/>
+  <rect class="lb" x="640" y="839" width="200" height="14"/>
+  <text x="740" y="850" class="l" text-anchor="middle">oauth:9000/admin/api (upsert clients)</text>
+
+  <!-- Docker engine -->
+  <rect class="vol" x="96" y="898" width="420" height="72" rx="10"/>
+  <text x="112" y="924" class="h">Docker Engine</text>
+  <text x="112" y="944" class="d">/var/run/docker.sock bind-mounted into cw-temporal;</text>
+  <text x="112" y="960" class="d">creates, starts, stops cw-agent-* containers and volumes</text>
+  <path class="ln" d="M200,816 V898" marker-end="url(#arr2)"/>
+  <rect class="lb" x="208" y="878" width="132" height="14"/>
+  <text x="212" y="889" class="l">Docker API (dockerode)</text>
+
+  <!-- Legend -->
+  <g transform="translate(600,918)">
+    <rect x="0" y="0" width="16" height="16" rx="4" class="ctr"/>
+    <text x="24" y="13" class="d">container</text>
+    <rect x="110" y="0" width="16" height="16" rx="4" class="proc"/>
+    <text x="134" y="13" class="d">process</text>
+    <rect x="210" y="0" width="16" height="16" rx="4" class="vol"/>
+    <text x="234" y="13" class="d">volume / host</text>
+    <rect x="340" y="0" width="16" height="16" rx="4" class="ext"/>
+    <text x="364" y="13" class="d">model stand-in</text>
+    <rect x="0" y="28" width="16" height="16" rx="4" class="usr"/>
+    <text x="24" y="41" class="d">browser</text>
+    <rect x="110" y="28" width="28" height="16" rx="3" class="bnd"/>
+    <text x="146" y="41" class="d">host / network boundary</text>
+  </g>
+</svg>

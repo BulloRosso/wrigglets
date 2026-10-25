@@ -1,0 +1,19 @@
+{
+  "name": "@cw/mock-llm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scripted OpenAI-compatible chat completions server standing in for the AI gateway in local development and tests.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15",
+    "vitest": "5.0.5"
+  }
+}

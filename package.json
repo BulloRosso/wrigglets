@@ -1,0 +1,32 @@
+{
+  "name": "coworking-agents",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.8",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=4 run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 run test",
+    "lint": "pnpm -r run lint",
+    "stack:up": "node scripts/stack.mjs up",
+    "stack:down": "node scripts/stack.mjs down",
+    "stack:build": "node scripts/stack.mjs build",
+    "stack:reset": "node scripts/stack.mjs reset",
+    "stack:logs": "docker compose logs -f --tail=100"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.2",
+    "typescript": "6.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@temporalio/core-bridge",
+      "protobufjs",
+      "@swc/core"
+    ]
+  }
+}

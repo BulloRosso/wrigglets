@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1042" viewBox="0 0 1200 1042" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Sign-in flow (OIDC)</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #1d2733; }
+    .lb { fill: #ffffff; }
+    .life { stroke: #5b6777; stroke-width: 1.2; stroke-dasharray: 4 4; }
+    .note { fill: #fffde7; stroke: #b59a00; stroke-width: 1; }
+  </style>
+  <defs>
+    <marker id="m6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="m6b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00796b"/></marker>
+  </defs>
+  <rect width="1200" height="1042" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Sign-in to an agent (OpenID Connect, authorization code + PKCE)</text>
+  <text x="32" y="66" class="st">Split horizon: the browser uses the public URL, the agent calls the OAuth server internally; the issuer is always the public URL.</text>
+  <line class="life" x1="190" y1="134" x2="190" y2="982"/>
+  <rect x="45" y="86" width="290" height="48" rx="10" fill="#f1eafb" stroke="#6a3fb4" stroke-width="1.5"/>
+  <text x="190" y="107" class="h" text-anchor="middle">Browser</text>
+  <text x="190" y="125" class="d" text-anchor="middle">Anna, Ben, Clara</text>
+  <line class="life" x1="590" y1="134" x2="590" y2="982"/>
+  <rect x="445" y="86" width="290" height="48" rx="10" fill="#e8f0fb" stroke="#1f5fad" stroke-width="1.5"/>
+  <text x="590" y="107" class="h" text-anchor="middle">Agent server</text>
+  <text x="590" y="125" class="d" text-anchor="middle">agent-&lt;id&gt; · OIDC relying party</text>
+  <line class="life" x1="1010" y1="134" x2="1010" y2="982"/>
+  <rect x="865" y="86" width="290" height="48" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="1.5"/>
+  <text x="1010" y="107" class="h" text-anchor="middle">OAuth server</text>
+  <text x="1010" y="125" class="d" text-anchor="middle">browser: localhost:9000 · agents: oauth:9000</text>
+  <path d="M190,190 H588" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+  <rect class="lb" x="232" y="170" width="317" height="16"/>
+  <text x="390" y="181" class="l" text-anchor="middle">1  GET http://localhost:81xx/auth/login?returnTo=…</text>
+  <rect class="note" x="600" y="212" width="276" height="64" rx="6"/>
+  <text x="610" y="231" class="d">create state, nonce, PKCE code_verifier;</text>
+  <text x="610" y="249" class="d">seal them into the encrypted flow cookie</text>
+  <text x="610" y="267" class="d">cw_&lt;id&gt;_flow (10 min)</text>
+  <path d="M590,320 H192" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+  <rect class="lb" x="213" y="286" width="354" height="30"/>
+  <text x="390" y="297" class="l" text-anchor="middle">2  302 → http://localhost:9000/auth?client_id=agent-&lt;id&gt;</text>
+  <text x="390" y="311" class="l" text-anchor="middle">&amp;code_challenge (S256)&amp;state&amp;nonce  · Set-Cookie flow</text>
+  <path d="M190,358 H1008" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+  <rect class="lb" x="626" y="338" width="348" height="16"/>
+  <text x="800" y="349" class="l" text-anchor="middle">3  GET /auth (authorization request, public issuer URL)</text>
+  <path d="M1010,396 H192" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+  <rect class="lb" x="651" y="376" width="299" height="16"/>
+  <text x="800" y="387" class="l" text-anchor="middle">4  redirect → /interaction/:uid  (sign-in page)</text>
+  <path d="M190,434 H1008" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+  <rect class="lb" x="642" y="414" width="317" height="16"/>
+  <text x="800" y="425" class="l" text-anchor="middle">5  POST /interaction/:uid/login (e-mail, password)</text>
+  <rect class="note" x="852" y="456" width="148" height="46" rx="6"/>
+  <text x="862" y="475" class="d">consent auto-granted</text>
+  <text x="862" y="493" class="d">(first-party client)</text>
+  <path d="M1010,532 H192" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+  <rect class="lb" x="614" y="512" width="372" height="16"/>
+  <text x="800" y="523" class="l" text-anchor="middle">6  302 → http://localhost:81xx/auth/callback?code=…&amp;state=…</text>
+  <path d="M190,570 H588" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+  <rect class="lb" x="235" y="550" width="311" height="16"/>
+  <text x="390" y="561" class="l" text-anchor="middle">7  GET /auth/callback?code&amp;state  (+ flow cookie)</text>
+  <rect class="note" x="600" y="592" width="250" height="28" rx="6"/>
+  <text x="610" y="611" class="d">unseal flow cookie; state must match</text>
+  <path d="M590,664 H1008" fill="none" stroke="#00796b" stroke-width="1.5" marker-end="url(#m6b)"/>
+  <rect class="lb" x="651" y="630" width="299" height="30"/>
+  <text x="800" y="641" class="l" text-anchor="middle">8  POST http://oauth:9000/token  (back channel)</text>
+  <text x="800" y="655" class="l" text-anchor="middle">client_secret_basic, code, code_verifier</text>
+  <path d="M1010,702 H592" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+  <rect class="lb" x="709" y="682" width="183" height="16"/>
+  <text x="800" y="693" class="l" text-anchor="middle">9  ID token (+ access token)</text>
+  <path d="M590,740 H1008" fill="none" stroke="#00796b" stroke-width="1.5" marker-end="url(#m6b)"/>
+  <rect class="lb" x="672" y="720" width="256" height="16"/>
+  <text x="800" y="731" class="l" text-anchor="middle">10  GET http://oauth:9000/jwks  (cached)</text>
+  <rect class="note" x="600" y="762" width="282" height="100" rx="6"/>
+  <text x="610" y="781" class="d">verify ID token signature via JWKS:</text>
+  <text x="610" y="799" class="d">iss = http://localhost:9000 (public URL),</text>
+  <text x="610" y="817" class="d">aud = agent-&lt;id&gt;, nonce matches;</text>
+  <text x="610" y="835" class="d">roles claim must contain Agent.User</text>
+  <text x="610" y="853" class="d">(otherwise 403 "no access" page)</text>
+  <path d="M590,906 H192" fill="none" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+  <rect class="lb" x="207" y="872" width="366" height="30"/>
+  <text x="390" y="883" class="l" text-anchor="middle">11  302 → returnTo · Set-Cookie cw_&lt;id&gt; (JWE session, 8 h)</text>
+  <text x="390" y="897" class="l" text-anchor="middle">flow cookie cleared</text>
+  <path d="M190,944 H588" fill="none" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+  <rect class="lb" x="253" y="924" width="274" height="16"/>
+  <text x="390" y="935" class="l" text-anchor="middle">12  API calls + SSE with the session cookie</text>
+  <g transform="translate(32,1002)">
+    <line x1="0" y1="8" x2="36" y2="8" stroke="#5b6777" stroke-width="1.5" marker-end="url(#m6)"/>
+    <text x="44" y="12" class="d">front-channel request (browser)</text>
+    <line x1="250" y1="8" x2="286" y2="8" stroke="#5b6777" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#m6)"/>
+    <text x="294" y="12" class="d">response / redirect</text>
+    <line x1="440" y1="8" x2="476" y2="8" stroke="#00796b" stroke-width="1.5" marker-end="url(#m6b)"/>
+    <text x="484" y="12" class="d">back channel inside the Docker network</text>
+    <rect x="740" y="0" width="22" height="16" rx="3" class="note"/>
+    <text x="770" y="12" class="d">processing step</text>
+  </g>
+</svg>

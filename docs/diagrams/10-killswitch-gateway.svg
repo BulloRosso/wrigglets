@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="960" viewBox="0 0 1200 960" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Safety: kill switch, MCP gateway, A2A and Key Vault</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .n { font-size: 11px; font-weight: 700; fill: #ffffff; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lr { fill: none; stroke: #c62828; stroke-width: 2; }
+    .lb { fill: #ffffff; }
+    .ctr { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .proc { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .vol { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ext { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .badge { fill: #c62828; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c62828"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="960" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Safety: kill switch, MCP gateway, A2A and Key Vault</text>
+  <text x="32" y="66" class="st">Red = enforcement paths of the kill switch. The control plane is the source of truth; the gateway fails closed when its copy is older than 30 s.</text>
+
+  <!-- Control plane -->
+  <rect class="ctr" x="32" y="90" width="370" height="400" rx="10"/>
+  <text x="48" y="114" class="h">cw-temporal · control plane (admin server)</text>
+  <rect class="proc" x="48" y="128" width="338" height="62" rx="8"/>
+  <text x="62" y="148" class="h2">Admin console</text>
+  <text x="62" y="166" class="d">global kill switch · Safety &amp; tools page · per agent:</text>
+  <text x="62" y="182" class="d">Portrait · Collaboration (discovery set) · Safety tabs</text>
+  <rect class="proc" x="48" y="198" width="338" height="62" rx="8"/>
+  <text x="62" y="218" class="h2">KillSwitchService</text>
+  <text x="62" y="236" class="d">normal &lt; tools_off &lt; paused &lt; stopped · global + agent</text>
+  <text x="62" y="252" class="d">killswitch.json · audit log · reconcile every 60 s</text>
+  <rect class="proc" x="48" y="268" width="338" height="62" rx="8"/>
+  <text x="62" y="288" class="h2">SafetyRuleEngine (every 30 s)</text>
+  <text x="62" y="306" class="d">agent /internal/stats · gateway stats · failed streak</text>
+  <text x="62" y="322" class="d">trip → raise level (auto: rule) · never lowers</text>
+  <rect class="proc" x="48" y="338" width="338" height="62" rx="8"/>
+  <text x="62" y="358" class="h2">GatewayConfigService</text>
+  <text x="62" y="376" class="d">upstreams · allow-lists · peers · token hashes</text>
+  <text x="62" y="392" class="d">GET /internal/gateway-config · push /internal/refresh</text>
+  <rect class="proc" x="48" y="408" width="338" height="66" rx="8"/>
+  <text x="62" y="428" class="h2">AvatarService · Temporal dev server</text>
+  <text x="62" y="446" class="d">portraits in 4 moods (gpt-image-2.5-flare)</text>
+  <text x="62" y="462" class="d">AgentWorkflow per agent holds the workspace lock</text>
+
+  <!-- MCP gateway -->
+  <rect class="gw" x="452" y="90" width="330" height="400" rx="10"/>
+  <text x="468" y="114" class="h">cw-mcp-gateway :7400 (internal)</text>
+  <rect class="proc" x="468" y="128" width="298" height="46" rx="8"/>
+  <text x="482" y="148" class="h2">POST /agents/&lt;id&gt;/mcp</text>
+  <text x="482" y="165" class="d">Streamable HTTP · agent token (sha256 match)</text>
+  <rect class="proc" x="468" y="182" width="298" height="98" rx="8"/>
+  <text x="482" y="202" class="h2">Policy (fail-closed, in this order)</text>
+  <text x="482" y="220" class="d">1 config fresh (≤ 30 s)</text>
+  <text x="482" y="236" class="d">2 kill switch &lt; tools_off</text>
+  <text x="482" y="252" class="d">3 allow-list &lt;upstream&gt;__&lt;tool&gt;</text>
+  <text x="482" y="268" class="d">4 limits: 60/min · 64 KB · 60 s</text>
+  <rect class="proc" x="468" y="288" width="298" height="46" rx="8"/>
+  <text x="482" y="308" class="h2">Upstream pool</text>
+  <text x="482" y="325" class="d">headers {secretRef} resolved from Key Vault</text>
+  <rect class="proc" x="468" y="342" width="298" height="62" rx="8"/>
+  <text x="482" y="362" class="h2">A2A broker (a2a__list/send/get)</text>
+  <text x="482" y="380" class="d">discovery set · callee not paused · no loops</text>
+  <text x="482" y="396" class="d">step context → "on behalf of" requester</text>
+  <rect class="vol" x="468" y="412" width="298" height="62" rx="8"/>
+  <text x="482" y="432" class="h2">volume mcp-gateway-data</text>
+  <text x="482" y="450" class="d">audit.jsonl (no arguments) · a2a-open.json</text>
+  <text x="482" y="466" class="d">per-agent counters for safety rules</text>
+
+  <!-- Right column -->
+  <rect class="ctr" x="832" y="90" width="336" height="118" rx="10"/>
+  <text x="848" y="114" class="h">cw-keyvault · Lowkey Vault 7.3.127</text>
+  <text x="848" y="134" class="d">Key Vault REST API · https://keyvault:8443 (local CA)</text>
+  <text x="848" y="152" class="d">managed-identity token endpoint :8080</text>
+  <text x="848" y="170" class="d">secret mcp-demo-authorization (seeded)</text>
+  <text x="848" y="194" class="l">Azure: Key Vault + managed identity (same SDK calls)</text>
+
+  <rect class="ctr" x="832" y="228" width="336" height="96" rx="10"/>
+  <text x="848" y="252" class="h">cw-mcp-demo :7500 (example upstream)</text>
+  <text x="848" y="272" class="d">tools supplier_lookup · fx_rate</text>
+  <text x="848" y="290" class="d">requires Bearer token (from Key Vault)</text>
+  <text x="848" y="310" class="l">real world: ERP, supplier DB, SharePoint …</text>
+
+  <rect class="ext" x="832" y="344" width="336" height="70" rx="10"/>
+  <text x="848" y="368" class="h">OpenAI Images API (external)</text>
+  <text x="848" y="388" class="d">edit endpoint · OPENAI_API_KEY from the host env</text>
+
+  <rect class="vol" x="832" y="430" width="336" height="60" rx="10"/>
+  <text x="848" y="454" class="h2">Azure: API Management replaces the gateway</text>
+  <text x="848" y="474" class="d">product/subscription per agent · policies</text>
+
+  <!-- Agents -->
+  <rect class="bnd" x="16" y="570" width="1168" height="250" rx="12"/>
+  <rect class="ctr" x="32" y="586" width="560" height="220" rx="10"/>
+  <text x="48" y="610" class="h">cw-agent-max</text>
+  <rect class="proc" x="48" y="622" width="260" height="70" rx="8"/>
+  <text x="62" y="642" class="h2">Harness (opencode)</text>
+  <text x="62" y="660" class="d">one MCP server: "gateway"</text>
+  <text x="62" y="676" class="d">tools gateway_&lt;upstream&gt;__&lt;tool&gt;</text>
+  <rect class="proc" x="318" y="622" width="258" height="70" rx="8"/>
+  <text x="332" y="642" class="h2">TaskWorkflow</text>
+  <text x="332" y="660" class="d">suspended ↔ resume (same step)</text>
+  <text x="332" y="676" class="d">awaiting_delegations (no lock)</text>
+  <rect class="proc" x="48" y="700" width="528" height="90" rx="8"/>
+  <text x="62" y="720" class="h2">Agent server</text>
+  <text x="62" y="738" class="d">/internal/stats (tokens, permission requests, step failures) · /api/avatar/:mood</text>
+  <text x="62" y="754" class="d">UI: kill-switch banner · portrait with mood · delegations card</text>
+  <text x="62" y="770" class="d">/a2a + agent card (gateway token only)</text>
+
+  <rect class="ctr" x="608" y="586" width="560" height="220" rx="10"/>
+  <text x="624" y="610" class="h">cw-agent-lara</text>
+  <rect class="proc" x="624" y="622" width="528" height="70" rx="8"/>
+  <text x="638" y="642" class="h2">A2A server (@a2a-js/sdk, JSON-RPC)</text>
+  <text x="638" y="660" class="d">/.well-known/agent-card.json · /a2a · only the gateway may call</text>
+  <text x="638" y="676" class="d">message → TaskWorkflow task-a2a-&lt;id&gt; · trigger agent · requestedBy = Anna</text>
+  <rect class="proc" x="624" y="700" width="528" height="90" rx="8"/>
+  <text x="638" y="720" class="h2">Normal task on Lara</text>
+  <text x="638" y="738" class="d">own approval policy (plan) · own workspace and audit trail</text>
+  <text x="638" y="754" class="d">tasks/get maps status + report contents back to Max</text>
+  <text x="638" y="770" class="d">Discovery set Max → Lara (directed; default isolated)</text>
+
+  <!-- Arrows -->
+  <!-- 1 control plane -> gateway config -->
+  <path class="lr" d="M402,150 L450,150" marker-end="url(#ar)"/>
+  <circle class="badge" cx="426" cy="136" r="9"/><text x="422.5" y="140" class="n">1</text>
+  <!-- 2 control plane -> agent workflow signals -->
+  <path class="lr" d="M300,490 L300,560 L447,560 L447,620" marker-end="url(#ar)"/>
+  <circle class="badge" cx="300" cy="526" r="9"/><text x="296.5" y="530" class="n">2</text>
+  <rect class="lb" x="312" y="518" width="132" height="16"/>
+  <text x="314" y="530" class="l">setKillSwitch · suspend · stop</text>
+  <!-- 3 harness -> gateway MCP -->
+  <path class="ln" d="M178,622 L178,545 L540,545 L540,492" marker-end="url(#a)"/>
+  <circle class="badge" cx="178" cy="580" r="9" fill="#5b6777"/><text x="174.5" y="584" class="n">3</text>
+  <rect class="lb" x="190" y="572" width="96" height="16"/>
+  <text x="192" y="584" class="l">MCP (agent token)</text>
+  <!-- 4 gateway -> key vault -->
+  <path class="ln" d="M782,150 L830,150" marker-end="url(#a)"/>
+  <circle class="badge" cx="806" cy="136" r="9" fill="#5b6777"/><text x="802.5" y="140" class="n">4</text>
+  <!-- 5 gateway -> mcp-demo -->
+  <path class="ln" d="M782,310 L830,280" marker-end="url(#a)"/>
+  <circle class="badge" cx="806" cy="282" r="9" fill="#5b6777"/><text x="802.5" y="286" class="n">5</text>
+  <!-- 6 gateway -> lara A2A -->
+  <path class="ln" d="M700,492 L700,530 L880,530 L880,620" marker-end="url(#a)"/>
+  <circle class="badge" cx="790" cy="530" r="9" fill="#5b6777"/><text x="786.5" y="534" class="n">6</text>
+  <rect class="lb" x="802" y="538" width="150" height="16"/>
+  <text x="804" y="550" class="l">A2A message/send · tasks/get</text>
+  <!-- 7 control plane -> OpenAI -->
+  <path class="ln" d="M402,440 L428,440 L428,508 L1000,508 L1000,416" marker-end="url(#a)"/>
+  <circle class="badge" cx="960" cy="508" r="9" fill="#5b6777"/><text x="956.5" y="512" class="n">7</text>
+
+  <!-- Legend -->
+  <text x="32" y="848" class="h">Flows</text>
+  <text x="32" y="868" class="d">1 config, kill-switch state and peers (poll 2 s, push on change) · 2 kill switch to AgentWorkflow (holder suspended, no new grants), stopped → cancel tasks + stop container</text>
+  <text x="32" y="886" class="d">3 the only MCP endpoint of the agent; also checkDelegations · 4 secretRef → value with a managed-identity token · 5 tool call with credential from Key Vault</text>
+  <text x="32" y="904" class="d">6 delegation to a peer in the discovery set; result integrated by the caller after the peer task is terminal · 7 portrait generation (neutral from reference, other moods from neutral)</text>
+  <text x="32" y="930" class="l">Levels: tools_off = gateway denies tools and A2A · paused = no lock grants, running step aborted and resumed later · stopped = tasks cancelled, container stopped. Safety rules raise levels automatically; lifting is manual.</text>
+</svg>

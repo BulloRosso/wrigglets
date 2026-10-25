@@ -1,0 +1,24 @@
+{
+  "name": "@cw/harness-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent Harness (opencode) configuration template and AGENTS.md template.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "templates"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Audit trail</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .sub { font-size: 12px; font-style: italic; fill: #5b6777; }
+    .d { font-size: 12px; fill: #37414f; }
+    .m { font-size: 12px; fill: #1d2733; font-family: Consolas, 'Courier New', monospace; }
+    .l { font-size: 11px; fill: #37414f; }
+    .th { font-size: 12px; font-weight: 600; fill: #1d2733; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+    .tmp { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .git { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .task { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .exp { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.5; }
+    .app { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="arr8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="880" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Audit trail: two pillars, one link</text>
+  <text x="32" y="66" class="st">Temporal records the decisions, Git records the changes; both carry the same Workflow-Id, and the audit export makes the history permanent.</text>
+  <rect class="tmp" x="30" y="92" width="360" height="318" rx="10"/>
+  <text x="46" y="118" class="h">Pillar 1 · Temporal event history</text>
+  <text x="46" y="137" class="sub">who · when · why · what next</text>
+  <text x="46" y="164" class="d">• started: input, requested by, trigger</text>
+  <text x="46" y="182" class="d">• update "decide": approver + comment</text>
+  <text x="46" y="200" class="d">• activities: step summaries, tokens, results</text>
+  <text x="46" y="218" class="d">• timers: reminder 4 h, expiry 7 d</text>
+  <text x="46" y="236" class="d">• signals: lock acquire / granted / release</text>
+  <text x="46" y="254" class="d">• schedules: what runs when (next runs)</text>
+  <rect x="46" y="282" width="328" height="112" rx="8" fill="#ffffff" stroke="#00796b" stroke-width="1"/>
+  <text x="60" y="304" class="d">retention: 90 days</text>
+  <text x="60" y="322" class="d">payloads AES-256-GCM encrypted</text>
+  <text x="60" y="340" class="d">(shared codec key ring), decoded via</text>
+  <text x="60" y="358" class="d">/codec in Temporal Web UI and agent UI</text>
+  <text x="60" y="376" class="d">timeline view per task in the agent UI</text>
+  <rect class="task" x="470" y="150" width="260" height="150" rx="10"/>
+  <text x="486" y="176" class="h">One task = one TaskWorkflow</text>
+  <text x="486" y="200" class="d">Workflow-Id = Task-Id</text>
+  <text x="486" y="218" class="d">e.g. task-…  (also file names)</text>
+  <text x="486" y="236" class="d">Run-Id = execution run</text>
+  <text x="486" y="254" class="d">Step-Id = &lt;taskId&gt;:&lt;kind&gt;:&lt;n&gt;</text>
+  <path class="ln" d="M470,225 H392" marker-end="url(#arr8)"/>
+  <rect class="lb" x="398" y="208" width="66" height="13"/>
+  <text x="431" y="218" class="l" text-anchor="middle">Workflow-Id</text>
+  <path class="ln" d="M730,225 H808" marker-end="url(#arr8)"/>
+  <rect class="lb" x="738" y="208" width="66" height="13"/>
+  <text x="771" y="218" class="l" text-anchor="middle">trailers</text>
+  <rect class="git" x="810" y="92" width="360" height="318" rx="10"/>
+  <text x="826" y="118" class="h">Pillar 2 · Git history (workspace)</text>
+  <text x="826" y="137" class="sub">what exactly changed</text>
+  <text x="826" y="164" class="d">• one commit per step: plan, run, fix, upload, final</text>
+  <text x="826" y="182" class="d">• full diff of every file the agent touched</text>
+  <text x="826" y="200" class="d">• revert commits when a deviation is rejected</text>
+  <rect x="826" y="222" width="328" height="172" rx="8" fill="#ffffff" stroke="#1f5fad" stroke-width="1"/>
+  <text x="840" y="244" class="th">commit trailers</text>
+  <text x="840" y="266" class="m">Requested-By:</text>
+  <text x="950" y="266" class="m">anna@example.com</text>
+  <text x="840" y="283" class="m">Approved-By:</text>
+  <text x="950" y="283" class="m">anna@example.com</text>
+  <text x="840" y="300" class="m">Task-Id:</text>
+  <text x="950" y="300" class="m">task-…</text>
+  <text x="840" y="317" class="m">Workflow-Id:</text>
+  <text x="950" y="317" class="m">task-…</text>
+  <text x="840" y="334" class="m">Run-Id:</text>
+  <text x="950" y="334" class="m">…</text>
+  <text x="840" y="351" class="m">Step-Id:</text>
+  <text x="950" y="351" class="m">task-…:run:1</text>
+  <text x="840" y="368" class="m">Trigger:</text>
+  <text x="950" y="368" class="m">manual | schedule</text>
+  <rect class="exp" x="30" y="460" width="740" height="104" rx="10"/>
+  <text x="46" y="486" class="h">Permanent audit export (written at finalize, also for unsuccessful outcomes)</text>
+  <text x="46" y="510" class="m">.agent/audit/yyyy/mm/&lt;task&gt;.json</text>
+  <text x="46" y="530" class="d">input · final state · mapped timeline · full decoded event history — committed to Git,</text>
+  <text x="46" y="548" class="d">so the "who/when/why" survives the 90-day Temporal retention</text>
+  <path class="ln" d="M210,410 V458" marker-end="url(#arr8)"/>
+  <rect class="lb" x="218" y="427" width="150" height="14"/>
+  <text x="222" y="438" class="l">decoded history at finalize</text>
+  <path class="ln" d="M740,460 V436 H990 V412" marker-end="url(#arr8)"/>
+  <rect class="lb" x="836" y="429" width="110" height="14"/>
+  <text x="891" y="440" class="l" text-anchor="middle">committed to Git</text>
+  <rect class="app" x="810" y="460" width="360" height="104" rx="10"/>
+  <text x="826" y="486" class="h">App audit log (JSONL)</text>
+  <text x="826" y="510" class="d">schedule create / edit / pause / delete / trigger,</text>
+  <text x="826" y="528" class="d">force-release of the lock: who, when, before/after</text>
+  <text x="826" y="546" class="d">admin console: own log on /data (agent lifecycle)</text>
+  <text x="30" y="614" class="h">Which source answers which question?</text>
+  <rect x="30" y="674" width="1140" height="1" fill="#d5dbe3"/>
+  <text x="30" y="662" class="th">question</text>
+  <text x="360" y="662" class="th">Temporal history</text>
+  <text x="520" y="662" class="th">Git history</text>
+  <text x="760" y="662" class="th">Audit export</text>
+  <text x="900" y="662" class="th">App audit log</text>
+  <rect x="30" y="679" width="1140" height="26" fill="#f4f6fa"/>
+  <text x="40" y="696" class="d">Who requested the task?</text>
+  <text x="360" y="696" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="520" y="696" class="d"><tspan fill="#2e7d32">●</tspan> Requested-By</text>
+  <text x="760" y="696" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="40" y="722" class="d">Who approved, with which comment?</text>
+  <text x="360" y="722" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="520" y="722" class="d"><tspan fill="#2e7d32">●</tspan> Approved-By</text>
+  <text x="760" y="722" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <rect x="30" y="731" width="1140" height="26" fill="#f4f6fa"/>
+  <text x="40" y="748" class="d">When did each step happen?</text>
+  <text x="360" y="748" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="520" y="748" class="d"><tspan fill="#2e7d32">●</tspan> commit time</text>
+  <text x="760" y="748" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="40" y="774" class="d">What exactly changed?</text>
+  <text x="520" y="774" class="d"><tspan fill="#2e7d32">●</tspan> diff per step</text>
+  <rect x="30" y="783" width="1140" height="26" fill="#f4f6fa"/>
+  <text x="40" y="800" class="d">What's scheduled, who changed a schedule?</text>
+  <text x="360" y="800" class="d"><tspan fill="#2e7d32">●</tspan> schedules</text>
+  <text x="900" y="800" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="40" y="826" class="d">Who force-released the lock?</text>
+  <text x="360" y="826" class="d"><tspan fill="#2e7d32">●</tspan> signal</text>
+  <text x="900" y="826" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <rect x="30" y="835" width="1140" height="26" fill="#f4f6fa"/>
+  <text x="40" y="852" class="d">Task older than 90 days?</text>
+  <text x="520" y="852" class="d"><tspan fill="#2e7d32">●</tspan></text>
+  <text x="760" y="852" class="d"><tspan fill="#2e7d32">●</tspan> permanent</text>
+</svg>

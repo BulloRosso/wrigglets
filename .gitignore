@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.local/
+.env
+coverage/
+*.log
+.playwright-mcp/
+.env.*
+.claude/

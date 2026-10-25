@@ -19,10 +19,17 @@ const MOOD_PROMPT: Record<AvatarMood, string> = {
   doubt: 'Change only the facial expression: in doubt, sceptical and pondering, one eyebrow raised, mouth slanted to one side, eyes looking sideways. Keep everything else identical.',
 };
 
+/** Framing rules repeated in every request: the portraits are shown as small round avatars, so nothing may be cut off. */
+const FRAMING =
+  'Framing: the complete character must fit inside the image — the top of the head and the full length of both antennae (including their ' +
+  'round tips) must be clearly visible with empty transparent space above them; nothing may touch or be cut by any edge of the image. ' +
+  'Leave a margin of about 12% of the image size on every side, with slightly more space above the antennae than below the shoulders. ' +
+  'Center the character horizontally; the head occupies roughly the middle 60% of the image height.';
+
 const BASE_PROMPT =
   'Use the attached image as the character and style reference. Create a head-and-shoulders portrait of a mascot character in exactly this ' +
-  'rendering style (glossy cartoon, thick dark outline, soft highlights), centered, facing the viewer, the whole head visible with some margin, ' +
-  'no text, no frame, transparent background.';
+  'rendering style (glossy cartoon, thick dark outline, soft highlights), facing the viewer, no text, no frame, transparent background. ' +
+  FRAMING;
 
 export interface AvatarOptions {
   dataDir: string;
@@ -130,7 +137,7 @@ export class AvatarService {
           .map(async (m) => {
             job.moods[m] = 'running';
             try {
-              const img = await this.edit(neutral, `Same character, same style, same framing and transparent background. ${MOOD_PROMPT[m]}`);
+              const img = await this.edit(neutral, `Same character, same style, same size and position in the image, transparent background. ${FRAMING} ${MOOD_PROMPT[m]}`);
               await atomicWrite(this.imagePath(agentId, m), img);
               meta.moods[m] = { generatedAt: new Date().toISOString() };
               job.moods[m] = 'done';

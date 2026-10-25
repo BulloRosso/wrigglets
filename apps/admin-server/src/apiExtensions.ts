@@ -18,6 +18,8 @@ import type { AvatarService } from './avatars.js';
 import type { Config } from './config.js';
 import type { GatewayConfigService } from './gateway.js';
 import type { KillSwitchService } from './killswitch.js';
+import { approvalMailHtml, notifyMailBody, type MailService } from './mail.js';
+import type { OAuthAdmin } from './oauthAdmin.js';
 import type { AdminAudit, AgentRegistry } from './registry.js';
 import type { SafetyRuleEngine } from './safety.js';
 
@@ -30,6 +32,8 @@ export interface ExtensionDeps {
   gateway: GatewayConfigService;
   safety: SafetyRuleEngine;
   secrets?: SecretStore;
+  mail: MailService;
+  oauth: Pick<OAuthAdmin, 'users'>;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -190,6 +194,21 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
     await sendImage(res, d.avatars.imagePath(req.params.id, req.params.mood), meta?.moods[req.params.mood]?.generatedAt);
   });
 
+  /* ------------------------------------------------------------ mail outbox (human in the loop, ADR-0026) */
+  r.get('/mail', async (req, res) => {
+    const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
+    const all = await d.mail.list(500);
+    res.json({ delivery: d.mail.delivery, mails: agentId ? all.filter((m) => m.agentId === agentId) : all });
+  });
+  r.get('/mail/:id/html', async (req, res) => {
+    const html = await d.mail.html(req.params.id);
+    if (!html) throw new HttpError(404, 'mail not found');
+    // Shown in a sandboxed iframe: no scripts, no external resources, links do not navigate the console.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.type('html').send(html);
+  });
+
   return r;
 }
 
@@ -206,6 +225,22 @@ export function internalRouter(d: ExtensionDeps): Router {
     if (!isMood(req.params.mood)) return res.status(404).end();
     const meta = await d.avatars.meta(req.params.agentId);
     await sendImage(res, d.avatars.imagePath(req.params.agentId, req.params.mood), meta?.moods[req.params.mood]?.generatedAt);
+  });
+  /** Human in the loop: the agent asks everybody with access to it for a decision (by e-mail). */
+  r.post('/agents/:agentId/notify', express.json({ limit: '32kb' }), async (req, res) => {
+    const entry = d.registry.get(req.params.agentId);
+    if (!entry || !safeEqual(bearer(req), entry.secrets.internalToken)) return res.status(401).json({ error: 'unauthorized' });
+    const body = notifyMailBody.parse(req.body);
+    const agentId = entry.spec.agentId;
+    // Users with a role for this agent (directly or for all agents); platform admins only by explicit role.
+    const to = (await d.oauth.users())
+      .filter((u) => !u.disabled && ((u.agentRoles[agentId]?.length ?? 0) > 0 || (u.agentRoles['*']?.length ?? 0) > 0))
+      .map((u) => u.email)
+      .sort();
+    const { subject, html } = approvalMailHtml(entry.spec.displayName, body);
+    const rec = await d.mail.send({ agentId, agentName: entry.spec.displayName, taskId: body.taskId, kind: body.kind, to, subject, html });
+    await d.audit.write({ by: `agent:${agentId}`, action: 'mail.approval', target: agentId, details: { taskId: body.taskId, recipients: to.length, status: rec.status } });
+    res.json({ id: rec.id, recipients: to.length, status: rec.status });
   });
   return r;
 }

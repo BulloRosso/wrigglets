@@ -6,6 +6,7 @@ import GroupOutlined from '@mui/icons-material/GroupOutlined';
 import HistoryEduOutlined from '@mui/icons-material/HistoryEduOutlined';
 import OpenInNewOutlined from '@mui/icons-material/OpenInNewOutlined';
 import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
+import MailOutlined from '@mui/icons-material/MailOutlined';
 import { AppShell, ErrorAlert, Loading } from '@cw/ui';
 import { useMe } from './api';
 import { GlobalKillSwitch } from './components/KillSwitch';
@@ -14,6 +15,7 @@ import { AgentsPage } from './pages/AgentsPage';
 import { AuditPage } from './pages/AuditPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SafetyPage } from './pages/SafetyPage';
+import { MailPage } from './pages/MailPage';
 import { UsersPage } from './pages/UsersPage';
 
 export function App() {
@@ -24,6 +26,7 @@ export function App() {
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
     { label: 'Safety & tools', icon: <ShieldOutlined />, to: '/safety' },
+    { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail' },
     { label: 'Users & access', icon: <GroupOutlined />, to: '/users' },
     { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit' },
   ].map((n) => ({ ...n, selected: pathname === n.to || pathname.startsWith(`${n.to}/`), onClick: () => navigate(n.to) }));
@@ -55,6 +58,7 @@ export function App() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/:id" element={<AgentDetailPage />} />
           <Route path="/safety" element={<SafetyPage />} />
+          <Route path="/mail" element={<MailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

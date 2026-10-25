@@ -18,10 +18,20 @@ Desktop** environment, extended to a small platform:
   kill switch, and brokers **agent-to-agent (A2A)** delegation inside each agent's discovery set
 - **`keyvault` container**: Azure Key Vault emulator (Lowkey Vault) for upstream credentials
 - **Kill switch**: per agent and global, with graded levels (tools off, paused, stopped) and automatic triggers
+- **Human in the loop by e-mail**: when a task needs a decision, the agent mails everybody with access to it, with
+  links straight into the decision dialog. Mails go to a configurable mail API or the outbox (`mail_out`), and admins
+  can review them in the console.
+- **Task conversation**: a Markdown chat history per task (request, agent reports, decisions, comments, results)
+- **File preview** in the agent UI: Markdown, Mermaid diagrams, PDF, text, CSV, images, Excel
 - **Agent portraits** in four moods, generated from a guiding image with an OpenAI image model
 - TypeScript/Node.js throughout, React + Material UI with one shared theme, prepared for Azure (private ACR, APIM, Key Vault)
 
-![Completed task with a delegation to a colleague](docs/images/tour/10-task-completed.png)
+## Architecture
+
+<img src="docs/diagrams/00-containers.svg" alt="Containers of the local stack and their responsibilities" width="100%">
+
+More detail: [docs/architecture.md](docs/architecture.md); safety, gateway and A2A in
+[diagram 10](docs/diagrams/10-killswitch-gateway.svg).
 
 ## Quick start
 
@@ -63,6 +73,6 @@ Details: [docs/getting-started.md](docs/getting-started.md). New here? Follow th
 corepack pnpm install && corepack pnpm -r build && corepack pnpm test
 ```
 
-90 tests: workflow behaviour against a local Temporal test server (approvals, lock, cancellation, budget,
+88 tests: workflow behaviour against a local Temporal test server (approvals, lock, cancellation, budget,
 continue-as-new, kill-switch suspend/resume, delegation wait), replay of recorded histories, timeline mapping, Git
-conventions, path safety, OIDC roles, codec, gateway policy, safety rules, mock-model hooks.
+conventions, path safety, OIDC roles, codec, gateway policy, safety rules, approval mails, mock-model hooks.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
@@ -29,98 +29,7 @@ import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import { EmptyState, ErrorAlert, Loading, PageHeader, formatBytes, formatRelative } from '@cw/ui';
 import { api } from '../api';
 import { CommitList } from '../components/CommitList';
-import { Markdown } from '../components/Markdown';
-
-const TEXT_EXT = ['md', 'txt', 'csv', 'json', 'yaml', 'yml', 'py', 'ts', 'js', 'html', 'svg', 'xml', 'log', 'gitignore'];
-const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
-
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let quoted = false;
-  const sep = (text.split('\n')[0]?.match(/;/g)?.length ?? 0) > (text.split('\n')[0]?.match(/,/g)?.length ?? 0) ? ';' : ',';
-  for (let i = 0; i < text.length && rows.length < 501; i++) {
-    const c = text[i]!;
-    if (quoted) {
-      if (c === '"' && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (c === '"') quoted = false;
-      else cell += c;
-    } else if (c === '"') quoted = true;
-    else if (c === sep) {
-      row.push(cell);
-      cell = '';
-    } else if (c === '\n') {
-      row.push(cell.replace(/\r$/, ''));
-      rows.push(row);
-      row = [];
-      cell = '';
-    } else cell += c;
-  }
-  if (cell || row.length) rows.push([...row, cell]);
-  return rows;
-}
-
-function FilePreview({ path }: { path: string }) {
-  const ext = path.split('.').pop()?.toLowerCase() ?? '';
-  const isText = TEXT_EXT.includes(ext) || !path.includes('.');
-  const text = useQuery({ queryKey: ['file', path], queryFn: () => api.fileText(path), enabled: isText });
-  const csv = useMemo(() => (ext === 'csv' && text.data ? parseCsv(text.data) : undefined), [ext, text.data]);
-
-  if (IMAGE_EXT.includes(ext)) return <Box component="img" src={api.fileUrl(path)} alt={path} sx={{ maxWidth: '100%', borderRadius: 1 }} />;
-  if (ext === 'pdf') return <Box component="iframe" title={path} src={api.fileUrl(path)} sx={{ width: '100%', height: '70vh', border: 0 }} />;
-  if (!isText) {
-    return (
-      <EmptyState
-        title="No preview available"
-        action={
-          <Button startIcon={<DownloadOutlined />} href={api.fileUrl(path, true)}>
-            Download
-          </Button>
-        }
-      />
-    );
-  }
-  if (text.isLoading) return <Loading />;
-  if (text.error) return <ErrorAlert error={text.error} />;
-  if (ext === 'md') return <Markdown>{text.data ?? ''}</Markdown>;
-  if (csv) {
-    return (
-      <Box sx={{ overflow: 'auto', maxHeight: '70vh' }}>
-        <Box component="table" sx={{ borderCollapse: 'collapse', fontSize: 13, '& td, & th': { border: 1, borderColor: 'divider', px: 1, py: 0.5, whiteSpace: 'nowrap' }, '& th': { bgcolor: 'action.hover', position: 'sticky', top: 0 } }}>
-          <thead>
-            <tr>
-              {csv[0]?.map((h, i) => (
-                <th key={i}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {csv.slice(1).map((r, i) => (
-              <tr key={i}>
-                {r.map((c, j) => (
-                  <td key={j}>{c}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </Box>
-        {csv.length > 500 && (
-          <Typography variant="caption" color="text.secondary">
-            First 500 rows shown.
-          </Typography>
-        )}
-      </Box>
-    );
-  }
-  return (
-    <Box component="pre" sx={{ m: 0, fontSize: 13, fontFamily: 'ui-monospace, Consolas, monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '70vh', overflow: 'auto' }}>
-      {text.data}
-    </Box>
-  );
-}
+import { FilePreview, previewLabel } from '../components/FilePreview';
 
 function UploadDialog({ open, dir, onClose }: { open: boolean; dir: string; onClose: () => void }) {
   const navigate = useNavigate();
@@ -219,6 +128,8 @@ export function WorkspacePage() {
             <Card>
               <CardHeader
                 title={file}
+                subheader={previewLabel(file)}
+                titleTypographyProps={{ sx: { fontFamily: "monospace", fontSize: 15, wordBreak: "break-all" } }}
                 action={
                   <Button size="small" startIcon={<DownloadOutlined />} href={api.fileUrl(file, true)}>
                     Download

@@ -31,6 +31,17 @@ Automatic trips (safety rules) appear with `auto · <rule>` in the console. They
 **If the control plane is down:** the gateway stops all tool calls after 30 s on its own (fail-closed). To stop an
 agent completely, run `docker stop cw-agent-<id>` (Azure: stop the Web App).
 
+## Approval e-mails not arriving
+
+1. Admin console → **Mail outbox**: is the mail there? Check its recipients and status.
+   - **outbox file**: no `MAIL_API_URL` is configured; mails are only stored.
+   - **delivery failed**: the mail API rejected the mail or is unreachable; the error is shown on the mail.
+   - **sent**: the mail API accepted it.
+2. No mail at all for a waiting task: check the agent logs for `approval mail not sent`. Typical causes are the
+   control plane being unreachable, or the agent having been created before this feature (fix: **Redeploy**).
+3. *(nobody has access to this agent)* means no user has a role for the agent: grant roles on the agent's
+   **Access** tab.
+
 ## Restart an agent / the harness
 
 - Admin console → Agent → **Restart** (container restart) or **Redeploy** (re-create container from the registry

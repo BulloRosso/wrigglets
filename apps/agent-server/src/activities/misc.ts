@@ -17,12 +17,43 @@ const NOTIFY_TEXT: Record<NotifyInput['kind'], string> = {
   budget_exceeded: 'stopped: token budget exhausted',
 };
 
+/**
+ * Human in the loop (ADR-0026): the control plane mails everybody with access to this agent, with links into the
+ * decision dialog. Best effort — a failed mail must not fail (and thereby repeat) the notification activity.
+ */
+async function mailApprovalRequest(deps: ActivityDeps, input: NotifyInput, link: string) {
+  const { CONTROL_PLANE_URL: base, CONTROL_PLANE_TOKEN: token, AGENT_ID } = deps.config;
+  if (!base || !token) return;
+  try {
+    const res = await fetch(`${base}/internal/agents/${encodeURIComponent(AGENT_ID)}/notify`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: input.kind,
+        taskId: input.taskId,
+        title: input.title,
+        text: input.text,
+        link,
+        requestedBy: input.to[0] ? { upn: input.to[0].upn, name: input.to[0].name } : undefined,
+        awaiting: /deviation/i.test(input.text ?? '') ? 'deviation' : 'plan',
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`control plane returned ${res.status}`);
+    const r = (await res.json()) as { recipients: number; status: string };
+    logger.info({ taskId: input.taskId, recipients: r.recipients, status: r.status }, 'approval request mailed');
+  } catch (err) {
+    logger.warn({ taskId: input.taskId, err: String(err) }, 'approval mail not sent');
+  }
+}
+
 export function createNotify(deps: ActivityDeps) {
   return async function notify(input: NotifyInput): Promise<void> {
     const link = `${deps.config.publicBaseUrl}/tasks/${encodeURIComponent(input.taskId)}`;
     for (const to of input.to) {
       await deps.notifications.append({ to: to.upn, kind: input.kind, taskId: input.taskId, title: input.title, text: input.text });
     }
+    if (input.kind === 'approval_requested' || input.kind === 'approval_reminder') await mailApprovalRequest(deps, input, link);
     const url = deps.config.NOTIFY_TEAMS_WEBHOOK_URL;
     if (url) {
       const res = await fetch(url, {

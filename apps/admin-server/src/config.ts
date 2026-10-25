@@ -59,6 +59,9 @@ const schema = z.object({
   /** Control plane URL as reachable from agent containers (portraits). */
   AGENT_CONTROL_PLANE_URL: z.string().url().default('http://temporal:8080'),
   DEMO_UPSTREAM_URL: z.string().url().optional(),
+  /** Mail API for agent notifications: POST { to: string[], subject, body (HTML) }. Unset = outbox files only. */
+  MAIL_API_URL: z.string().url().optional().or(z.literal('')),
+  MAIL_API_KEY: z.string().optional(),
   /** Seeded into Key Vault as `mcp-demo-authorization` when missing (local demo only). */
   MCP_DEMO_TOKEN: z.string().optional(),
 

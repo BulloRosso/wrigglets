@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link as RouterLink, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -32,6 +32,8 @@ import { AgentPortrait, ConfirmDialog, ErrorAlert, KeyValueList, Loading, PageHe
 import { api, avatarUrl, hasRole, useMe } from '../api';
 import { CommitList, DiffDialog } from '../components/CommitList';
 import { LivePanel } from '../components/LivePanel';
+import { FilePreviewDialog } from '../components/FilePreview';
+import { TaskConversation } from '../components/TaskConversation';
 import { Markdown } from '../components/Markdown';
 
 type Pending = { kind: 'approve' | 'revise' | 'reject' | 'cancel' } | undefined;
@@ -42,7 +44,9 @@ export function TaskDetailPage() {
   const me = useMe();
   const [pending, setPending] = useState<Pending>();
   const [diff, setDiff] = useState<string>();
-  const [comment, setComment] = useState('');
+  const [previewPath, setPreviewPath] = useState<string>();
+  const [params, setParams] = useSearchParams();
+  const deepLinkHandled = useRef(false);
 
   const detail = useQuery({
     queryKey: ['task', id],
@@ -74,12 +78,23 @@ export function TaskDetailPage() {
     },
   });
   const addComment = useMutation({
-    mutationFn: () => api.comment(id, comment),
-    onSuccess: (s) => {
-      setComment('');
-      refresh(s);
-    },
+    mutationFn: (text: string) => api.comment(id, text),
+    onSuccess: (st) => refresh(st),
   });
+
+  const decideParam = params.get('decide');
+  useEffect(() => {
+    if (deepLinkHandled.current || !decideParam || !state || !me.data) return;
+    deepLinkHandled.current = true;
+    const next = new URLSearchParams(params);
+    next.delete('decide');
+    setParams(next, { replace: true });
+    if (state.status !== 'awaiting_approval') return;
+    const owner = state.trigger.kind === 'schedule' ? state.trigger.owner : state.requestedBy;
+    const allowed = hasRole(me.data, 'approver') || me.data.user.upn === owner.upn;
+    if (allowed && (decideParam === 'approve' || decideParam === 'revise' || decideParam === 'reject')) setPending({ kind: decideParam });
+    else setTimeout(() => document.getElementById('decision')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  }, [decideParam, state, me.data, params, setParams]);
 
   if (detail.isLoading) return <Loading />;
   if (detail.error || !state) return <ErrorAlert error={detail.error ?? new Error('Task not found')} />;
@@ -123,7 +138,7 @@ export function TaskDetailPage() {
       )}
 
       {state.status === 'awaiting_approval' && (
-        <Card sx={{ mb: 3, borderColor: 'warning.main', borderWidth: 2 }}>
+        <Card id="decision" sx={{ mb: 3, borderColor: 'warning.main', borderWidth: 2, scrollMarginTop: 80 }}>
           <CardHeader
             title={state.awaiting === 'deviation' ? 'Verification found deviations — approve the result?' : 'The plan is waiting for approval'}
             subheader={`Requested by ${owner.name || owner.upn}${state.revisions ? ` · revision ${state.revisions}` : ''}. ${mayDecide ? '' : 'Only approvers or the requester can decide.'}`}
@@ -173,7 +188,7 @@ export function TaskDetailPage() {
               {state.result.outputs
                 .filter((o) => !o.startsWith('.agent/'))
                 .map((o) => (
-                  <Chip key={o} size="small" component={RouterLink} to={`/workspace?file=${encodeURIComponent(o)}`} clickable label={o} />
+                  <Chip key={o} size="small" onClick={() => setPreviewPath(o)} clickable label={o} sx={{ fontFamily: 'monospace' }} />
                 ))}
             </Stack>
           )}
@@ -184,6 +199,14 @@ export function TaskDetailPage() {
         <Grid size={{ xs: 12, lg: 8 }}>
           <Stack spacing={3}>
             {active && <LivePanel taskId={id} />}
+            <TaskConversation
+              state={state}
+              agentName={me.data?.agent.displayName ?? 'Agent'}
+              onSend={(text) => addComment.mutateAsync(text)}
+              sending={addComment.isPending}
+              error={addComment.error}
+              onOpenFile={setPreviewPath}
+            />
             <Card>
               <CardHeader title="Activity timeline" subheader="From the Temporal event history" />
               <CardContent>{timeline.data ? <TimelineChart timeline={timeline.data} showLegend /> : timeline.isLoading ? <Loading /> : <ErrorAlert error={timeline.error} />}</CardContent>
@@ -280,47 +303,14 @@ export function TaskDetailPage() {
             <Card>
               <CardHeader title="Instructions" />
               <CardContent sx={{ pt: 0 }}>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {state.instructions}
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader title="Decisions and comments" />
-              <CardContent sx={{ pt: 0 }}>
-                <List dense disablePadding>
-                  {[
-                    ...state.decisions.map((d) => ({ at: d.at, who: d.by.name || d.by.upn, text: `${d.decision === 'approve' ? 'Approved' : d.decision === 'reject' ? 'Rejected' : 'Requested changes'}${d.kind === 'deviation' ? ' (deviation)' : ''}${d.comment ? `: ${d.comment}` : ''}` })),
-                    ...state.notes.map((n) => ({ at: n.at, who: n.by.name || n.by.upn, text: n.text })),
-                  ]
-                    .sort((a, b) => a.at.localeCompare(b.at))
-                    .map((e, i) => (
-                      <ListItem key={i} disableGutters divider>
-                        <ListItemText primary={e.text} secondary={`${e.who} · ${formatDateTime(e.at)}`} slotProps={{ primary: { sx: { whiteSpace: 'pre-wrap' } } }} />
-                      </ListItem>
-                    ))}
-                </List>
-                <Stack
-                  component="form"
-                  spacing={1}
-                  sx={{ mt: 2 }}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (comment.trim()) addComment.mutate();
-                  }}
-                >
-                  <TextField label="Add a comment" multiline minRows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-                  <ErrorAlert error={addComment.error} />
-                  <Button type="submit" variant="outlined" disabled={!comment.trim() || addComment.isPending} sx={{ alignSelf: 'flex-end' }}>
-                    Comment
-                  </Button>
-                </Stack>
+                <Markdown>{state.instructions}</Markdown>
               </CardContent>
             </Card>
           </Stack>
         </Grid>
       </Grid>
 
+      <FilePreviewDialog path={previewPath} onClose={() => setPreviewPath(undefined)} />
       <ConfirmDialog
         open={!!pending}
         title={

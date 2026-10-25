@@ -30,3 +30,6 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0023](0023-a2a-between-agents.md) | Agent-to-agent delegation (A2A): discovery sets, gateway-mediated | Accepted |
 | [0024](0024-key-vault-emulation.md) | Key Vault emulation with Lowkey Vault | Accepted |
 | [0025](0025-agent-portraits.md) | Agent portraits generated with an OpenAI image model | Accepted |
+| [0026](0026-human-in-the-loop-email.md) | Human in the loop by e-mail: mail API or outbox, deep links into the decision dialog | Accepted |
+| [0027](0027-workspace-file-preview.md) | Workspace file preview in the browser | Accepted |
+| [0028](0028-task-conversation.md) | Task conversation (chat history) derived from the workflow state | Accepted |

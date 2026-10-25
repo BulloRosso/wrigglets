@@ -66,6 +66,20 @@ export interface GatewayInfo {
   tools: Array<{ name: string; description?: string }>;
 }
 
+export interface MailRecord {
+  id: string;
+  at: string;
+  agentId: string;
+  agentName: string;
+  taskId?: string;
+  kind: string;
+  to: string[];
+  subject: string;
+  delivery: 'api' | 'file';
+  status: 'sent' | 'failed' | 'written';
+  error?: string;
+}
+
 export type AgentTask = TaskListItem & { agentId: string };
 
 const id = encodeURIComponent;
@@ -113,6 +127,8 @@ export const api = {
     apiFetch<AvatarJob>(`/api/agents/${id(agentId)}/avatar`, { method: 'POST', json: { prompt, moods } }),
   uploadReference: (file: Blob) => apiFetch<void>('/api/avatars/reference', { method: 'PUT', body: file, headers: { 'content-type': 'image/png' } }),
   resetReference: () => apiFetch<void>('/api/avatars/reference', { method: 'DELETE' }),
+  mails: (agentId?: string) => apiFetch<{ delivery: 'api' | 'file'; mails: MailRecord[] }>(`/api/mail${agentId ? `?agentId=${id(agentId)}` : ''}`),
+  mailHtmlUrl: (mailId: string) => `/api/mail/${id(mailId)}/html`,
   audit: (target?: string) => apiFetch<AdminAuditEntry[]>(`/api/audit${target ? `?target=${id(target)}` : ''}`),
 };
 

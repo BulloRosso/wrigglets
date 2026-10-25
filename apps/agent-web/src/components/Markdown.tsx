@@ -1,8 +1,23 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Box from '@mui/material/Box';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import type { Components } from 'react-markdown';
+import { MermaidDiagram } from './Mermaid';
 
-/** Safe Markdown rendering (no raw HTML) with GitHub-flavoured tables. */
+/** ```mermaid fenced blocks become diagrams; all other code stays code. */
+const COMPONENTS: Components = {
+  pre({ children }) {
+    const child = (Array.isArray(children) ? children[0] : children) as ReactNode;
+    if (isValidElement(child)) {
+      const props = (child as ReactElement<{ className?: string; children?: ReactNode }>).props;
+      if (/\blanguage-mermaid\b/.test(props.className ?? '')) return <MermaidDiagram code={String(props.children ?? '').trimEnd()} />;
+    }
+    return <pre>{children}</pre>;
+  },
+};
+
+/** Safe Markdown rendering (no raw HTML) with GitHub-flavoured tables and Mermaid diagrams. */
 export function Markdown({ children }: { children: string }) {
   return (
     <Box
@@ -22,7 +37,9 @@ export function Markdown({ children }: { children: string }) {
         '& a': { color: 'primary.main' },
       }}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+        {children}
+      </ReactMarkdown>
     </Box>
   );
 }

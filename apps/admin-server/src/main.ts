@@ -1,3 +1,4 @@
+import { MailService } from './mail.js';
 import { SecretStore } from '@cw/secrets';
 import { AgentService } from './agents.js';
 import { AvatarService } from './avatars.js';
@@ -73,7 +74,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, secrets } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, secrets, oauth, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

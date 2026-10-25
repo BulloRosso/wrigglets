@@ -31,6 +31,13 @@ On first run this
 > If `localhost` does not resolve in your browser (some sandboxed browsers), add `PUBLIC_HOST=127.0.0.1` to `.env`
 > and run `docker compose up -d` again. All OIDC URLs follow this setting.
 
+**Optional settings**, read from your environment or from `.env`:
+
+| Variable | Effect |
+|---|---|
+| `OPENAI_API_KEY` | enables agent portraits (keep it in your environment, not in `.env`) |
+| `MAIL_API_URL`, `MAIL_API_KEY` | approval e-mails are delivered through this endpoint (`POST { to[], subject, body }`, bearer key). Without it, mails are only written to the outbox: admin console → **Mail outbox** |
+
 ## 2. Create an agent
 
 1. Open the admin console, sign in as the platform admin.

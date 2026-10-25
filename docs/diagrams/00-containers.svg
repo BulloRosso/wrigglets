@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" viewBox="0 0 1200 860" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Containers and their responsibilities</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .img { font-size: 11px; fill: #5b6777; font-family: Consolas, monospace; }
+    .d { font-size: 12px; fill: #37414f; }
+    .l { font-size: 11px; fill: #37414f; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .lb { fill: #ffffff; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .sup { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ext { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="860" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Wrigglets — containers and responsibilities</text>
+  <text x="32" y="66" class="st">Local stack on Docker Desktop (docker-compose.yml). Agent containers are created at runtime by the admin console. Azure equivalents in docs/azure.md.</text>
+
+  <!-- People -->
+  <rect class="usr" x="32" y="86" width="560" height="62" rx="10"/>
+  <text x="48" y="110" class="h">Team members (Anna, Ben, Clara …)</text>
+  <text x="48" y="130" class="d">agent web UI · tasks, approvals, conversation, workspace preview · e-mail links</text>
+  <rect class="usr" x="608" y="86" width="560" height="62" rx="10"/>
+  <text x="624" y="110" class="h">Platform admin</text>
+  <text x="624" y="130" class="d">admin console · agents, access, safety &amp; tools, mail outbox, portraits</text>
+
+  <rect class="bnd" x="16" y="166" width="1168" height="536" rx="12"/>
+  <text x="32" y="188" class="bl">Docker network "coworking"</text>
+
+  <!-- Agents -->
+  <rect class="ag" x="32" y="200" width="370" height="250" rx="10"/>
+  <text x="48" y="224" class="h">agent-&lt;id&gt;  (Max, Lara, …)</text>
+  <text x="48" y="241" class="img">coworking/agent · :81xx → 8080 · one per agent</text>
+  <text x="48" y="266" class="d">• Web UI + API (OIDC sign-in, roles per agent)</text>
+  <text x="48" y="286" class="d">• Temporal worker: task workflows, approvals,</text>
+  <text x="60" y="302" class="d">workspace lock, schedules, audit export</text>
+  <text x="48" y="322" class="d">• Agent Harness (opencode) does the work with</text>
+  <text x="60" y="338" class="d">the model; only MCP server = the gateway</text>
+  <text x="48" y="358" class="d">• Git workspace (volume): every change committed</text>
+  <text x="48" y="378" class="d">• A2A server for delegated tasks (gateway only)</text>
+  <text x="48" y="398" class="d">• File preview: md, Mermaid, PDF, images, Excel …</text>
+  <text x="48" y="418" class="d">• Approval request → asks control plane to mail</text>
+  <text x="48" y="438" class="d">  everybody with access</text>
+
+  <!-- Control plane -->
+  <rect class="cp" x="416" y="200" width="370" height="250" rx="10"/>
+  <text x="432" y="224" class="h">temporal  (control plane)</text>
+  <text x="432" y="241" class="img">coworking/control-plane · :8080 · :8233 · :7233</text>
+  <text x="432" y="266" class="d">• Temporal server (dev) + Temporal Web UI</text>
+  <text x="432" y="286" class="d">• Admin console: create / start / stop / monitor</text>
+  <text x="444" y="302" class="d">agent containers (Docker API), users &amp; access</text>
+  <text x="432" y="322" class="d">• Kill switch + automatic safety rules</text>
+  <text x="432" y="342" class="d">• MCP gateway configuration, Key Vault secrets</text>
+  <text x="432" y="362" class="d">• Agent portraits (OpenAI image model)</text>
+  <text x="432" y="382" class="d">• Mail: approval e-mails → mail API or</text>
+  <text x="444" y="398" class="d">outbox /data/mail_out (HTML, previewable)</text>
+  <text x="432" y="418" class="d">• Payload codec server for the Temporal UI</text>
+
+  <!-- OAuth -->
+  <rect class="cp" x="800" y="200" width="368" height="118" rx="10"/>
+  <text x="816" y="224" class="h">oauth</text>
+  <text x="816" y="241" class="img">coworking/oauth · :9000</text>
+  <text x="816" y="266" class="d">• OpenID Connect provider + sign-in pages</text>
+  <text x="816" y="286" class="d">• users, per-agent roles, OIDC clients</text>
+  <text x="816" y="306" class="d">• managed by the admin console</text>
+
+  <!-- mock llm -->
+  <rect class="sup" x="800" y="332" width="368" height="118" rx="10"/>
+  <text x="816" y="356" class="h">mock-llm</text>
+  <text x="816" y="373" class="img">coworking/mock-llm · internal</text>
+  <text x="816" y="398" class="d">• scripted OpenAI-compatible model for local use</text>
+  <text x="816" y="418" class="d">• replaced by the AI gateway in real use</text>
+
+  <!-- Gateway -->
+  <rect class="gw" x="32" y="470" width="370" height="214" rx="10"/>
+  <text x="48" y="494" class="h">mcp-gateway</text>
+  <text x="48" y="511" class="img">coworking/mcp-gateway · internal :7400</text>
+  <text x="48" y="536" class="d">• the only MCP endpoint agents see</text>
+  <text x="48" y="556" class="d">• per-agent tool allow-lists, rate and size limits</text>
+  <text x="48" y="576" class="d">• kill switch enforcement, fail-closed</text>
+  <text x="48" y="596" class="d">• credentials from Key Vault (never to agents)</text>
+  <text x="48" y="616" class="d">• A2A broker: discovery sets, loop protection</text>
+  <text x="48" y="636" class="d">• audit of every tool call</text>
+  <text x="48" y="664" class="l">Azure: API Management</text>
+
+  <!-- mcp demo -->
+  <rect class="sup" x="416" y="470" width="370" height="100" rx="10"/>
+  <text x="432" y="494" class="h">mcp-demo</text>
+  <text x="432" y="511" class="img">coworking/mcp-demo · internal :7500</text>
+  <text x="432" y="536" class="d">• example company system as MCP server</text>
+  <text x="432" y="556" class="d">  (supplier lookup, FX rates)</text>
+
+  <!-- keyvault -->
+  <rect class="sup" x="416" y="584" width="370" height="100" rx="10"/>
+  <text x="432" y="608" class="h">keyvault  (+ keyvault-certs init)</text>
+  <text x="432" y="625" class="img">nagyesta/lowkey-vault · internal :8443</text>
+  <text x="432" y="650" class="d">• Azure Key Vault emulator, local CA for TLS</text>
+  <text x="432" y="670" class="d">• managed-identity token endpoint</text>
+
+  <!-- volumes -->
+  <rect class="sup" x="800" y="470" width="368" height="214" rx="10"/>
+  <text x="816" y="494" class="h">Volumes</text>
+  <text x="816" y="520" class="d">• cw-agent-&lt;id&gt;-home: workspace (Git), artifacts</text>
+  <text x="816" y="540" class="d">• control-plane-data: Temporal DB, registry,</text>
+  <text x="828" y="556" class="d">kill switch, portraits, mail_out</text>
+  <text x="816" y="576" class="d">• oauth-data: users, clients</text>
+  <text x="816" y="596" class="d">• mcp-gateway-data: tool-call audit</text>
+  <text x="816" y="616" class="d">• keyvault-certs: CA + TLS certificate</text>
+
+  <!-- External -->
+  <text x="32" y="728" class="bl">External services</text>
+  <rect class="ext" x="32" y="740" width="370" height="96" rx="10"/>
+  <text x="48" y="764" class="h">AI gateway (model provider)</text>
+  <text x="48" y="786" class="d">used by the harness instead of mock-llm</text>
+  <text x="48" y="806" class="d">AI_GATEWAY_BASE_URL / API_KEY / MODEL</text>
+  <rect class="ext" x="416" y="740" width="370" height="96" rx="10"/>
+  <text x="432" y="764" class="h">Mail API (optional)</text>
+  <text x="432" y="786" class="d">POST { to[], subject, body } — MAIL_API_URL</text>
+  <text x="432" y="806" class="d">unset: mails stay in the outbox (mail_out)</text>
+  <rect class="ext" x="800" y="740" width="368" height="96" rx="10"/>
+  <text x="816" y="764" class="h">OpenAI Images API</text>
+  <text x="816" y="786" class="d">agent portraits in four moods</text>
+  <text x="816" y="806" class="d">OPENAI_API_KEY from the host environment</text>
+
+  <!-- arrows -->
+  <path class="ln" d="M217,148 L217,198" marker-end="url(#a)"/>
+  <path class="ln" d="M888,148 L700,198" marker-end="url(#a)"/>
+  <path class="ln" d="M402,300 L414,300" marker-end="url(#a)"/>
+  <path class="ln" d="M786,260 L798,260" marker-end="url(#a)"/>
+  <path class="ln" d="M217,450 L217,468" marker-end="url(#a)"/>
+  <path class="ln" d="M402,520 L414,520" marker-end="url(#a)"/>
+  <path class="ln" d="M402,634 L414,634" marker-end="url(#a)"/>
+  <path class="ln" d="M600,450 L600,468" marker-end="url(#a)"/>
+</svg>

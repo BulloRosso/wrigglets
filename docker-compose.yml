@@ -59,6 +59,9 @@ services:
       MCP_DEMO_TOKEN: ${MCP_DEMO_TOKEN:?}
       # Agent portraits (taken from the host environment, never written to .env)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Human in the loop: mail API (POST {to[], subject, body}); empty = mails only in /data/mail_out
+      MAIL_API_URL: ${MAIL_API_URL:-}
+      MAIL_API_KEY: ${MAIL_API_KEY:-}
       KEYVAULT_URL: https://keyvault:8443
       KEYVAULT_EMULATOR: "true"
       AZURE_POD_IDENTITY_AUTHORITY_HOST: http://keyvault:8080

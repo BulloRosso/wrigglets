@@ -9,6 +9,8 @@ export interface AgentSecrets {
   sessionSecret: string;
   /** Bearer token of the agent towards the control plane and the MCP gateway. */
   internalToken: string;
+  /** LiteLLM virtual key of the agent (its only credential for the AI model, ADR-0029). */
+  aiKey?: string;
 }
 
 interface RegistryData {

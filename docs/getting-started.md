@@ -12,12 +12,18 @@
 node scripts/stack.mjs up        # or: pnpm stack:up
 ```
 
+**Required: a real AI model.** Agents work with OpenAI models through LiteLLM. Set `OPENAI_API_KEY` in your machine's
+environment before starting (Windows: `setx OPENAI_API_KEY "sk-…"`, then open a new terminal). The key is passed to the
+LiteLLM container and never written to `.env`. Without it, the stack starts, but the admin console and the agent UIs
+say that no AI model is available and tasks cannot run.
+
 On first run this
 
-1. creates `.env` with fresh secrets (codec key, OAuth admin token, client and session secrets, admin and demo passwords),
-2. builds four images: `coworking/agent`, `coworking/control-plane`, `coworking/oauth`, `coworking/mock-llm`
-   (first build ~5–10 min),
-3. starts the `temporal`, `oauth` and `mock-llm` containers and waits until they are healthy,
+1. creates `.env` with fresh secrets: codec key, OAuth admin token, client and session secrets, LiteLLM master key and
+   database password, and the admin and demo passwords;
+2. builds the images `coworking/agent`, `coworking/control-plane`, `coworking/oauth`, `coworking/mcp-gateway` and
+   `coworking/mcp-demo` (first build ~5–10 min), and pulls LiteLLM 1.102.0, PostgreSQL and Lowkey Vault;
+3. starts the stack and waits until OAuth, the control plane and LiteLLM are healthy;
 4. prints URLs and credentials:
 
 ```
@@ -62,9 +68,14 @@ On first run this
 | 7 | Admin console → Agent **Max** → Monitoring / Logs / Tasks | CPU/memory, live logs, tasks of the agent |
 | 8 | Temporal Web UI → workflow `task-…` | payloads are encrypted at rest and shown decrypted (codec endpoint) |
 
-The default model is the **mock** (`mock-llm`), which writes the files a prompt asks for. To use the real AI gateway
-Platform set `AI_GATEWAY_BASE_URL`, `AI_GATEWAY_API_KEY`, `AI_GATEWAY_MODEL` in `.env`, recreate the control plane
-(`docker compose up -d`) and **Redeploy** the agents (or set the model per agent in *Settings*).
+**Model and cost:**
+
+- Each agent uses one of the models configured in `infra/litellm/config.yaml`; the default is `gpt-5.4-mini`
+  (`AI_GATEWAY_MODEL`). Choose the model per agent in *Settings*.
+- Each agent has its own LiteLLM virtual key with a **spend limit in USD per 30 days** (default `AGENT_SPEND_LIMIT_USD=25`,
+  changeable per agent). Users see the agent's spend in the status banner.
+- The admin console's dashboard shows the current token prices and the spend of every agent. LiteLLM's own UI is at
+  http://localhost:4000/ui (user `admin`, password `CW_LITELLM_MASTER_KEY` from `.env`).
 
 ## 4. Everyday commands
 

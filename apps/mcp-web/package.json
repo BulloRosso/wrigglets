@@ -1,19 +1,22 @@
 {
-  "name": "@cw/mock-llm",
+  "name": "@cw/mcp-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Scripted OpenAI-compatible chat completions server standing in for the AI gateway in local development and tests.",
+  "description": "Web access (search, fetch) as upstream MCP server behind the MCP gateway; public addresses only.",
   "main": "./dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "express": "5.3.0"
+  },
   "devDependencies": {
-    "tsx": "4.23.15",
+    "@types/express": "5.0.6",
     "vitest": "5.0.5"
   }
 }

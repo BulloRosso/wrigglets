@@ -6,7 +6,7 @@ import multer from 'multer';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import type { StagingFile, WorkspaceEntry } from '@cw/shared';
-import { isProtectedPath, resolveWorkspacePath } from '../../workspace/paths.js';
+import { isProtectedPath, resolveWorkspacePath, uploadFileName } from '../../workspace/paths.js';
 import { HttpError, type ApiDeps } from '../context.js';
 import { startTaskWorkflow } from './tasks.js';
 
@@ -91,7 +91,8 @@ export function workspaceRouter(deps: ApiDeps): Router {
         const dir = path.join(config.stagingDir, (req as unknown as { uploadId: string }).uploadId);
         mkdir(dir, { recursive: true }).then(() => cb(null, dir), (err) => cb(err, dir));
       },
-      filename: (_req, file, cb) => cb(null, path.basename(file.originalname).replace(/[^\w.\- ()]/g, '_')),
+      // UTF-8 file names (umlauts etc.) are kept; see uploadFileName
+      filename: (_req, file, cb) => cb(null, uploadFileName(file.originalname)),
     }),
     limits: { fileSize: 50 * 1024 * 1024, files: 10 },
   });

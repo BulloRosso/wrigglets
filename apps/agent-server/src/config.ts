@@ -60,7 +60,6 @@ const schema = z
     AI_GATEWAY_MODEL: z.string().min(3),
     AI_GATEWAY_SMALL_MODEL: z.string().optional(),
 
-    TASK_DEFAULT_TOKEN_BUDGET: z.coerce.number().int().positive().default(400_000),
     TASK_MAX_FIX_ROUNDS: z.coerce.number().int().min(0).max(10).default(2),
     TASK_MAX_REVISIONS: z.coerce.number().int().min(0).max(10).default(3),
     APPROVAL_REMINDER_AFTER: duration.default('4h'),

@@ -155,7 +155,6 @@ export const createTaskBody = z.object({
   instructions: z.string().trim().min(1).max(20_000),
   type: z.enum(['analysis', 'change', 'report']),
   approval: z.enum(APPROVAL_POLICIES).default('plan'),
-  maxTokens: z.number().int().min(1_000).max(5_000_000).optional(),
 });
 export type CreateTaskBody = z.infer<typeof createTaskBody>;
 

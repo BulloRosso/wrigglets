@@ -27,10 +27,30 @@ const secret = (n = 24) => randomBytes(n).toString('base64url');
 const password = () => `${secret(9)}-${Math.floor(Math.random() * 90 + 10)}`;
 
 /** Secrets added after the first version; appended to an existing .env when missing. */
-const laterSecrets = () => ({ GATEWAY_TOKEN: secret(32), MCP_DEMO_TOKEN: secret(24) });
+const laterSecrets = () => ({
+  GATEWAY_TOKEN: secret(32),
+  MCP_DEMO_TOKEN: secret(24),
+  MCP_WEB_TOKEN: secret(24),
+  // LiteLLM requires keys starting with "sk-"
+  CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
+  CW_LITELLM_SALT_KEY: `sk-${secret(32)}`,
+  CW_LITELLM_DB_PASSWORD: secret(24),
+});
+
+/** Settings of earlier versions that are no longer valid (the scripted mock model was removed, ADR-0029). */
+const OBSOLETE = /^(AI_GATEWAY_BASE_URL|AI_GATEWAY_API_KEY|MOCK_CHUNK_DELAY_MS)=.*$|^AI_GATEWAY_MODEL=mock-.*$|^# Model provider\..*$/;
 
 function ensureEnv() {
   if (existsSync(envFile)) {
+    const original = readFileSync(envFile, 'utf8');
+    const cleaned = original
+      .split(/\r?\n/)
+      .filter((l) => !OBSOLETE.test(l))
+      .join('\n');
+    if (cleaned !== original) {
+      writeFileSync(envFile, cleaned);
+      console.log('Removed the settings of the old mock model from .env (the AI model is now LiteLLM → OpenAI).');
+    }
     const have = readEnv();
     const missing = Object.entries(laterSecrets()).filter(([k]) => !have[k]);
     if (missing.length) {
@@ -53,10 +73,11 @@ function ensureEnv() {
     'SEED_DEMO_USERS=true',
     `DEMO_USER_PASSWORD=${password()}`,
     '',
-    '# Model provider. Default: the scripted mock. For the AI gateway set the real endpoint, key and model id.',
-    'AI_GATEWAY_BASE_URL=http://mock-llm:4010/v1',
-    'AI_GATEWAY_API_KEY=mock-key',
-    'AI_GATEWAY_MODEL=mock-large',
+    '# AI model: LiteLLM → OpenAI. OPENAI_API_KEY comes from your environment (never put it here).',
+    '# Default model for new agents (must be in infra/litellm/config.yaml) and default spend limit per agent (USD / 30 days).',
+    'AI_GATEWAY_MODEL=gpt-5.4-mini',
+    'AI_GATEWAY_SMALL_MODEL=gpt-5.4-nano',
+    'AGENT_SPEND_LIMIT_USD=25',
     '',
     'TEMPORAL_NAMESPACE=agent-dev',
     'AGENT_IMAGE=coworking/agent:local',
@@ -110,11 +131,22 @@ switch (cmd) {
       console.error('Docker is not running. Start Docker Desktop first.');
       process.exit(1);
     }
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn(`
+!! OPENAI_API_KEY is not set in this environment. Agents need a real AI model:
+!!   Windows:  setx OPENAI_API_KEY "sk-..."   (then open a new terminal)
+!!   macOS/Linux: export OPENAI_API_KEY=sk-...
+!! The stack starts anyway; agents and the admin console show what is missing.
+`);
+    }
     build();
     run('docker', ['compose', 'up', '-d', '--remove-orphans']);
     const env = readEnv();
     const host = env.PUBLIC_HOST || 'localhost';
-    const ok = waitHealthy(`http://${host}:9000/health`, 'OAuth server') & waitHealthy(`http://${host}:8080/health`, 'Temporal + admin console');
+    const ok =
+      waitHealthy(`http://${host}:9000/health`, 'OAuth server') &
+      waitHealthy(`http://${host}:8080/health`, 'Temporal + admin console') &
+      waitHealthy(`http://${host}:4000/health/liveliness`, 'LiteLLM (AI gateway)');
     console.log(`
 ────────────────────────────────────────────────────────────────────────
  Coworking Agents — local stack ${ok ? 'is up' : 'started (some services are not healthy yet)'}
@@ -123,7 +155,10 @@ switch (cmd) {
   Temporal Web UI   http://${host}:8233
   OAuth server      http://${host}:9000
 
-  Agent portraits   ${process.env.OPENAI_API_KEY ? 'enabled (OPENAI_API_KEY from your environment)' : 'disabled — set OPENAI_API_KEY in your environment'}
+  LiteLLM           http://${host}:4000/ui   (user admin, password = CW_LITELLM_MASTER_KEY in .env)
+
+  AI model          ${process.env.OPENAI_API_KEY ? `OpenAI via LiteLLM, default ${env.AI_GATEWAY_MODEL || 'gpt-5.4-mini'} (OPENAI_API_KEY from your environment)` : 'NOT CONFIGURED — set OPENAI_API_KEY in your environment and run this again'}
+  Agent portraits   ${process.env.OPENAI_API_KEY ? 'enabled' : 'disabled (needs OPENAI_API_KEY)'}
 
   Platform admin    ${env.BOOTSTRAP_ADMIN_EMAIL}  /  ${env.BOOTSTRAP_ADMIN_PASSWORD}
   Demo users        anna@example.com, ben@example.com (approver), clara@example.com
@@ -154,7 +189,11 @@ switch (cmd) {
     }
     break;
   }
+  case 'env':
+    // create or migrate .env only (new secrets, removal of obsolete settings)
+    ensureEnv();
+    break;
   default:
-    console.error(`Unknown command "${cmd}". Use up | build | down [--agents] | reset [--env].`);
+    console.error(`Unknown command "${cmd}". Use up | build | env | down [--agents] | reset [--env].`);
     process.exit(1);
 }

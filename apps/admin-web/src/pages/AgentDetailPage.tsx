@@ -49,6 +49,7 @@ import {
 } from '@cw/ui';
 import { api, avatarSrc, useMe } from '../api';
 import { CollaborationTab, PortraitTab, SafetyTab } from '../components/AgentTabs';
+import { AiBudgetTab } from '../components/AiBudgetTab';
 
 function Overview({ a }: { a: AgentSummary }) {
   const h = a.health;
@@ -312,7 +313,7 @@ function Settings({ a }: { a: AgentSummary }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const images = useQuery({ queryKey: ['images'], queryFn: api.images });
-  const [f, setF] = useState({ displayName: a.spec.displayName, description: a.spec.description ?? '', model: a.spec.model, image: a.spec.image, cpus: a.spec.resources.cpus, memoryMb: a.spec.resources.memoryMb });
+  const [f, setF] = useState({ displayName: a.spec.displayName, description: a.spec.description ?? '', image: a.spec.image, cpus: a.spec.resources.cpus, memoryMb: a.spec.resources.memoryMb });
   const [deleting, setDeleting] = useState(false);
   const [purge, setPurge] = useState(false);
   const save = useMutation({ mutationFn: () => api.updateAgent(a.spec.agentId, f), onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent', a.spec.agentId] }) });
@@ -341,7 +342,9 @@ function Settings({ a }: { a: AgentSummary }) {
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField label="Model" value={f.model} onChange={(e) => set('model', e.target.value)} />
+              <Typography variant="body2" color="text.secondary">
+                Model, spend limit and the AI key are managed on the <b>AI &amp; budget</b> tab.
+              </Typography>
               <Stack direction="row" spacing={2}>
                 <TextField type="number" label="CPUs" value={f.cpus} onChange={(e) => set('cpus', Number(e.target.value))} />
                 <TextField type="number" label="Memory (MB)" value={f.memoryMb} onChange={(e) => set('memoryMb', Number(e.target.value))} />
@@ -421,7 +424,7 @@ function AgentAudit({ agentId }: { agentId: string }) {
   );
 }
 
-const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'Portrait', 'Collaboration', 'Safety', 'Settings', 'Audit'] as const;
+const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Portrait', 'Collaboration', 'Safety', 'Settings', 'Audit'] as const;
 
 export function AgentDetailPage() {
   const { id = '' } = useParams();
@@ -494,6 +497,7 @@ export function AgentDetailPage() {
       {tab === 'Logs' && <Logs agentId={id} />}
       {tab === 'Tasks' && <Tasks a={a} />}
       {tab === 'Access' && <Access agentId={id} />}
+      {tab === 'AI & budget' && <AiBudgetTab a={a} />}
       {tab === 'Portrait' && <PortraitTab a={a} />}
       {tab === 'Collaboration' && <CollaborationTab a={a} />}
       {tab === 'Safety' && <SafetyTab a={a} />}

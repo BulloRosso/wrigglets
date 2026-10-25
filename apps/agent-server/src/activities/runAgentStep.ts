@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Context } from '@temporalio/activity';
 import { ApplicationFailure, CancelledFailure } from '@temporalio/common';
-import { artifactPaths, workspacePaths } from '@cw/shared';
+import { artifactPaths, formatUsd, workspacePaths } from '@cw/shared';
 import {
   ACTIVITY_ERRORS,
   type BudgetExceededDetails,
@@ -44,6 +44,22 @@ export function createRunAgentStep(deps: ActivityDeps) {
     if (await git.isDirty()) {
       log.warn('workspace dirty before step — resetting to last checkpoint');
       await git.resetToHead();
+    }
+
+    // 1b. Real AI model and spend limit (ADR-0029): checked via the LiteLLM API before any model call
+    const spend = await deps.spend.get();
+    if (spend && !spend.ai.configured) {
+      throw ApplicationFailure.nonRetryable(
+        `No AI model available: ${spend.ai.problem ?? 'not configured'}. ${spend.ai.howToFix ?? ''}`.trim(),
+        ACTIVITY_ERRORS.aiNotConfigured,
+      );
+    }
+    if (spend?.exceeded) {
+      throw ApplicationFailure.create({
+        message: `Spend limit of ${formatUsd(spend.limitUsd)} per ${spend.windowDays} days reached (${formatUsd(spend.spentUsd)} spent). An administrator can raise the limit.`,
+        type: ACTIVITY_ERRORS.budgetExceeded,
+        nonRetryable: true,
+      });
     }
 
     // 2. Harness + session
@@ -102,6 +118,10 @@ export function createRunAgentStep(deps: ActivityDeps) {
     }
     safetyStats.recordTokens(turn.tokens.total);
     if (turn.error) safetyStats.recordStepFailure();
+    if (turn.error?.kind === 'provider' && /budget has been exceeded|exceededbudget|max budget/i.test(turn.error.message)) {
+      // LiteLLM's key budget is the backstop of the spend limit
+      throw ApplicationFailure.create({ message: `Spend limit reached: ${turn.error.message}`, type: ACTIVITY_ERRORS.budgetExceeded, nonRetryable: true });
+    }
     if (turn.error?.kind === 'provider') throw ApplicationFailure.retryable(turn.error.message, ACTIVITY_ERRORS.provider);
     if (turn.error?.kind === 'permission') throw ApplicationFailure.nonRetryable(turn.error.message, ACTIVITY_ERRORS.permissionDenied);
     if (turn.error?.kind === 'aborted') throw ApplicationFailure.retryable('Harness turn was aborted', 'Aborted');

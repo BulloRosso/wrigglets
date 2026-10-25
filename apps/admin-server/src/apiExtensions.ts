@@ -18,6 +18,7 @@ import type { AvatarService } from './avatars.js';
 import type { Config } from './config.js';
 import type { GatewayConfigService } from './gateway.js';
 import type { KillSwitchService } from './killswitch.js';
+import type { LiteLLMService } from './litellm.js';
 import { approvalMailHtml, notifyMailBody, type MailService } from './mail.js';
 import type { OAuthAdmin } from './oauthAdmin.js';
 import type { AdminAudit, AgentRegistry } from './registry.js';
@@ -33,6 +34,10 @@ export interface ExtensionDeps {
   safety: SafetyRuleEngine;
   secrets?: SecretStore;
   mail: MailService;
+  ai: LiteLLMService;
+  spendLimit: (spec: AgentSummary['spec']) => number;
+  agents: Pick<import('./agents.js').AgentService, 'update' | 'rotateAiKey' | 'aiModels'>;
+  smallModel: string;
   oauth: Pick<OAuthAdmin, 'users'>;
 }
 
@@ -195,6 +200,52 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   });
 
   /* ------------------------------------------------------------ mail outbox (human in the loop, ADR-0026) */
+  /* ------------------------------------------------------------ AI gateway, prices and spend (ADR-0029) */
+  r.get('/ai', async (req, res) => {
+    const status = await d.ai.status(req.query.refresh === '1');
+    const agents = await Promise.all(d.registry.list().map((spec) => d.ai.agentSpend(spec, d.registry.get(spec.agentId)?.secrets.aiKey, d.spendLimit(spec))));
+    res.json({ status, agents });
+  });
+  /** AI & budget of one agent: spend, daily history and its LiteLLM key — managed here, not in the LiteLLM UI. */
+  r.get('/agents/:id/ai', async (req, res) => {
+    const entry = d.registry.get(req.params.id);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    const key = entry.secrets.aiKey;
+    const [spend, info, daily] = await Promise.all([
+      d.ai.agentSpend(entry.spec, key, d.spendLimit(entry.spec)),
+      key ? d.ai.keyInfo(key).then((k) => ({ key: k }), (err: unknown) => ({ keyError: String(err instanceof Error ? err.message : err).slice(0, 200) })) : Promise.resolve({ keyError: 'no key provisioned yet' }),
+      key ? d.ai.dailySpend(key).catch(() => []) : Promise.resolve([]),
+    ]);
+    res.json({ spend, ...info, daily, smallModel: d.smallModel });
+  });
+  r.put('/agents/:id/ai', async (req, res) => {
+    if (!d.registry.get(req.params.id)) throw new HttpError(404, 'agent not found');
+    const body = z.object({ spendLimitUsd: z.number().min(0.5).max(10_000).optional(), model: z.string().trim().min(1).max(120).optional() }).parse(req.body);
+    const before = d.registry.get(req.params.id)!.spec;
+    await d.agents.update(req.params.id, body);
+    await d.audit.write({ by: by(req), action: 'agent.ai', target: req.params.id, details: { spendLimitUsd: body.spendLimitUsd, model: body.model, previousModel: before.model, previousLimit: before.spendLimitUsd } });
+    res.json({ ok: true, redeployed: body.model !== undefined && body.model !== before.model });
+  });
+  r.post('/agents/:id/ai/rotate', async (req, res) => {
+    await d.agents.rotateAiKey(req.params.id);
+    await d.audit.write({ by: by(req), action: 'agent.ai.rotate', target: req.params.id });
+    res.json({ ok: true });
+  });
+  r.post('/agents/:id/ai/block', async (req, res) => {
+    const entry = d.registry.get(req.params.id);
+    if (!entry?.secrets.aiKey) throw new HttpError(404, 'agent or key not found');
+    const { blocked } = z.object({ blocked: z.boolean() }).parse(req.body);
+    await d.ai.setBlocked(entry.secrets.aiKey, blocked);
+    await d.audit.write({ by: by(req), action: blocked ? 'agent.ai.block' : 'agent.ai.unblock', target: req.params.id });
+    res.json({ ok: true, blocked });
+  });
+
+  r.get('/agents/:id/spend', async (req, res) => {
+    const entry = d.registry.get(req.params.id);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    res.json(await d.ai.agentSpend(entry.spec, entry.secrets.aiKey, d.spendLimit(entry.spec)));
+  });
+
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
     const all = await d.mail.list(500);
@@ -225,6 +276,12 @@ export function internalRouter(d: ExtensionDeps): Router {
     if (!isMood(req.params.mood)) return res.status(404).end();
     const meta = await d.avatars.meta(req.params.agentId);
     await sendImage(res, d.avatars.imagePath(req.params.agentId, req.params.mood), meta?.moods[req.params.mood]?.generatedAt);
+  });
+  /** Spend of the agent's virtual key over the last 30 days and whether a real AI model is usable (ADR-0029). */
+  r.get('/agents/:agentId/spend', async (req, res) => {
+    const entry = d.registry.get(req.params.agentId);
+    if (!entry || !safeEqual(bearer(req), entry.secrets.internalToken)) return res.status(401).json({ error: 'unauthorized' });
+    res.json(await d.ai.agentSpend(entry.spec, entry.secrets.aiKey, d.spendLimit(entry.spec)));
   });
   /** Human in the loop: the agent asks everybody with access to it for a decision (by e-mail). */
   r.post('/agents/:agentId/notify', express.json({ limit: '32kb' }), async (req, res) => {

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -182,7 +182,12 @@ const Pre = ({ text }: { text: string }) => (
 export function FilePreview({ path }: { path: string }) {
   const kind = previewKind(path);
   const textual = kind === 'markdown' || kind === 'mermaid' || kind === 'csv' || kind === 'text';
-  const text = useQuery({ queryKey: ['file', path], queryFn: () => api.fileText(path), enabled: textual });
+  const qc = useQueryClient();
+  const text = useQuery({ queryKey: ['file', path], queryFn: () => api.fileText(path), enabled: textual, retry: false });
+  const gone = !!text.error && /no longer exists/.test(String(text.error));
+  useEffect(() => {
+    if (gone) void qc.invalidateQueries({ queryKey: ['tree'] });
+  }, [gone, qc]);
   const csv = useMemo(() => (kind === 'csv' && text.data ? parseCsv(text.data) : undefined), [kind, text.data]);
   const [view, setView] = useState<'rendered' | 'source'>('rendered');
 

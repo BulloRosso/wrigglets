@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1.7
 #
-# One Dockerfile, four images (build with --target):
+# One Dockerfile, several images (build with --target):
 #   agent          – agent container: API/BFF + Temporal worker + Agent Harness (opencode)   [spec §5.1]
 #   control-plane  – the "temporal" container: Temporal dev server + Web UI + admin console
 #   oauth          – OpenID Connect server (node-oidc-provider) + sign-in pages
-#   mock-llm       – OpenAI-compatible scripted model (stand-in for the AI gateway)
+#   mcp-gateway    – MCP gateway (tools, kill switch, A2A broker)
+#   mcp-demo       – example upstream MCP server
+#   mcp-web        – internet access (web search, fetch) as upstream MCP server
+# The AI model is LiteLLM (official image, see docker-compose.yml) → OpenAI.
 #
 # All versions are pinned (spec §13 supply chain).
 
@@ -27,9 +30,9 @@ COPY apps/admin-server/package.json apps/admin-server/
 COPY apps/admin-web/package.json apps/admin-web/
 COPY apps/oauth-server/package.json apps/oauth-server/
 COPY apps/oauth-web/package.json apps/oauth-web/
-COPY apps/mock-llm/package.json apps/mock-llm/
 COPY apps/mcp-gateway/package.json apps/mcp-gateway/
 COPY apps/mcp-demo/package.json apps/mcp-demo/
+COPY apps/mcp-web/package.json apps/mcp-web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/codec/package.json packages/codec/
@@ -47,16 +50,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/admin-server deploy --legacy --prod /out/admin && \
     pnpm --filter @cw/oauth-server deploy --legacy --prod /out/oauth && \
     pnpm --filter @cw/mcp-gateway deploy --legacy --prod /out/mcp-gateway && \
-    pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo
-
-# ---------------------------------------------------------------- mock-llm
-FROM ${NODE_IMAGE} AS mock-llm
-WORKDIR /app
-COPY --from=build /src/apps/mock-llm/dist ./dist
-COPY --from=build /src/apps/mock-llm/package.json ./
-USER node
-EXPOSE 4010
-CMD ["node", "dist/main.js"]
+    pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo && \
+    pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway
@@ -78,6 +73,15 @@ COPY --from=build /out/mcp-demo ./
 ENV NODE_ENV=production PORT=7500
 USER node
 EXPOSE 7500
+CMD ["node", "dist/main.js"]
+
+# ---------------------------------------------------------------- mcp-web (internet access, ADR-0031)
+FROM ${NODE_IMAGE} AS mcp-web
+WORKDIR /app
+COPY --from=build /out/mcp-web ./
+ENV NODE_ENV=production PORT=7600
+USER node
+EXPOSE 7600
 CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- oauth

@@ -5,6 +5,7 @@ import { AppAuditLog } from './api/appAudit.js';
 import { createApp } from './api/app.js';
 import { createAuth } from './api/auth.js';
 import { GatewayClient } from './gatewayClient.js';
+import { SpendClient } from './spend.js';
 import { loadConfig } from './config.js';
 import { OpencodeHarnessClient } from './harness/client.js';
 import { HarnessEventBus } from './harness/events.js';
@@ -79,7 +80,8 @@ async function main() {
 
   // 9. HTTP
   const notifications = new NotificationStore(config.artifactsDir);
-  const deps = { config, temporal: client, codec, git, events, notifications, audit: new AppAuditLog(config.artifactsDir), health };
+  const spend = new SpendClient(config);
+  const deps = { config, temporal: client, codec, git, events, notifications, audit: new AppAuditLog(config.artifactsDir), health, spend };
   const app = createApp(deps, createAuth(config));
   const server: Server = app.listen(config.port, () => logger.info({ port: config.port, url: config.publicBaseUrl }, 'http server listening'));
   server.keepAliveTimeout = 65_000;
@@ -95,6 +97,7 @@ async function main() {
     codec,
     notifications,
     gateway: new GatewayClient(config.MCP_GATEWAY_BASE_URL, config.AGENT_ID, config.MCP_GATEWAY_TOKEN),
+    spend,
   });
 
   let workerDone: Promise<void> | undefined;

@@ -1,6 +1,6 @@
 # ADR-0013: Scripted OpenAI-compatible mock model for development and tests
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0029](0029-litellm-ai-gateway-and-spend-limits.md) — the mock model was removed
 - **Date:** 2026-10-25
 - **Spec:** §12, §15 (mock OpenAI-compatible server), §16.3
 

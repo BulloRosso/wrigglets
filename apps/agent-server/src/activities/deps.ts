@@ -6,6 +6,7 @@ import type { HarnessEventBus } from '../harness/events.js';
 import type { HarnessSupervisor } from '../harness/supervisor.js';
 import type { GatewayClient } from '../gatewayClient.js';
 import type { NotificationStore } from '../notifications.js';
+import type { SpendClient } from '../spend.js';
 import type { Git } from '../workspace/git.js';
 
 /** Everything activities depend on, injected at worker creation (keeps activities testable). */
@@ -19,4 +20,5 @@ export interface ActivityDeps {
   codec: PayloadCodec;
   notifications: NotificationStore;
   gateway: GatewayClient;
+  spend: Pick<SpendClient, 'get'>;
 }

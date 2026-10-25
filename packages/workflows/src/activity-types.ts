@@ -147,4 +147,5 @@ export const ACTIVITY_ERRORS = {
   harnessConfig: 'HarnessConfigError',
   harnessUnavailable: 'HarnessUnavailable',
   provider: 'ProviderError',
+  aiNotConfigured: 'AiNotConfigured',
 } as const;

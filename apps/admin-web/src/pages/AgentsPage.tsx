@@ -26,12 +26,14 @@ import SmartToyOutlined from '@mui/icons-material/SmartToyOutlined';
 import { AGENT_ID_PATTERN, slugify, type AgentSummary } from '@cw/shared';
 import { AgentPortrait, EmptyState, ErrorAlert, KeyValueList, KillSwitchChip, Loading, PageHeader, StatusChip, formatRelative } from '@cw/ui';
 import { api, avatarSrc } from '../api';
+import { AiNotConfiguredAlert, ModelSelect, useAi } from '../components/Ai';
+import { formatUsd } from '@cw/shared';
 
 export function CreateAgentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const images = useQuery({ queryKey: ['images'], queryFn: api.images, enabled: open });
-  const [f, setF] = useState({ displayName: '', agentId: '', description: '', model: '', image: '', cpus: 1, memoryMb: 2048, start: true });
+  const [f, setF] = useState({ displayName: '', agentId: '', description: '', model: '', spendLimitUsd: '', image: '', cpus: 1, memoryMb: 2048, start: true });
   const [idTouched, setIdTouched] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const agentId = idTouched ? f.agentId : slugify(f.displayName, 30);
@@ -42,6 +44,7 @@ export function CreateAgentDialog({ open, onClose }: { open: boolean; onClose: (
         displayName: f.displayName,
         description: f.description || undefined,
         model: f.model || undefined,
+        spendLimitUsd: f.spendLimitUsd ? Number(f.spendLimitUsd) : undefined,
         image: f.image || undefined,
         cpus: f.cpus,
         memoryMb: f.memoryMb,
@@ -84,7 +87,16 @@ export function CreateAgentDialog({ open, onClose }: { open: boolean; onClose: (
               </MenuItem>
             ))}
           </TextField>
-          <TextField label="Model" value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="platform default" helperText="Model id of the AI gateway (or the mock in local development)" />
+          <ModelSelect value={f.model} onChange={(v) => set('model', v)} allowDefault />
+          <TextField
+            label="Spend limit (USD per 30 days)"
+            type="number"
+            value={f.spendLimitUsd}
+            onChange={(e) => set('spendLimitUsd', e.target.value)}
+            placeholder="platform default"
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: 0.5, step: 0.5 } }}
+            helperText="Budget of the agent's LiteLLM virtual key; checked before every step"
+          />
           <Stack direction="row" spacing={2}>
             <TextField type="number" label="CPUs" value={f.cpus} onChange={(e) => set('cpus', Number(e.target.value))} slotProps={{ htmlInput: { min: 0.25, max: 8, step: 0.25 } }} />
             <TextField type="number" label="Memory (MB)" value={f.memoryMb} onChange={(e) => set('memoryMb', Number(e.target.value))} slotProps={{ htmlInput: { min: 512, max: 16384, step: 256 } }} />
@@ -111,6 +123,8 @@ function AgentCard({ a }: { a: AgentSummary }) {
     onSettled: () => void qc.invalidateQueries({ queryKey: ['agents'] }),
   });
   const running = a.runtime.state === 'running' || a.runtime.state === 'starting';
+  const ai = useAi();
+  const sp = ai.data?.agents.find((x) => x.agentId === a.spec.agentId);
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
@@ -137,6 +151,7 @@ function AgentCard({ a }: { a: AgentSummary }) {
             ['Workspace', a.lock?.holder ? `busy (${a.lock.waiting.length} waiting)` : a.lock ? 'idle' : '–'],
             ['Open tasks', a.openTasks ?? '–'],
             ['Model', a.spec.model],
+            ['Spend (30 days)', sp ? `${formatUsd(sp.spentUsd)} of ${formatUsd(sp.limitUsd)}${sp.exceeded ? ' — limit reached' : ''}` : '–'],
             ['Image', <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{a.spec.image}</Typography>],
           ]}
         />
@@ -178,6 +193,7 @@ export function AgentsPage() {
           </Button>
         }
       />
+      <AiNotConfiguredAlert />
       <ErrorAlert error={q.error} />
       {q.isLoading && <Loading />}
       {q.data?.length === 0 && (

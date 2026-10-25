@@ -48,9 +48,14 @@ const schema = z.object({
   AGENT_LOG_LEVEL: z.string().default('info'),
 
   /* Defaults handed to new agents (AI gateway or the mock) */
-  AI_GATEWAY_BASE_URL: z.string().url(),
-  AI_GATEWAY_API_KEY: z.string().min(1),
-  AI_GATEWAY_MODEL: z.string().min(1).default('mock-large'),
+  /** AI gateway = LiteLLM proxy (ADR-0029); agents get virtual keys created with the master key. */
+  LITELLM_URL: z.string().url().default('http://litellm:4000'),
+  LITELLM_PUBLIC_URL: z.string().url().optional(),
+  LITELLM_MASTER_KEY: z.string().optional(),
+  AI_GATEWAY_MODEL: z.string().min(1).default('gpt-5.4-mini'),
+  AI_GATEWAY_SMALL_MODEL: z.string().min(1).default('gpt-5.4-nano'),
+  /** Default spend limit of a new agent in USD per rolling 30 days. */
+  AGENT_SPEND_LIMIT_USD: z.coerce.number().min(0.5).max(10_000).default(25),
   APPROVAL_REMINDER_AFTER: z.string().default('4h'),
 
   /* MCP gateway, Key Vault, internal URLs */
@@ -64,6 +69,9 @@ const schema = z.object({
   MAIL_API_KEY: z.string().optional(),
   /** Seeded into Key Vault as `mcp-demo-authorization` when missing (local demo only). */
   MCP_DEMO_TOKEN: z.string().optional(),
+  /** Web access upstream (search, fetch); token seeded into Key Vault as `mcp-web-authorization` (ADR-0031). */
+  WEB_UPSTREAM_URL: z.string().url().optional(),
+  MCP_WEB_TOKEN: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

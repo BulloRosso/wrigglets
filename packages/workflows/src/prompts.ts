@@ -49,6 +49,10 @@ export function runPrompt(taskId: string, input: TaskInput, approval?: { comment
   if (approval?.comment) lines.push(`The plan was approved by ${approval.by} with this comment: ${approval.comment}`);
   if (input.type === 'report' || input.type === 'analysis') {
     lines.push(`Write the main result to \`reports/${stepFileName(taskId)}.md\` unless the plan names a different output path.`);
+    lines.push(
+      'The report must contain the actual answer itself — the concrete results, numbers, tables and conclusions the request asks for — ' +
+        'written for the requester. Do not only describe what you did or where the result is.',
+    );
   }
   lines.push('Only change files that the plan requires. Never touch `.git`, `AGENTS.md` or `opencode.json`.');
   return lines.join('\n');

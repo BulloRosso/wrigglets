@@ -2,6 +2,7 @@ import type { AgentSpec, AgentSummary, CreateAgentBody, HealthReport, UpdateAgen
 import type { Config } from './config.js';
 import { logger } from './logger.js';
 import type { OAuthAdmin } from './oauthAdmin.js';
+import type { LiteLLMService } from './litellm.js';
 import type { AgentRegistry, AgentSecrets } from './registry.js';
 import type { AgentRuntime } from './runtime/types.js';
 import type { TemporalPlatform } from './temporal/platform.js';
@@ -26,7 +27,47 @@ export class AgentService {
     private readonly runtime: AgentRuntime,
     private readonly oauth: OAuthAdmin,
     private readonly temporal: TemporalPlatform,
+    private readonly ai?: LiteLLMService,
   ) {}
+
+  spendLimit(spec: AgentSpec) {
+    return spec.spendLimitUsd ?? this.config.AGENT_SPEND_LIMIT_USD;
+  }
+
+  /** Models the agent's key may use: its model and the small model (titles, summaries). */
+  aiModels(spec: AgentSpec) {
+    return [...new Set([spec.model, this.config.AI_GATEWAY_SMALL_MODEL])];
+  }
+
+  /** Replaces the agent's virtual key: new key with the same budget and models, redeploy, then delete the old key. */
+  async rotateAiKey(agentId: string) {
+    const entry = this.registry.get(agentId);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    if (!this.ai) throw new HttpError(409, 'No AI gateway configured');
+    const old = entry.secrets.aiKey;
+    const key = await this.ai.rotateKey(entry.spec, this.spendLimit(entry.spec), this.aiModels(entry.spec));
+    const secrets = { ...entry.secrets, aiKey: key };
+    await this.registry.put(entry.spec, secrets);
+    await this.runtime.deploy(entry.spec, this.env(entry.spec, secrets), { start: true });
+    await this.ai.deleteKey(old);
+    return key;
+  }
+
+  /** Creates or updates the agent's LiteLLM virtual key (budget = spend limit) and stores it with the secrets. */
+  async ensureAiKey(spec: AgentSpec, secrets: AgentSecrets): Promise<AgentSecrets> {
+    if (!this.ai) return secrets;
+    try {
+      const key = await this.ai.ensureKey(spec, secrets.aiKey, this.spendLimit(spec), this.aiModels(spec));
+      if (key === secrets.aiKey) return secrets;
+      const next = { ...secrets, aiKey: key };
+      await this.registry.put(spec, next);
+      return next;
+    } catch (err) {
+      // LiteLLM down: deploy anyway; the agent shows "no AI model" until the next redeploy
+      logger.warn({ agentId: spec.agentId, err: String(err) }, 'could not provision the LiteLLM key');
+      return secrets;
+    }
+  }
 
   publicUrl(spec: AgentSpec) {
     return `http://${this.config.AGENT_PUBLIC_HOST}:${spec.hostPort}`;
@@ -52,9 +93,11 @@ export class AgentService {
       TEMPORAL_UI_URL: c.TEMPORAL_UI_PUBLIC_URL,
       PAYLOAD_CODEC_KEYS: c.PAYLOAD_CODEC_KEYS,
       CODEC_CORS_ORIGINS: c.TEMPORAL_UI_PUBLIC_URL,
-      AI_GATEWAY_BASE_URL: c.AI_GATEWAY_BASE_URL,
-      AI_GATEWAY_API_KEY: c.AI_GATEWAY_API_KEY,
+      // AI model through LiteLLM with the agent's own virtual key (ADR-0029)
+      AI_GATEWAY_BASE_URL: `${c.LITELLM_URL}/v1`,
+      AI_GATEWAY_API_KEY: secrets.aiKey ?? 'not-provisioned',
       AI_GATEWAY_MODEL: spec.model,
+      AI_GATEWAY_SMALL_MODEL: c.AI_GATEWAY_SMALL_MODEL,
       APPROVAL_REMINDER_AFTER: c.APPROVAL_REMINDER_AFTER,
       APPROVAL_EXPIRE_AFTER: c.APPROVAL_EXPIRE_AFTER,
       AUTH_MODE: 'oidc',
@@ -104,12 +147,13 @@ export class AgentService {
       image: body.image ?? this.config.AGENT_IMAGE,
       hostPort: body.hostPort ?? (await this.freePort()),
       model: body.model ?? this.config.AI_GATEWAY_MODEL,
+      spendLimitUsd: body.spendLimitUsd ?? this.config.AGENT_SPEND_LIMIT_USD,
       resources: { cpus: body.cpus, memoryMb: body.memoryMb },
       createdAt: now,
       createdBy: by,
       updatedAt: now,
     };
-    const { secrets } = await this.registry.put(spec);
+    const secrets = await this.ensureAiKey(spec, (await this.registry.put(spec)).secrets);
     await this.registerClient(spec, secrets);
     const runtime = await this.runtime.deploy(spec, this.env(spec, secrets), { start: body.start });
     logger.info({ agentId: spec.agentId, port: spec.hostPort, image: spec.image }, 'agent deployed');
@@ -125,6 +169,7 @@ export class AgentService {
       description: patch.description ?? entry.spec.description,
       image: patch.image ?? entry.spec.image,
       model: patch.model ?? entry.spec.model,
+      spendLimitUsd: patch.spendLimitUsd ?? entry.spec.spendLimitUsd,
       resources: { cpus: patch.cpus ?? entry.spec.resources.cpus, memoryMb: patch.memoryMb ?? entry.spec.resources.memoryMb },
       avatarPrompt: patch.avatarPrompt ?? entry.spec.avatarPrompt,
       peers: patch.peers ? [...new Set(patch.peers.filter((p) => p !== agentId))].sort() : entry.spec.peers,
@@ -132,12 +177,15 @@ export class AgentService {
     };
     if (spec.peers?.some((p) => !this.registry.get(p))) throw new HttpError(400, 'Unknown agent in discovery set');
     await this.registry.put(spec, entry.secrets);
-    // Portrait prompt and discovery set do not need a new container.
+    // a new spend limit only changes the LiteLLM key budget
+    const secrets =
+      patch.spendLimitUsd !== undefined || patch.model !== undefined || !entry.secrets.aiKey ? await this.ensureAiKey(spec, entry.secrets) : entry.secrets;
+    // Portrait prompt, discovery set and spend limit do not need a new container.
     const runtimeFields: Array<keyof UpdateAgentBody> = ['displayName', 'description', 'image', 'model', 'cpus', 'memoryMb'];
     if (!runtimeFields.some((k) => patch[k] !== undefined)) return { spec, runtime: await this.runtime.inspect(agentId) };
-    await this.registerClient(spec, entry.secrets);
+    await this.registerClient(spec, secrets);
     // Re-create the container; the /home volume (workspace) is kept. Temporal retries in-flight steps.
-    const runtime = await this.runtime.deploy(spec, this.env(spec, entry.secrets), { start: true });
+    const runtime = await this.runtime.deploy(spec, this.env(spec, secrets), { start: true });
     return { spec, runtime };
   }
 
@@ -145,8 +193,9 @@ export class AgentService {
   async redeploy(agentId: string) {
     const entry = this.registry.get(agentId);
     if (!entry) throw new HttpError(404, 'agent not found');
-    await this.registerClient(entry.spec, entry.secrets);
-    return this.runtime.deploy(entry.spec, this.env(entry.spec, entry.secrets), { start: true });
+    const secrets = await this.ensureAiKey(entry.spec, entry.secrets);
+    await this.registerClient(entry.spec, secrets);
+    return this.runtime.deploy(entry.spec, this.env(entry.spec, secrets), { start: true });
   }
 
   async remove(agentId: string, opts: { purgeData: boolean; removeAccess: boolean }) {
@@ -156,6 +205,7 @@ export class AgentService {
     await this.oauth.deleteClient(this.clientId(agentId), opts.removeAccess).catch((err) => logger.warn({ err: String(err) }, 'could not delete OIDC client'));
     let temporal = { schedules: 0, workflows: 0 };
     if (opts.purgeData) temporal = await this.temporal.purgeAgent(agentId, 'agent deleted by admin');
+    await this.ai?.deleteKey(entry.secrets.aiKey);
     await this.registry.delete(agentId);
     return temporal;
   }

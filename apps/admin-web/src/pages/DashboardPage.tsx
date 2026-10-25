@@ -6,6 +6,7 @@ import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
+import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -18,6 +19,7 @@ import KeyOutlined from '@mui/icons-material/KeyOutlined';
 import DnsOutlined from '@mui/icons-material/DnsOutlined';
 import { AgentPortrait, EmptyState, ErrorAlert, KillSwitchChip, Loading, PageHeader, RelativeTime, StatusChip } from '@cw/ui';
 import { api, avatarSrc } from '../api';
+import { AiGatewayCard, AiNotConfiguredAlert } from '../components/Ai';
 
 function Metric({ label, value, tone }: { label: string; value: ReactNode; tone?: 'warning' | 'error' | 'success' }) {
   return (
@@ -52,6 +54,7 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle="State of the platform: Temporal, identity provider, agent runtime and the work of all agents." />
+      <AiNotConfiguredAlert />
       <ErrorAlert error={overview.error} />
       {!o ? (
         <Loading />
@@ -83,6 +86,9 @@ export function DashboardPage() {
           </Grid>
         </Grid>
       )}
+      <Box sx={{ mb: 3 }}>
+        <AiGatewayCard />
+      </Box>
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, xl: 5 }}>

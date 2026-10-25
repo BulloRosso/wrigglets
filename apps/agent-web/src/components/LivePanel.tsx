@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TerminalOutlined from '@mui/icons-material/TerminalOutlined';
 import type { LiveEvent } from '@cw/shared';
+import { formatNumber } from '@cw/ui';
 
 type ToolEv = Extract<LiveEvent, { type: 'tool' }>;
 type TextEv = Extract<LiveEvent, { type: 'text' }>;
@@ -62,7 +63,7 @@ export function LivePanel({ taskId }: { taskId: string }) {
         avatar={<TerminalOutlined color={active ? 'primary' : 'disabled'} />}
         title="Live activity"
         subheader={active ? 'The Agent Harness is working on a step…' : connected ? 'Idle — waiting for the next step' : 'Connecting…'}
-        action={tokens.input + tokens.output > 0 ? <Chip size="small" variant="outlined" label={`${(tokens.input + tokens.output).toLocaleString()} tokens (this session)`} /> : undefined}
+        action={tokens.input + tokens.output > 0 ? <Chip size="small" variant="outlined" label={`${formatNumber(tokens.input + tokens.output)} tokens (this session)`} /> : undefined}
       />
       {active && <LinearProgress />}
       <CardContent sx={{ maxHeight: 420, overflow: 'auto', pt: 1 }}>

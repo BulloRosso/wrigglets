@@ -22,7 +22,6 @@ export const createScheduleBody = z.object({
   type: z.enum(['analysis', 'change', 'report']),
   approval: z.enum(APPROVAL_POLICIES).default('deviation'),
   calendar: calendarSpec,
-  maxTokens: z.number().int().min(1_000).max(5_000_000).optional(),
 });
 export type CreateScheduleBody = z.infer<typeof createScheduleBody>;
 

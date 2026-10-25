@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ScheduleNotFoundError, ScheduleOverlapPolicy, type ScheduleDescription, type ScheduleOptions, type ScheduleSpec } from '@temporalio/client';
 import {
+  UNLIMITED_TOKENS,
   SCHEDULE_TIMEZONE,
   calendarToCron,
   createScheduleBody,
@@ -115,7 +116,7 @@ export function scheduleRouter(deps: ApiDeps): Router {
       requestedBy: owner,
       trigger: { kind: 'schedule', scheduleId, owner },
       approval: body.approval,
-      budget: { maxTokens: body.maxTokens ?? config.TASK_DEFAULT_TOKEN_BUDGET },
+      budget: { maxTokens: UNLIMITED_TOKENS }, // spend limit in USD per agent instead (ADR-0029)
       settings: taskSettings(deps),
     };
     const memo: ScheduleMemo = { owner, createdBy: owner, createdAt: new Date().toISOString(), calendar: body.calendar, history: [] };

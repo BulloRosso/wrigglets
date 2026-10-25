@@ -17,7 +17,7 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0010](0010-schedule-history-in-audit-log.md) | Schedule change history in the application audit log | Accepted |
 | [0011](0011-material-ui.md) | Material UI (MUI) for all user interfaces | Accepted |
 | [0012](0012-task-ids-and-file-safe-paths.md) | Task ids of scheduled runs and file-system-safe paths | Accepted |
-| [0013](0013-mock-llm.md) | Scripted OpenAI-compatible mock model for development and tests | Accepted |
+| [0013](0013-mock-llm.md) | Scripted OpenAI-compatible mock model for development and tests | Superseded by 0029 |
 | [0014](0014-approval-rules-in-workflow.md) | Approval rules enforced by update validators (and the API) | Accepted |
 | [0015](0015-deviation-rejection-reverts.md) | Rejecting a deviation reverts the task's run/fix commits | Accepted |
 | [0016](0016-verification-path-policy.md) | Verification: path policy per task type and plug-in scripts | Accepted |
@@ -33,3 +33,6 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0026](0026-human-in-the-loop-email.md) | Human in the loop by e-mail: mail API or outbox, deep links into the decision dialog | Accepted |
 | [0027](0027-workspace-file-preview.md) | Workspace file preview in the browser | Accepted |
 | [0028](0028-task-conversation.md) | Task conversation (chat history) derived from the workflow state | Accepted |
+| [0029](0029-litellm-ai-gateway-and-spend-limits.md) | LiteLLM as AI gateway, virtual keys per agent, USD spend limits | Accepted |
+| [0030](0030-chat-with-the-agent.md) | Chat with the agent about a task | Accepted |
+| [0031](0031-internet-access-via-mcp.md) | Internet access for agents through an MCP upstream behind the gateway | Accepted |

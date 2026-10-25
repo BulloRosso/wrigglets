@@ -11,3 +11,5 @@ export * from './controlplane.js';
 export * from './avatar.js';
 export * from './killswitch.js';
 export * from './gateway.js';
+export * from './ai.js';
+export * from './chat.js';

@@ -12,6 +12,7 @@ import { logger } from '../logger.js';
 import type { Git } from '../workspace/git.js';
 import { PathSafetyError } from '../workspace/paths.js';
 import type { AppAuditLog } from './appAudit.js';
+import type { SpendClient } from '../spend.js';
 
 export interface ApiDeps {
   config: Config;
@@ -22,6 +23,8 @@ export interface ApiDeps {
   notifications: NotificationStore;
   audit: AppAuditLog;
   health: () => Promise<HealthReport>;
+  /** 30-day USD spend and AI model status (ADR-0029). */
+  spend: Pick<SpendClient, 'get'>;
 }
 
 export class HttpError extends Error {

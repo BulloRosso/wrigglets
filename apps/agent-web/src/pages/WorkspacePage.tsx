@@ -73,7 +73,8 @@ export function WorkspacePage() {
   const dir = params.get('dir') ?? (file ? file.split('/').slice(0, -1).join('/') : '');
   const [tab, setTab] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const tree = useQuery({ queryKey: ['tree', dir], queryFn: () => api.tree(dir) });
+  // files change while tasks run: refresh the listing regularly
+  const tree = useQuery({ queryKey: ['tree', dir], queryFn: () => api.tree(dir), refetchInterval: 10_000 });
   const history = useQuery({ queryKey: ['history', file ?? dir], queryFn: () => api.commits({ path: file ?? (dir || undefined), limit: 50 }), enabled: tab === 1 || !file });
   const crumbs = dir ? dir.split('/') : [];
   const open = (p: { dir?: string; file?: string }) => setParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)) as Record<string, string>);

@@ -36,4 +36,6 @@ export interface AgentStatusResponse {
   stats: { grantsTotal: number };
   killSwitch?: AgentState['killSwitch'];
   health: HealthReport;
+  /** USD spend of the last 30 days vs. limit, and whether a real AI model is configured (ADR-0029). */
+  spend?: import('./ai.js').AgentSpend;
 }

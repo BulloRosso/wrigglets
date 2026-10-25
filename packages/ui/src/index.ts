@@ -1,6 +1,6 @@
 export { createAppTheme, brand } from './theme';
 export { apiFetch, ApiError, errorMessage } from './api';
-export { formatBytes, formatNumber, formatDuration, formatRelative, formatDateTime } from './format';
+export { formatBytes, formatNumber, formatDuration, formatRelative, formatDateTime, localizeTimestamps, userLocale } from './format';
 export { Logo } from './components/Logo';
 export { AppShell, type AppShellProps, type NavItem } from './components/AppShell';
 export { StatusChip, statusLabel } from './components/StatusChip';

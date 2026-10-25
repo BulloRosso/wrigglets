@@ -1,3 +1,9 @@
+/**
+ * Dates and numbers follow the browser's locale (e.g. de-DE: "25.10.2026, 16:29:04", "22.120"); the UI language
+ * itself is English, so relative phrases ("5 minutes ago") stay English.
+ */
+export const userLocale: string | undefined = typeof navigator !== 'undefined' ? navigator.languages?.[0] ?? navigator.language : undefined;
+
 export function formatBytes(n?: number): string {
   if (n === undefined || n === null || Number.isNaN(n)) return '–';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -12,7 +18,7 @@ export function formatBytes(n?: number): string {
 
 export function formatNumber(n?: number): string {
   if (n === undefined || n === null) return '–';
-  return new Intl.NumberFormat('en').format(n);
+  return new Intl.NumberFormat(userLocale).format(n);
 }
 
 export function formatDuration(ms: number): string {
@@ -36,7 +42,14 @@ export function formatRelative(iso?: string, now = Date.now()): string {
   if (abs < 3_600_000) return rtf.format(sign * Math.round(abs / 60_000), 'minute');
   if (abs < 86_400_000) return rtf.format(sign * Math.round(abs / 3_600_000), 'hour');
   if (abs < 30 * 86_400_000) return rtf.format(sign * Math.round(abs / 86_400_000), 'day');
-  return new Date(iso).toLocaleDateString('en-GB');
+  return new Date(iso).toLocaleDateString(userLocale);
 }
 
-export const formatDateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString('en-GB') : '–');
+export const formatDateTime = (iso?: string) => (iso ? new Date(iso).toLocaleString(userLocale) : '–');
+
+/** ISO 8601 timestamps with a time zone (e.g. "2026-10-25T12:57:09.029Z") inside free text, e.g. agent summaries. */
+const ISO_IN_TEXT = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:?\d{2})(?![\w:])/g;
+
+/** Shows timestamps that agents write into text in the reader's local date/time format. */
+export const localizeTimestamps = (text: string) =>
+  text.replace(ISO_IN_TEXT, (iso) => (Number.isNaN(Date.parse(iso)) ? iso : new Date(iso).toLocaleString(userLocale)));

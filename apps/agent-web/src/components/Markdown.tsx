@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm';
 import Box from '@mui/material/Box';
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import type { Components } from 'react-markdown';
+import { localizeTimestamps } from '@cw/ui';
 import { MermaidDiagram } from './Mermaid';
 
 /** ```mermaid fenced blocks become diagrams; all other code stays code. */
@@ -38,7 +39,8 @@ export function Markdown({ children }: { children: string }) {
       }}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
-        {children}
+        {/* raw HTML stays disabled; models sometimes put <br> into table cells — show it as a separator */}
+        {localizeTimestamps(children.replace(/<br\s*\/?>/gi, ' · '))}
       </ReactMarkdown>
     </Box>
   );

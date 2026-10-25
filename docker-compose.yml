@@ -6,8 +6,12 @@
 #   http://${PUBLIC_HOST:-localhost}:8233  Temporal Web UI
 #   http://${PUBLIC_HOST:-localhost}:9000  OAuth / OpenID Connect server
 #   http://${PUBLIC_HOST:-localhost}:81xx  agents (created from the admin console)
+#   http://${PUBLIC_HOST:-localhost}:4000  LiteLLM (AI gateway; admin UI at /ui, master key in .env)
 #
-# Internal only: mcp-gateway (7400), mcp-demo (7500), keyvault (Lowkey Vault, 8443 TLS + 8080 token endpoint).
+# Internal only: mcp-gateway (7400), mcp-demo (7500), mcp-web (7600, internet access), keyvault (Lowkey Vault, 8443 TLS + 8080 token endpoint),
+# litellm-db (PostgreSQL for LiteLLM keys and spend).
+#
+# The AI model is always real: LiteLLM calls the OpenAI API with OPENAI_API_KEY from the machine's environment.
 
 name: coworking
 
@@ -47,9 +51,13 @@ services:
       AGENT_IMAGE: ${AGENT_IMAGE:-coworking/agent:local}
       AGENT_TEMPORAL_ADDRESS: temporal:7233
       AGENT_OIDC_INTERNAL_URL: http://oauth:9000
-      AI_GATEWAY_BASE_URL: ${AI_GATEWAY_BASE_URL:-http://mock-llm:4010/v1}
-      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-mock-key}
-      AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL:-mock-large}
+      # AI gateway = LiteLLM; agents get virtual keys with a USD spend limit (ADR-0029)
+      LITELLM_URL: http://litellm:4000
+      LITELLM_PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:4000
+      LITELLM_MASTER_KEY: ${CW_LITELLM_MASTER_KEY:?run scripts/stack.mjs env to add CW_LITELLM_MASTER_KEY}
+      AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL:-gpt-5.4-mini}
+      AI_GATEWAY_SMALL_MODEL: ${AI_GATEWAY_SMALL_MODEL:-gpt-5.4-nano}
+      AGENT_SPEND_LIMIT_USD: ${AGENT_SPEND_LIMIT_USD:-25}
       APPROVAL_REMINDER_AFTER: ${APPROVAL_REMINDER_AFTER:-4h}
       APPROVAL_EXPIRE_AFTER: ${APPROVAL_EXPIRE_AFTER:-7d}
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:?run scripts/stack.mjs to add GATEWAY_TOKEN}
@@ -57,6 +65,8 @@ services:
       AGENT_CONTROL_PLANE_URL: http://temporal:8080
       DEMO_UPSTREAM_URL: http://mcp-demo:7500/mcp
       MCP_DEMO_TOKEN: ${MCP_DEMO_TOKEN:?}
+      WEB_UPSTREAM_URL: http://mcp-web:7600/mcp
+      MCP_WEB_TOKEN: ${MCP_WEB_TOKEN:?run scripts/stack.mjs env to add MCP_WEB_TOKEN}
       # Agent portraits (taken from the host environment, never written to .env)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Human in the loop: mail API (POST {to[], subject, body}); empty = mails only in /data/mail_out
@@ -102,14 +112,52 @@ services:
       retries: 5
     networks: [coworking]
 
-  mock-llm:
-    build: { <<: *build, target: mock-llm }
-    image: coworking/mock-llm:local
-    container_name: cw-mock-llm
-    hostname: mock-llm
+  # AI gateway: LiteLLM 1.102.0 (pinned by digest; same image as ghcr.io/berriai/litellm:v1.102.0)
+  litellm:
+    image: litellm/litellm:v1.102.0@sha256:32cfd7a427f6470033b4dcc9e75dfbea2aa32dbc298b0b511a40e962ce818362
+    container_name: cw-litellm
+    hostname: litellm
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./infra/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:
-      MOCK_CHUNK_DELAY_MS: ${MOCK_CHUNK_DELAY_MS:-40}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LITELLM_MASTER_KEY: ${CW_LITELLM_MASTER_KEY:?}
+      LITELLM_SALT_KEY: ${CW_LITELLM_SALT_KEY:?}
+      DATABASE_URL: postgresql://litellm:${CW_LITELLM_DB_PASSWORD:?}@litellm-db:5432/litellm
+      STORE_MODEL_IN_DB: "False"
+      # current prices: fetch LiteLLM's maintained model cost map at startup
+      LITELLM_LOCAL_MODEL_COST_MAP: "False"
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+    depends_on:
+      litellm-db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=4).status == 200 else 1)"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+      start_period: 60s
+    networks: [coworking]
+
+  litellm-db:
+    image: postgres:17.6-alpine
+    container_name: cw-litellm-db
+    hostname: litellm-db
+    restart: unless-stopped
+    volumes:
+      - litellm-db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${CW_LITELLM_DB_PASSWORD:?}
+      POSTGRES_DB: litellm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     networks: [coworking]
 
   mcp-gateway:
@@ -146,6 +194,18 @@ services:
     restart: unless-stopped
     environment:
       DEMO_TOKEN: ${MCP_DEMO_TOKEN:?}
+    networks: [coworking]
+
+  # Internet access for agents as an MCP upstream behind the gateway (search + reading public pages, ADR-0031).
+  # The only container with outbound web access for agents; private and internal addresses are refused.
+  mcp-web:
+    build: { <<: *build, target: mcp-web }
+    image: coworking/mcp-web:local
+    container_name: cw-mcp-web
+    hostname: mcp-web
+    restart: unless-stopped
+    environment:
+      WEB_TOKEN: ${MCP_WEB_TOKEN:?}
     networks: [coworking]
 
   # Azure Key Vault emulator (ADR-0024). TLS with a local CA created by keyvault-certs.
@@ -193,3 +253,4 @@ volumes:
   oauth-data:
   mcp-gateway-data:
   keyvault-certs:
+  litellm-db-data:

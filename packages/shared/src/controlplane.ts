@@ -15,8 +15,10 @@ export interface AgentSpec {
   image: string;
   /** Host port the agent UI is published on (local Docker runtime only). */
   hostPort: number;
-  /** Model id as configured in the harness provider block, e.g. `aigateway/gpt-5`. */
+  /** Model name as configured in LiteLLM (infra/litellm/config.yaml), e.g. `gpt-5.4-mini`. */
   model: string;
+  /** Spend limit of the agent's LiteLLM virtual key in USD per rolling 30 days (ADR-0029). */
+  spendLimitUsd?: number;
   resources: { cpus: number; memoryMb: number };
   /** Prompt describing the agent's portrait (see AvatarService). */
   avatarPrompt?: string;
@@ -62,6 +64,8 @@ export interface AgentSummary {
   killSwitch?: EffectiveKillSwitch;
   /** Timestamp of the portrait set (for cache busting); undefined = no portrait yet. */
   avatarVersion?: string;
+  /** Spend of the last 30 days (only when requested). */
+  spend?: import('./ai.js').AgentSpend;
 }
 
 export const createAgentBody = z.object({
@@ -71,6 +75,7 @@ export const createAgentBody = z.object({
   gitEmail: z.string().email().optional(),
   image: z.string().trim().min(1).max(300).optional(),
   model: z.string().trim().min(3).max(120).optional(),
+  spendLimitUsd: z.number().min(0.5).max(10_000).optional(),
   hostPort: z.number().int().min(1024).max(65535).optional(),
   cpus: z.number().min(0.25).max(8).default(1),
   memoryMb: z.number().int().min(512).max(16_384).default(2048),
@@ -83,6 +88,7 @@ export const updateAgentBody = z.object({
   description: z.string().trim().max(500).optional(),
   image: z.string().trim().min(1).max(300).optional(),
   model: z.string().trim().min(3).max(120).optional(),
+  spendLimitUsd: z.number().min(0.5).max(10_000).optional(),
   cpus: z.number().min(0.25).max(8).optional(),
   memoryMb: z.number().int().min(512).max(16_384).optional(),
   avatarPrompt: z.string().trim().max(2000).optional(),

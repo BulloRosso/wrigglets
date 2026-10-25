@@ -76,11 +76,12 @@
   <text x="816" y="306" class="d">• managed by the admin console</text>
 
   <!-- mock llm -->
-  <rect class="sup" x="800" y="332" width="368" height="118" rx="10"/>
-  <text x="816" y="356" class="h">mock-llm</text>
-  <text x="816" y="373" class="img">coworking/mock-llm · internal</text>
-  <text x="816" y="398" class="d">• scripted OpenAI-compatible model for local use</text>
-  <text x="816" y="418" class="d">• replaced by the AI gateway in real use</text>
+  <rect class="cp" x="800" y="332" width="368" height="118" rx="10"/>
+  <text x="816" y="356" class="h">litellm  (+ litellm-db)</text>
+  <text x="816" y="373" class="img">litellm/litellm:v1.102.0 · :4000 (/ui)</text>
+  <text x="816" y="398" class="d">• AI gateway: OpenAI models, virtual key per agent</text>
+  <text x="816" y="418" class="d">• cost per request, USD spend limit per 30 days</text>
+  <text x="816" y="438" class="d">• PostgreSQL for keys and spend logs</text>
 
   <!-- Gateway -->
   <rect class="gw" x="32" y="470" width="370" height="214" rx="10"/>
@@ -117,13 +118,14 @@
   <text x="816" y="576" class="d">• oauth-data: users, clients</text>
   <text x="816" y="596" class="d">• mcp-gateway-data: tool-call audit</text>
   <text x="816" y="616" class="d">• keyvault-certs: CA + TLS certificate</text>
+  <text x="816" y="636" class="d">• litellm-db-data: virtual keys, spend logs</text>
 
   <!-- External -->
   <text x="32" y="728" class="bl">External services</text>
   <rect class="ext" x="32" y="740" width="370" height="96" rx="10"/>
-  <text x="48" y="764" class="h">AI gateway (model provider)</text>
-  <text x="48" y="786" class="d">used by the harness instead of mock-llm</text>
-  <text x="48" y="806" class="d">AI_GATEWAY_BASE_URL / API_KEY / MODEL</text>
+  <text x="48" y="764" class="h">OpenAI API (the real model)</text>
+  <text x="48" y="786" class="d">called only by LiteLLM, current token prices</text>
+  <text x="48" y="806" class="d">OPENAI_API_KEY from the host environment</text>
   <rect class="ext" x="416" y="740" width="370" height="96" rx="10"/>
   <text x="432" y="764" class="h">Mail API (optional)</text>
   <text x="432" y="786" class="d">POST { to[], subject, body } — MAIL_API_URL</text>
@@ -131,7 +133,7 @@
   <rect class="ext" x="800" y="740" width="368" height="96" rx="10"/>
   <text x="816" y="764" class="h">OpenAI Images API</text>
   <text x="816" y="786" class="d">agent portraits in four moods</text>
-  <text x="816" y="806" class="d">OPENAI_API_KEY from the host environment</text>
+  <text x="816" y="806" class="d">same OPENAI_API_KEY</text>
 
   <!-- arrows -->
   <path class="ln" d="M217,148 L217,198" marker-end="url(#a)"/>

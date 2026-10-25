@@ -1,0 +1,30 @@
+# LiteLLM proxy (ADR-0029): the AI gateway of the local stack.
+#
+# - Every agent uses its own virtual key (created by the admin console via /key/generate) with a USD budget.
+# - Upstream: the OpenAI API with OPENAI_API_KEY from the machine's environment (never stored in .env).
+# - Prices: LiteLLM's maintained model cost map, fetched at startup (LITELLM_LOCAL_MODEL_COST_MAP=False), so spend
+#   is computed with the current OpenAI token prices. The admin console shows the prices in use.
+
+model_list:
+  - model_name: gpt-5.5
+    litellm_params: { model: openai/gpt-5.5, api_key: os.environ/OPENAI_API_KEY }
+  - model_name: gpt-5.4
+    litellm_params: { model: openai/gpt-5.4, api_key: os.environ/OPENAI_API_KEY }
+  - model_name: gpt-5.4-mini
+    litellm_params: { model: openai/gpt-5.4-mini, api_key: os.environ/OPENAI_API_KEY }
+  - model_name: gpt-5.4-nano
+    litellm_params: { model: openai/gpt-5.4-nano, api_key: os.environ/OPENAI_API_KEY }
+  - model_name: gpt-4.1-mini
+    litellm_params: { model: openai/gpt-4.1-mini, api_key: os.environ/OPENAI_API_KEY }
+
+litellm_settings:
+  # Translate/drop parameters a model does not support (e.g. max_tokens vs. max_completion_tokens).
+  drop_params: true
+  # No prompts or responses in the spend logs, only usage and cost.
+  turn_off_message_logging: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  # Spend logs are needed for the rolling 30-day spend per agent.
+  disable_spend_logs: false

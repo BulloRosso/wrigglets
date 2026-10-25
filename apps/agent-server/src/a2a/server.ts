@@ -13,7 +13,7 @@ import {
   type ServerCallContext,
 } from '@a2a-js/sdk/server';
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from '@a2a-js/sdk/server/express';
-import type { Identity, Principal, TaskState as CwTaskState } from '@cw/shared';
+import { UNLIMITED_TOKENS, type Identity, type Principal, type TaskState as CwTaskState } from '@cw/shared';
 import { cancelUpdate, taskStateQuery } from '@cw/workflows/messages';
 import type { ApiDeps } from '../api/context.js';
 import { startTaskWorkflow } from '../api/routes/tasks.js';
@@ -107,10 +107,10 @@ class TaskWorkflowExecutor implements AgentExecutor {
       requester,
       {
         title: String(meta.title ?? text.slice(0, 80)).slice(0, 120),
-        instructions: `${text}\n\n(Delegated via A2A by agent "${caller}" on behalf of ${onBehalfOf.name} <${onBehalfOf.upn}>.)`,
+        instructions: `${text}\n\n(Delegated via A2A by agent "${caller}" on behalf of ${onBehalfOf.name} (${onBehalfOf.upn}).)`,
         type,
         approval,
-        budget: { maxTokens: this.deps.config.TASK_DEFAULT_TOKEN_BUDGET },
+        budget: { maxTokens: UNLIMITED_TOKENS },
       },
       { taskId: workflowId, trigger: { kind: 'agent', callerAgentId: caller, callerTaskId: meta.callerTaskId ? String(meta.callerTaskId) : undefined, a2aTaskId: rc.taskId } },
     );

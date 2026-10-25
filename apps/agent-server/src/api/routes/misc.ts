@@ -23,10 +23,17 @@ export function miscRouter(deps: ApiDeps): Router {
     });
   });
 
+  r.get('/agent/spend', async (_req, res) => {
+    const s = await deps.spend.get({ maxAgeMs: 5_000 });
+    if (!s) throw new HttpError(503, 'spend not available');
+    res.json(s);
+  });
+
   r.get('/agent/status', async (_req, res) => {
-    const [status, health] = await Promise.all([
+    const [status, health, spend] = await Promise.all([
       temporal.workflow.getHandle(agentWorkflowId(config.AGENT_ID)).query(agentStatusQuery),
       deps.health(),
+      deps.spend.get(),
     ]);
     const ids = [status.holder?.taskId, ...status.waiting.map((w) => w.taskId)].filter((x): x is string => !!x);
     const titles = new Map<string, string>();
@@ -42,6 +49,7 @@ export function miscRouter(deps: ApiDeps): Router {
       stats: { grantsTotal: status.stats.grantsTotal },
       health,
       killSwitch: status.killSwitch,
+      spend,
     };
     res.json(body);
   });

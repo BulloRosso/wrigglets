@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { isProtectedPath, resolveWorkspacePath } from '../src/workspace/paths.js';
+import { isProtectedPath, resolveWorkspacePath, uploadFileName } from '../src/workspace/paths.js';
 import { parseEasyAuthPrincipal } from '../src/api/auth.js';
 import { parseAnomalies } from '../src/activities/verify.js';
 
@@ -97,5 +97,23 @@ describe('verification plug-in output', () => {
     expect(parseAnomalies('{"anomalies": ["c"]}')).toEqual(['c']);
     expect(parseAnomalies('not json')).toEqual([]);
     expect(parseAnomalies('')).toEqual([]);
+  });
+});
+
+describe('upload file names', () => {
+  it('keeps umlauts that the multipart parser decoded as Latin-1', () => {
+    const latin1 = Buffer.from('Glänzender Kawaii-Grünling mit Antennen.png', 'utf8').toString('latin1');
+    expect(uploadFileName(latin1)).toBe('Glänzender Kawaii-Grünling mit Antennen.png');
+  });
+  it('keeps names that are already correct and other scripts', () => {
+    expect(uploadFileName('Größe übersicht.xlsx')).toBe('Größe übersicht.xlsx');
+    expect(uploadFileName('報告書 2026.pdf')).toBe('報告書 2026.pdf');
+    expect(uploadFileName('Prüfbericht Grünling – Übersicht (v2), A&B.md')).toBe('Prüfbericht Grünling – Übersicht (v2), A&B.md');
+  });
+  it('removes path parts and unsafe characters', () => {
+    expect(uploadFileName('../../etc/passwd')).toBe('passwd');
+    expect(uploadFileName('a\\b\\c;rm -rf $HOME.txt')).toBe('c_rm -rf _HOME.txt');
+    expect(uploadFileName('..hidden')).toBe('_hidden');
+    expect(uploadFileName('')).toBe('file');
   });
 });

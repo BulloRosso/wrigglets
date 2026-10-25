@@ -6,6 +6,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import { AgentPortrait, KILL_LEVEL_META, formatRelative } from '@cw/ui';
 import { agentMood, avatarUrl, useAgentStatus } from '../api';
+import { AiProblemAlert, SpendMeter } from './Spend';
 
 /** "Idle / working on X / N waiting" (spec §11.1), the agent's portrait and the kill-switch state (ADR-0022). */
 export function AgentStatusBanner() {
@@ -16,6 +17,7 @@ export function AgentStatusBanner() {
   const ks = s.killSwitch && s.killSwitch.level !== 'normal' ? s.killSwitch : undefined;
   return (
     <Stack spacing={2} sx={{ mb: 3 }}>
+      <AiProblemAlert spend={s.spend} />
       {ks && (
         <Alert severity={ks.level === 'tools_off' ? 'warning' : 'error'} icon={KILL_LEVEL_META[ks.level].icon}>
           <AlertTitle>
@@ -48,6 +50,11 @@ export function AgentStatusBanner() {
           {s.waiting.length > 0 ? `${s.waiting.length} task(s) waiting for the workspace.` : 'No tasks waiting.'}
           {harnessDown && ` Agent Harness: ${s.health.harness.state}.`}
           {s.health.temporal.state !== 'up' && ' Temporal is unreachable.'}
+          {s.spend && s.spend.ai.configured && (
+            <Box sx={{ mt: 1, maxWidth: 560 }}>
+              <SpendMeter spend={s.spend} name={s.displayName} dense />
+            </Box>
+          )}
         </Box>
       </Alert>
     </Stack>

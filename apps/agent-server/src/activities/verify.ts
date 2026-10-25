@@ -29,7 +29,19 @@ export function createVerify(deps: ActivityDeps) {
     const commits = (await git.log({ grep: `Task-Id: ${input.taskId}`, files: true, limit: 1000 })).filter((c) =>
       c.trailers['Task-Id']?.includes(input.taskId),
     );
-    const changed = [...new Set(commits.flatMap((c) => c.files ?? []))].sort();
+    const touched = [...new Set(commits.flatMap((c) => c.files ?? []))].sort();
+    // Net effect: a file the task created and removed again (e.g. a report first written to the wrong place and then
+    // moved to reports/) is no change. Files that existed before the task count, also when deleted.
+    const first = commits[commits.length - 1]?.hash;
+    const existsAt = (rev: string, f: string) => git.run(['cat-file', '-e', `${rev}:${f}`]).then(
+      () => true,
+      () => false,
+    );
+    const changed: string[] = [];
+    for (const f of touched) {
+      if (first && !(await existsAt('HEAD', f)) && !(await existsAt(`${first}^`, f))) continue;
+      changed.push(f);
+    }
     const ownPrefix = stepFileName(input.taskId);
 
     for (const f of changed) {

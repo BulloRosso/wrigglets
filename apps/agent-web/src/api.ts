@@ -12,6 +12,7 @@ import type {
   Principal,
   ScheduleDto,
   TaskDetail,
+  TaskChatMessage,
   TaskListItem,
   TaskState,
   Timeline,
@@ -40,6 +41,8 @@ export const api = {
   decide: (id: string, decision: 'approve' | 'reject' | 'revise', comment?: string) =>
     apiFetch<TaskState>(`/api/tasks/${encodeURIComponent(id)}/decision`, { method: 'POST', json: { decision, comment: comment || undefined } }),
   cancel: (id: string, reason?: string) => apiFetch<TaskState>(`/api/tasks/${encodeURIComponent(id)}/cancel`, { method: 'POST', json: { reason: reason || undefined } }),
+  chat: (id: string) => apiFetch<TaskChatMessage[]>(`/api/tasks/${encodeURIComponent(id)}/chat`),
+  sendChat: (id: string, text: string) => apiFetch<TaskChatMessage[]>(`/api/tasks/${encodeURIComponent(id)}/chat`, { method: 'POST', json: { text } }),
   comment: (id: string, text: string) => apiFetch<TaskState>(`/api/tasks/${encodeURIComponent(id)}/comments`, { method: 'POST', json: { text } }),
   taskTimeline: (id: string) => apiFetch<Timeline>(`/api/tasks/${encodeURIComponent(id)}/timeline`),
   timeline: (from: string, to: string) => apiFetch<Timeline & { range: { from: string; to: string } }>(`/api/timeline?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
@@ -52,7 +55,12 @@ export const api = {
   fileUrl: (path: string, download = false) => `/api/workspace/file?path=${encodeURIComponent(path)}${download ? '&download=1' : ''}`,
   fileText: async (path: string) => {
     const res = await fetch(`/api/workspace/file?path=${encodeURIComponent(path)}`, { credentials: 'same-origin' });
-    if (!res.ok) throw new Error(res.status === 404 ? 'File not found' : `Could not load file (${res.status})`);
+    if (!res.ok)
+      throw new Error(
+        res.status === 404
+          ? 'This file no longer exists in the workspace — a task step may have moved or removed it (for example after a verification fix). The file list was refreshed.'
+          : `Could not load file (${res.status})`,
+      );
     return res.text();
   },
   commits: (params: { path?: string; taskId?: string; limit?: number }) => {

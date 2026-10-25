@@ -4,6 +4,8 @@ import { LRUCache } from 'lru-cache';
 import { ulid } from 'ulid';
 import type { WorkflowExecutionInfo } from '@temporalio/client';
 import {
+  taskChatBody,
+  UNLIMITED_TOKENS,
   TASK_ID_PATTERN,
   agentWorkflowId,
   stepFileName,
@@ -27,6 +29,7 @@ import { metrics } from '../../telemetry.js';
 import { decodeHistory } from '../../timeline/history.js';
 import { mapHistory, mergeTimelines } from '../../timeline/mapHistory.js';
 import { readAuditExport } from '../../activities/finalize.js';
+import { TaskChat } from '../../chat/taskChat.js';
 import { HttpError, type ApiDeps } from '../context.js';
 
 export function taskSettings(deps: ApiDeps): TaskInput['settings'] {
@@ -129,7 +132,7 @@ export function taskRouter(deps: ApiDeps): Router {
       instructions: body.instructions,
       type: body.type,
       approval: body.approval,
-      budget: { maxTokens: body.maxTokens ?? config.TASK_DEFAULT_TOKEN_BUDGET },
+      budget: { maxTokens: UNLIMITED_TOKENS }, // spend limit in USD per agent instead (ADR-0029)
     });
     res.status(201).json({ taskId });
   });
@@ -189,6 +192,17 @@ export function taskRouter(deps: ApiDeps): Router {
       throw new HttpError(403, 'Only the requester or an admin may cancel');
     }
     res.json(await h.executeUpdate(cancelUpdate, { args: [{ by: req.user!, reason: body.reason }] }));
+  });
+
+  // Chat with the agent about the task (ADR-0030) — also for finished tasks
+  const chat = new TaskChat(deps);
+  r.get('/tasks/:id/chat', async (req, res) => {
+    res.json(await chat.list(req.params.id));
+  });
+  r.post('/tasks/:id/chat', async (req, res) => {
+    const body = taskChatBody.parse(req.body);
+    const state = await loadTaskState(deps, req.params.id);
+    res.status(201).json(await chat.ask(req.params.id, state, req.user!, body.text));
   });
 
   r.post('/tasks/:id/comments', async (req, res) => {
@@ -264,6 +278,18 @@ export function taskRouter(deps: ApiDeps): Router {
   });
 
   return r;
+}
+
+/** Task state from Temporal, or from the audit export once the workflow is beyond retention. */
+export async function loadTaskState(deps: ApiDeps, taskId: string): Promise<TaskState> {
+  try {
+    return await deps.temporal.workflow.getHandle(taskId).query(taskStateQuery);
+  } catch (err) {
+    const rel = await findAuditExport(deps, taskId);
+    const exp = rel ? ((await readAuditExport(deps.config.workspaceDir, rel)) as { state: TaskState } | undefined) : undefined;
+    if (!exp) throw err;
+    return exp.state;
+  }
 }
 
 export async function findAuditExport(deps: ApiDeps, taskId: string): Promise<string | undefined> {

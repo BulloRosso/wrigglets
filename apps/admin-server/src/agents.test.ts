@@ -9,8 +9,6 @@ const config = loadConfig({
   OAUTH_ADMIN_TOKEN: 'x'.repeat(32),
   ADMIN_CLIENT_SECRET: 'y'.repeat(20),
   SESSION_SECRET: 'z'.repeat(40),
-  AI_GATEWAY_BASE_URL: 'http://mock-llm:4010/v1',
-  AI_GATEWAY_API_KEY: 'key',
   GATEWAY_TOKEN: 'g'.repeat(32),
 });
 
@@ -20,7 +18,7 @@ const spec: AgentSpec = {
   gitEmail: 'agent-max@coworking.local',
   image: 'coworking/agent:local',
   hostPort: 8101,
-  model: 'mock-large',
+  model: 'gpt-5.4-mini',
   resources: { cpus: 1, memoryMb: 2048 },
   createdAt: '',
   createdBy: 'admin',
@@ -29,7 +27,7 @@ const spec: AgentSpec = {
 
 describe('AgentService.env', () => {
   const svc = new AgentService(config, {} as never, {} as never, {} as never, {} as never);
-  const env = svc.env(spec, { oidcClientSecret: 'client-secret', sessionSecret: 's'.repeat(43), internalToken: 'i'.repeat(43) });
+  const env = svc.env(spec, { oidcClientSecret: 'client-secret', sessionSecret: 's'.repeat(43), internalToken: 'i'.repeat(43), aiKey: 'sk-virtual' });
 
   it('wires the agent to Temporal, the OAuth server and the model provider', () => {
     expect(env).toMatchObject({
@@ -41,7 +39,9 @@ describe('AgentService.env', () => {
       OIDC_INTERNAL_URL: 'http://oauth:9000',
       OIDC_CLIENT_ID: 'agent-max',
       OIDC_CLIENT_SECRET: 'client-secret',
-      AI_GATEWAY_MODEL: 'mock-large',
+      AI_GATEWAY_BASE_URL: 'http://litellm:4000/v1',
+      AI_GATEWAY_API_KEY: 'sk-virtual',
+      AI_GATEWAY_MODEL: 'gpt-5.4-mini',
     });
   });
 

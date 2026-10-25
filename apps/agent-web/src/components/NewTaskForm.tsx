@@ -17,8 +17,9 @@ import Typography from '@mui/material/Typography';
 import ExpandMoreOutlined from '@mui/icons-material/ExpandMoreOutlined';
 import AddTaskOutlined from '@mui/icons-material/AddTaskOutlined';
 import type { ApprovalPolicy } from '@cw/shared';
+import { AiProblemAlert, SpendMeter } from './Spend';
 import { ErrorAlert } from '@cw/ui';
-import { api } from '../api';
+import { api, useAgentStatus } from '../api';
 
 const TYPES = [
   { value: 'analysis', label: 'Analysis', help: 'Read and evaluate data; results go to reports/' },
@@ -34,10 +35,12 @@ export function NewTaskForm() {
   const [instructions, setInstructions] = useState('');
   const [type, setType] = useState<'analysis' | 'report' | 'change'>('report');
   const [approval, setApproval] = useState<ApprovalPolicy>('plan');
-  const [maxTokens, setMaxTokens] = useState('');
+  const status = useAgentStatus();
+  const spend = status.data?.spend;
+  const blocked = !!spend && (!spend.ai.configured || spend.exceeded);
 
   const create = useMutation({
-    mutationFn: () => api.createTask({ title, instructions, type, approval, maxTokens: maxTokens ? Number(maxTokens) : undefined }),
+    mutationFn: () => api.createTask({ title, instructions, type, approval }),
     onSuccess: ({ taskId }) => {
       void qc.invalidateQueries({ queryKey: ['tasks'] });
       navigate(`/tasks/${encodeURIComponent(taskId)}`);
@@ -89,12 +92,13 @@ export function NewTaskForm() {
                 <FormControlLabel value="none" control={<Radio size="small" />} label="No approval" />
               </RadioGroup>
             </FormControl>
-            <TextField label="Token budget" type="number" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} placeholder="default" sx={{ width: 160 }} />
           </Stack>
+          {spend && spend.ai.configured && <SpendMeter spend={spend} name={status.data?.displayName ?? 'The agent'} />}
+          <AiProblemAlert spend={spend} />
           <ErrorAlert error={create.error} />
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
             <Button onClick={() => setExpanded(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={!valid || create.isPending}>
+            <Button type="submit" variant="contained" disabled={!valid || create.isPending || blocked}>
               {create.isPending ? 'Submitting…' : 'Submit task'}
             </Button>
           </Stack>

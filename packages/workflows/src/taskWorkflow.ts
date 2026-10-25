@@ -275,7 +275,8 @@ export async function taskWorkflow(input: TaskInput): Promise<TaskResult> {
           state.usage.tokens += d.tokens;
           state.steps.push({ stepId, kind, summary: d.summary, commit: d.commit, startedAt, endedAt: new Date().toISOString(), tokens: d.tokens, artifacts: [], filesTouched: [] });
         }
-        throw new BudgetExceeded();
+        // the activity explains why (e.g. the agent's 30-day spend limit in USD, ADR-0029)
+        throw new BudgetExceeded(err.cause.message);
       }
       throw err;
     }
@@ -514,7 +515,7 @@ export async function taskWorkflow(input: TaskInput): Promise<TaskResult> {
       throw err; // cancellation requested through Temporal itself (e.g. Temporal UI)
     }
     if (err instanceof BudgetExceeded) {
-      state.error = `Token budget of ${state.usage.maxTokens} exhausted (${state.usage.tokens} used)`;
+      state.error = err.message || `Token budget of ${state.usage.maxTokens} exhausted (${state.usage.tokens} used)`;
       await cleanup('budget_exceeded');
       return finish('budget_exceeded');
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link as RouterLink, useParams, useSearchParams } from 'react-router';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -26,10 +26,12 @@ import CheckOutlined from '@mui/icons-material/CheckOutlined';
 import EditNoteOutlined from '@mui/icons-material/EditNoteOutlined';
 import CloseOutlined from '@mui/icons-material/CloseOutlined';
 import StopCircleOutlined from '@mui/icons-material/StopCircleOutlined';
+import ReplayOutlined from '@mui/icons-material/ReplayOutlined';
 import OpenInNewOutlined from '@mui/icons-material/OpenInNewOutlined';
 import { ACTIVE_STATUSES, isTerminalStatus, moodForTaskStatus, type TaskState } from '@cw/shared';
 import { AgentPortrait, ConfirmDialog, ErrorAlert, KeyValueList, Loading, PageHeader, RelativeTime, StatusChip, TimelineChart, formatDateTime, formatNumber } from '@cw/ui';
-import { api, avatarUrl, hasRole, useMe } from '../api';
+import { api, avatarUrl, hasRole, useAgentStatus, useMe } from '../api';
+import { SpendMeter } from '../components/Spend';
 import { CommitList, DiffDialog } from '../components/CommitList';
 import { LivePanel } from '../components/LivePanel';
 import { FilePreviewDialog } from '../components/FilePreview';
@@ -42,6 +44,8 @@ export function TaskDetailPage() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const me = useMe();
+  const navigate = useNavigate();
+  const agentStatus = useAgentStatus();
   const [pending, setPending] = useState<Pending>();
   const [diff, setDiff] = useState<string>();
   const [previewPath, setPreviewPath] = useState<string>();
@@ -77,6 +81,16 @@ export function TaskDetailPage() {
       refresh(s);
     },
   });
+  const chat = useQuery({ queryKey: ['chat', id], queryFn: () => api.chat(id) });
+  const ask = useMutation({
+    mutationFn: (text: string) => api.sendChat(id, text),
+    onSuccess: (msgs) => qc.setQueryData(['chat', id], [...(chat.data ?? []), ...msgs]),
+  });
+  // same request as a new task, e.g. after a failure or with a better model
+  const runAgain = useMutation({
+    mutationFn: (st: TaskState) => api.createTask({ title: st.title, instructions: st.instructions, type: st.type as 'analysis' | 'report' | 'change', approval: st.approval }),
+    onSuccess: ({ taskId }) => navigate(`/tasks/${encodeURIComponent(taskId)}`),
+  });
   const addComment = useMutation({
     mutationFn: (text: string) => api.comment(id, text),
     onSuccess: (st) => refresh(st),
@@ -103,7 +117,6 @@ export function TaskDetailPage() {
   const owner = state.trigger.kind === 'schedule' ? state.trigger.owner : state.requestedBy;
   const mayDecide = !!user && (hasRole(me.data, 'approver') || user.upn === owner.upn);
   const mayCancel = !!user && !isTerminalStatus(state.status) && !state.cancelRequested && (user.upn === state.requestedBy.upn || hasRole(me.data, 'admin'));
-  const usagePct = Math.min(100, (state.usage.tokens / Math.max(1, state.usage.maxTokens)) * 100);
 
   return (
     <>
@@ -124,6 +137,10 @@ export function TaskDetailPage() {
           mayCancel ? (
             <Button color="error" variant="outlined" startIcon={<StopCircleOutlined />} onClick={() => setPending({ kind: 'cancel' })}>
               Cancel task
+            </Button>
+          ) : isTerminalStatus(state.status) && state.type !== 'upload' && state.trigger.kind !== 'agent' ? (
+            <Button variant="outlined" startIcon={<ReplayOutlined />} onClick={() => runAgain.mutate(state)} disabled={runAgain.isPending}>
+              Run again
             </Button>
           ) : undefined
         }
@@ -202,9 +219,11 @@ export function TaskDetailPage() {
             <TaskConversation
               state={state}
               agentName={me.data?.agent.displayName ?? 'Agent'}
-              onSend={(text) => addComment.mutateAsync(text)}
-              sending={addComment.isPending}
-              error={addComment.error}
+              chat={chat.data ?? []}
+              pendingQuestion={ask.isPending ? ask.variables : undefined}
+              onSend={(text) => ask.mutateAsync(text)}
+              sending={ask.isPending}
+              error={ask.error}
               onOpenFile={setPreviewPath}
             />
             <Card>
@@ -258,10 +277,18 @@ export function TaskDetailPage() {
                 ))}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader title="Commits" subheader="Git history of this task (with trailers)" />
-              <CardContent sx={{ pt: 0 }}>{commits.data ? <CommitList commits={commits.data} dense /> : <Loading />}</CardContent>
-            </Card>
+            {/* Git details matter for audits, less for everyday work: collapsed by default */}
+            <Accordion disableGutters variant="outlined" sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+                <Stack>
+                  <Typography variant="subtitle1">Commits</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Git history of this task (with trailers){commits.data ? ` · ${commits.data.length} commit(s)` : ''}
+                  </Typography>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>{commits.data ? <CommitList commits={commits.data} dense /> : <Loading />}</AccordionDetails>
+            </Accordion>
           </Stack>
         </Grid>
 
@@ -282,17 +309,14 @@ export function TaskDetailPage() {
                     ['Audit export', state.result?.auditPath ?? '–'],
                   ]}
                 />
-                <Box sx={{ mt: 2 }}>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Token budget
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatNumber(state.usage.tokens)} / {formatNumber(state.usage.maxTokens)}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress variant="determinate" value={usagePct} color={usagePct > 90 ? 'error' : usagePct > 70 ? 'warning' : 'primary'} sx={{ height: 8, borderRadius: 4 }} />
-                </Box>
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 2 }}>
+                  Tokens used by this task: {formatNumber(state.usage.tokens)}
+                </Typography>
+                {agentStatus.data?.spend && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <SpendMeter spend={agentStatus.data.spend} name={agentStatus.data.displayName} dense />
+                  </Box>
+                )}
                 {me.data?.temporalUiUrl && hasRole(me.data, 'admin') && (
                   <Button size="small" sx={{ mt: 2 }} endIcon={<OpenInNewOutlined />} href={`${me.data.temporalUiUrl}/namespaces/${me.data.temporalNamespace}/workflows/${encodeURIComponent(state.taskId)}`} target="_blank" rel="noreferrer">
                     Open in Temporal UI

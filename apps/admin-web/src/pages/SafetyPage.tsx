@@ -32,7 +32,7 @@ import KeyOutlined from '@mui/icons-material/KeyOutlined';
 import PlayArrowOutlined from '@mui/icons-material/PlayArrowOutlined';
 import ArrowForwardOutlined from '@mui/icons-material/ArrowForwardOutlined';
 import { KILL_LEVELS, type SafetyRule, type UpstreamServer } from '@cw/shared';
-import { AgentPortrait, EmptyState, ErrorAlert, KILL_LEVEL_META, KillSwitchChip, Loading, PageHeader, RelativeTime, StatusChip, errorMessage, formatNumber } from '@cw/ui';
+import { AgentPortrait, EmptyState, ErrorAlert, KILL_LEVEL_META, KillSwitchChip, Loading, PageHeader, RelativeTime, StatusChip, errorMessage, formatNumber, userLocale } from '@cw/ui';
 import { api, avatarSrc } from '../api';
 import { KillSwitchDialog } from '../components/KillSwitch';
 
@@ -163,7 +163,7 @@ function Rules() {
     <Card>
       <CardHeader
         title="Automatic triggers"
-        subheader={`Evaluated every 30 s${q.data.lastRun ? ` · last run ${new Date(q.data.lastRun).toLocaleTimeString('en-GB')}` : ''}`}
+        subheader={`Evaluated every 30 s${q.data.lastRun ? ` · last run ${new Date(q.data.lastRun).toLocaleTimeString(userLocale)}` : ''}`}
         action={
           <Stack direction="row" spacing={1}>
             <Button startIcon={<PlayArrowOutlined />} onClick={() => run.mutate()} disabled={run.isPending}>

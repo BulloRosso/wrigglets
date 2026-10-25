@@ -35,6 +35,12 @@ export class GatewayConfigService {
   async load(defaults: Partial<GatewayData> = {}) {
     try {
       this.data = { ...this.data, ...(JSON.parse(await readFile(this.file, 'utf8')) as GatewayData) };
+      // upstreams that were added to the platform later (e.g. "web") are registered once
+      const missing = (defaults.upstreams ?? []).filter((u) => !this.data.upstreams.some((x) => x.name === u.name));
+      if (missing.length) {
+        this.data.upstreams = [...this.data.upstreams, ...missing];
+        await this.persist();
+      }
     } catch {
       this.data = { ...this.data, ...defaults };
       await this.persist();

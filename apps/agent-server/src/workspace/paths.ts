@@ -48,3 +48,19 @@ export function isInside(root: string, candidate: string): boolean {
 export const PROTECTED_PATHS = [/^\.git(\/|$)/, /^AGENTS\.md$/, /^opencode\.jsonc?$/, /^\.opencode(\/|$)/, /^\.agent\/audit(\/|$)/];
 
 export const isProtectedPath = (rel: string) => PROTECTED_PATHS.some((re) => re.test(rel));
+
+/**
+ * File name of an upload: browsers send UTF-8, but the multipart parser decodes names as Latin-1 ("GlÃ¤nzender").
+ * Recode such names, normalize to NFC and keep letters, marks and digits of all scripts; everything else that could
+ * be unsafe in a path (separators, control and shell characters) becomes "_".
+ */
+export function uploadFileName(original: string): string {
+  let name = original;
+  if (/^[\x00-\xff]*$/.test(name) && /[\x80-\xff]/.test(name)) {
+    const recoded = Buffer.from(name, 'latin1').toString('utf8');
+    if (!recoded.includes('�')) name = recoded;
+  }
+  name = (name.replace(/\\/g, '/').split('/').pop() ?? '').normalize('NFC');
+  name = name.replace(/[^\p{L}\p{M}\p{N}\p{Pd}._ ()[\],+&'!#@]/gu, '_').replace(/^\.+/, '_').trim().slice(0, 180);
+  return name || 'file';
+}

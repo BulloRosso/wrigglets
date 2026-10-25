@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/wrigglets-banner.png" alt="Wrigglets! Five cartoon caterpillar agents playing on a playground" width="720"></p>
+
 # Coworking Agents
 
 AI colleagues that teams talk to through a web UI. Each agent works on one shared, Git-versioned workspace;

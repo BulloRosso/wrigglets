@@ -100,8 +100,14 @@ Ask anything about the task: why a decision was made, what a file contains, or w
 answers with its model, from the task, its files and its images. Each answer shows the model, tokens and cost, and
 counts towards the spend limit.
 
-The **+** button uploads one or more files into the workspace, as an audited upload task. The uploaded files are then
-mentioned in the question, so the agent reads them. The chat itself never changes files: for new work, start a task or
+The **+** button attaches one or more files. They appear as a preview above the input, with a thumbnail for pictures
+and their size, and each can be removed again (or all at once) before sending. **Upload & send** uploads the remaining
+files into the workspace as one audited upload task, waits until they are committed and then sends the question with
+the file paths, so the agent reads them. Without a question, **Upload** only uploads them.
+
+![Attached files before sending; each can be removed](docs/images/tour/u13-attachments.png)
+
+The agent reads files that were uploaded or named in the question. The chat itself never changes files: for new work, start a task or
 request changes.
 
 ![Lara describes a picture uploaded with the + button](docs/images/tour/u11-chat.png)

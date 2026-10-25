@@ -17,9 +17,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import SendOutlined from '@mui/icons-material/SendOutlined';
 import AddOutlined from '@mui/icons-material/AddOutlined';
+import CloseOutlined from '@mui/icons-material/CloseOutlined';
+import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
 import { Link as RouterLink } from 'react-router';
 import { formatUsd, isTerminalStatus, moodForTaskStatus, type AvatarMood, type Identity, type TaskChatMessage, type TaskState } from '@cw/shared';
-import { AgentPortrait, ErrorAlert, formatDateTime } from '@cw/ui';
+import { AgentPortrait, ErrorAlert, formatBytes, formatDateTime } from '@cw/ui';
 import { api, avatarUrl } from '../api';
 import { Markdown } from './Markdown';
 
@@ -213,6 +215,45 @@ function Bubble({ entry, agentName, onOpenFile }: { entry: Entry; agentName: str
   );
 }
 
+const MAX_ATTACHMENTS = 10;
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024; // same limit as the upload API
+
+/** One attached file before upload: thumbnail for images, name, size and a remove button. */
+function AttachmentPreview({ file, onRemove, disabled }: { file: File; onRemove: () => void; disabled: boolean }) {
+  const isImage = /^image\/(png|jpe?g|gif|webp)$/.test(file.type);
+  const [thumb, setThumb] = useState<string>();
+  useEffect(() => {
+    if (!isImage) return;
+    const url = URL.createObjectURL(file);
+    setThumb(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, isImage]);
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', pl: 0.75, pr: 0.25, py: 0.5, bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1.5, maxWidth: 280 }}>
+      {thumb ? (
+        <Box component="img" src={thumb} alt="" sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+      ) : (
+        <InsertDriveFileOutlined color="action" sx={{ fontSize: 32, flexShrink: 0 }} />
+      )}
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2" noWrap title={file.name}>
+          {file.name}
+        </Typography>
+        <Typography variant="caption" color={file.size > MAX_ATTACHMENT_BYTES ? 'error' : 'text.secondary'}>
+          {formatBytes(file.size)}
+        </Typography>
+      </Box>
+      <Tooltip title="Remove">
+        <span>
+          <IconButton size="small" aria-label={`Remove ${file.name}`} onClick={onRemove} disabled={disabled}>
+            <CloseOutlined fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Stack>
+  );
+}
+
 export function TaskConversation({
   state,
   agentName,
@@ -235,16 +276,27 @@ export function TaskConversation({
 }) {
   const [text, setText] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  /** Files chosen with "+" — uploaded only when the message is submitted, removable until then. */
+  const [attached, setAttached] = useState<File[]>([]);
   const [upload, setUpload] = useState<{ state: 'running' | 'done' | 'failed'; names: string[]; taskId?: string; files?: string[]; error?: string }>();
+  const busy = sending || upload?.state === 'running';
 
-  /** "+": upload files into the workspace (an audited upload task), then mention them in the question. */
-  async function uploadFiles(list: FileList | null) {
-    const files = [...(list ?? [])].slice(0, 10);
-    if (!files.length) return;
+  function attach(list: FileList | null) {
+    const picked = [...(list ?? [])];
+    setAttached((cur) => {
+      const key = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+      const seen = new Set(cur.map(key));
+      return [...cur, ...picked.filter((f) => !seen.has(key(f)))].slice(0, MAX_ATTACHMENTS);
+    });
+  }
+  const tooLarge = attached.filter((f) => f.size > MAX_ATTACHMENT_BYTES);
+
+  /** Upload the attached files as one upload task and wait until they are committed, so the agent can read them. */
+  async function uploadAttached(): Promise<string[]> {
+    const files = attached;
     setUpload({ state: 'running', names: files.map((f) => f.name) });
     try {
       const r = await api.upload(files, 'uploads');
-      // wait until the upload task has committed the files, so the agent can read them right away
       for (let i = 0; i < 60; i++) {
         const st = (await api.task(r.taskId)).state.status;
         if (st === 'completed') break;
@@ -252,12 +304,36 @@ export function TaskConversation({
         await new Promise((res) => setTimeout(res, 1000));
       }
       setUpload({ state: 'done', names: files.map((f) => f.name), taskId: r.taskId, files: r.files });
-      const mention = r.files.map((f) => `\`${f}\``).join(' ');
-      setText((t) => (t.trim() ? `${t.trim()} ${mention} ` : `${mention} `));
+      setAttached([]);
+      return r.files;
     } catch (err) {
       setUpload({ state: 'failed', names: files.map((f) => f.name), error: err instanceof Error ? err.message : String(err) });
+      throw err;
     }
   }
+
+  async function submit() {
+    if (busy || (!text.trim() && !attached.length) || tooLarge.length) return;
+    let question = text.trim();
+    if (attached.length) {
+      let paths: string[];
+      try {
+        paths = await uploadAttached();
+      } catch {
+        return; // the alert explains; files stay attached for another try
+      }
+      const mention = paths.map((f) => `\`${f}\``).join(' ');
+      if (!question) {
+        // upload only: keep the paths in the box so the next question refers to the files
+        setText(`${mention} `);
+        return;
+      }
+      question = `${mention} ${question}`;
+    }
+    await onSend(question);
+    setText('');
+  }
+
   const entries = conversationOf(state, agentName, chat);
   if (pendingQuestion) {
     const now = new Date().toISOString();
@@ -286,6 +362,28 @@ export function TaskConversation({
             <Bubble key={i} entry={e} agentName={agentName} onOpenFile={onOpenFile} />
           ))}
         </Stack>
+        {attached.length > 0 && (
+          <Box sx={{ mt: 2, p: 1.5, border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover' }}>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                {attached.length} file(s) will be uploaded to <code>uploads/</code> when you send — remove any you do not want
+              </Typography>
+              <Button size="small" onClick={() => setAttached([])} disabled={busy}>
+                Remove all
+              </Button>
+            </Stack>
+            <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+              {attached.map((f, i) => (
+                <AttachmentPreview key={`${f.name}:${f.size}:${f.lastModified}`} file={f} disabled={busy} onRemove={() => setAttached((cur) => cur.filter((_, j) => j !== i))} />
+              ))}
+            </Stack>
+            {tooLarge.length > 0 && (
+              <Typography variant="caption" color="error" component="div" sx={{ mt: 1 }}>
+                {tooLarge.map((f) => f.name).join(', ')}: larger than {formatBytes(MAX_ATTACHMENT_BYTES)} — please remove.
+              </Typography>
+            )}
+          </Box>
+        )}
         <Stack
           component="form"
           direction="row"
@@ -293,13 +391,22 @@ export function TaskConversation({
           sx={{ mt: 2, alignItems: 'flex-end' }}
           onSubmit={(e) => {
             e.preventDefault();
-            if (text.trim()) void onSend(text.trim()).then(() => setText(''));
+            void submit();
           }}
         >
-          <input ref={fileInput} type="file" multiple hidden onChange={(e) => { void uploadFiles(e.target.files); e.target.value = ''; }} />
-          <Tooltip title="Upload files into the workspace (e.g. a picture, a spreadsheet) and ask about them">
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              attach(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          <Tooltip title={`Attach files (up to ${MAX_ATTACHMENTS}) — they are uploaded into the workspace when you send, and ${agentName} reads them`}>
             <span>
-              <IconButton aria-label="Upload files" onClick={() => fileInput.current?.click()} disabled={upload?.state === 'running'} sx={{ mb: 0.25 }}>
+              <IconButton aria-label="Attach files" onClick={() => fileInput.current?.click()} disabled={busy || attached.length >= MAX_ATTACHMENTS} sx={{ mb: 0.25 }}>
                 {upload?.state === 'running' ? <CircularProgress size={22} /> : <AddOutlined />}
               </IconButton>
             </span>
@@ -311,15 +418,21 @@ export function TaskConversation({
             maxRows={8}
             size="small"
             label={`Ask ${agentName}`}
-            placeholder="e.g. What is shown in the picture? Why did you choose this supplier? (Ctrl+Enter sends)"
+            placeholder={attached.length ? 'Ask about the attached files, or send to upload them only' : 'e.g. What is shown in the picture? Why did you choose this supplier? (Ctrl+Enter sends)'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && text.trim()) void onSend(text.trim()).then(() => setText(''));
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void submit();
             }}
           />
-          <Button type="submit" variant="contained" endIcon={<SendOutlined />} disabled={!text.trim() || sending}>
-            Send
+          <Button
+            type="submit"
+            variant="contained"
+            endIcon={<SendOutlined />}
+            disabled={busy || (!text.trim() && !attached.length) || tooLarge.length > 0}
+            sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            {attached.length ? (text.trim() ? 'Upload & send' : 'Upload') : 'Send'}
           </Button>
         </Stack>
         {upload && (
@@ -331,7 +444,7 @@ export function TaskConversation({
             {upload.state === 'running' && `Uploading ${upload.names.join(', ')} into the workspace…`}
             {upload.state === 'done' && (
               <>
-                Uploaded to the workspace: {upload.files?.join(', ')}. The files are mentioned in your question, so {agentName} reads them.{' '}
+                Uploaded to the workspace: {upload.files?.join(', ')}.{' '}
                 {upload.taskId && (
                   <Link component={RouterLink} to={`/tasks/${encodeURIComponent(upload.taskId)}`}>
                     Upload task
@@ -339,7 +452,7 @@ export function TaskConversation({
                 )}
               </>
             )}
-            {upload.state === 'failed' && `Upload failed: ${upload.error}`}
+            {upload.state === 'failed' && `Upload failed: ${upload.error}. The files are still attached — try again or remove them.`}
           </Alert>
         )}
         <ErrorAlert error={error} />

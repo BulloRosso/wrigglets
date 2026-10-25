@@ -30,6 +30,10 @@ workflow is closed.
   - Messages are stored per task in `ARTIFACTS_DIR/chat/<taskId>.jsonl`, with model, tokens, cost and the files used.
   - Every question is written to the app audit log (`task.chat`).
   - The limit is 30 questions per person per 10 minutes.
+- **Attachments:** the **+** button attaches files to the next message. They are shown as a preview (thumbnail for
+  pictures, name, size) and can be removed one by one or all at once. Nothing is uploaded before sending: on submit, the
+  remaining files are uploaded as one upload task (an audited commit authored by the person). After the commit the
+  question is sent with the file paths, so the agent reads them. Up to 10 files, 50 MB each.
 - **Guards:** questions are refused with a clear message when no AI model is available or the spend limit is reached.
 
 ## Consequences

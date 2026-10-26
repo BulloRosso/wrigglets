@@ -1,13 +1,14 @@
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import multer from 'multer';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import type { StagingFile, WorkspaceEntry } from '@cw/shared';
 import { isProtectedPath, resolveWorkspacePath, uploadFileName } from '../../workspace/paths.js';
 import { HttpError, type ApiDeps } from '../context.js';
+import { requireRole } from '../auth.js';
 import { startTaskWorkflow } from './tasks.js';
 
 const MAX_FILE = 20 * 1024 * 1024;
@@ -39,6 +40,33 @@ const MIME: Record<string, string> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
 };
+
+const MAX_AGENTS_MD = 256 * 1024;
+const agentsMdBody = z.object({ content: z.string().max(MAX_AGENTS_MD), by: z.object({ upn: z.string().min(1), name: z.string().optional() }).optional() });
+
+/** AGENTS.md is protected from tasks and uploads; only administrators edit it, directly, as a commit authored by them. */
+export function agentsMdHandlers(deps: ApiDeps) {
+  const { config, git } = deps;
+  const file = path.join(config.workspaceDir, 'AGENTS.md');
+  const get: RequestHandler = async (_req, res) => {
+    res.json({ content: await readFile(file, 'utf8').catch(() => '') });
+  };
+  const put = (identity: (req: Parameters<RequestHandler>[0]) => { upn: string; name?: string }): RequestHandler => async (req, res) => {
+    const body = agentsMdBody.parse(req.body);
+    const by = identity(req);
+    if (body.content.includes('\0')) throw new HttpError(400, 'invalid content');
+    const content = body.content === '' || body.content.endsWith('\n') ? body.content : `${body.content}\n`;
+    await writeFile(file, content, 'utf8');
+    const commit = await git.commitPaths(['AGENTS.md'], {
+      subject: 'docs(agents): update AGENTS.md',
+      trailers: { 'Requested-By': by.upn, Trigger: 'manual' },
+      author: { name: by.name || by.upn, email: by.upn },
+    });
+    await deps.audit.write({ by: by.upn, action: 'agents-md.update', target: 'AGENTS.md', details: { commit } });
+    res.json({ commit: commit ?? null });
+  };
+  return { get, put };
+}
 
 /** Read-only workspace access for users; writes only through upload tasks (spec §2.2 #5, §8.4). */
 export function workspaceRouter(deps: ApiDeps): Router {
@@ -73,6 +101,10 @@ export function workspaceRouter(deps: ApiDeps): Router {
     if (req.query.download === '1' || !MIME[ext]) res.setHeader('Content-Disposition', `attachment; filename="${path.basename(rel).replace(/"/g, '')}"`);
     createReadStream(abs).pipe(res);
   });
+
+  const agentsMd = agentsMdHandlers(deps);
+  r.get('/workspace/agents-md', requireRole(config.roles.admin), agentsMd.get);
+  r.put('/workspace/agents-md', requireRole(config.roles.admin), agentsMd.put((req) => ({ upn: req.user!.upn, name: req.user!.name })));
 
   r.get('/workspace/commits', async (req, res) => {
     const p = req.query.path ? (await resolveWorkspacePath(config.workspaceDir, String(req.query.path), { mustExist: false })).rel : undefined;

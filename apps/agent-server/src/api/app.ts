@@ -11,7 +11,7 @@ import { errorHandler, type ApiDeps } from './context.js';
 import { codecHandlers, codecRouter, miscRouter } from './routes/misc.js';
 import { scheduleRouter } from './routes/schedules.js';
 import { taskRouter } from './routes/tasks.js';
-import { workspaceRouter } from './routes/workspace.js';
+import { agentsMdHandlers, workspaceRouter } from './routes/workspace.js';
 
 export function createApp(deps: ApiDeps, auth: Auth): Express {
   const app = express();
@@ -31,6 +31,18 @@ export function createApp(deps: ApiDeps, auth: Auth): Express {
     const token = deps.config.CONTROL_PLANE_TOKEN;
     if (!token || req.header('authorization') !== `Bearer ${token}`) return void res.status(401).json({ error: 'unauthorized' });
     res.json(safetyStats.snapshot());
+  });
+  // AGENTS.md editing from the admin console (the admin server has verified the platform admin and passes their identity)
+  const controlPlane: express.RequestHandler = (req, res, next) => {
+    const token = deps.config.CONTROL_PLANE_TOKEN;
+    if (!token || req.header('authorization') !== `Bearer ${token}`) return void res.status(401).json({ error: 'unauthorized' });
+    next();
+  };
+  const agentsMd = agentsMdHandlers(deps);
+  app.get('/internal/agents-md', controlPlane, agentsMd.get);
+  app.put('/internal/agents-md', controlPlane, express.json({ limit: '512kb' }), (req, res, next) => {
+    if (!req.body?.by?.upn) return void res.status(400).json({ error: 'by.upn required' });
+    agentsMd.put(() => req.body.by)(req, res, next);
   });
   mountA2a(app, deps);
   mountGuard(app, deps.guard);

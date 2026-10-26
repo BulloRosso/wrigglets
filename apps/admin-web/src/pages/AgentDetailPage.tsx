@@ -33,6 +33,7 @@ import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import { ALL_AGENT_ROLES, type AgentStats, type AgentSummary } from '@cw/shared';
 import {
   AgentPortrait,
+  AgentsMdEditor,
   ConfirmDialog,
   KillSwitchChip,
   EmptyState,
@@ -425,7 +426,7 @@ function AgentAudit({ agentId }: { agentId: string }) {
   );
 }
 
-const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Settings', 'Audit'] as const;
+const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Instructions', 'Settings', 'Audit'] as const;
 
 export function AgentDetailPage() {
   const { id = '' } = useParams();
@@ -503,6 +504,7 @@ export function AgentDetailPage() {
       {tab === 'Portrait' && <PortraitTab a={a} />}
       {tab === 'Collaboration' && <CollaborationTab a={a} />}
       {tab === 'Safety' && <SafetyTab a={a} />}
+      {tab === 'Instructions' && <AgentsMdEditor load={async () => (await api.agentsMd(id)).content} save={(content) => api.saveAgentsMd(id, content)} />}
       {tab === 'Settings' && <Settings a={a} />}
       {tab === 'Audit' && <AgentAudit agentId={id} />}
       {me.data && (

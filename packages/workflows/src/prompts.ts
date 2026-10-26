@@ -1,4 +1,4 @@
-import { stepFileName, workspacePaths, type TaskInput } from '@cw/shared';
+import { reportPath, workspacePaths, type TaskInput } from '@cw/shared';
 import type { VerifyResult } from './activity-types.js';
 
 /*
@@ -40,7 +40,7 @@ export function planPrompt(taskId: string, input: TaskInput, revision?: { commen
   return lines.join('\n');
 }
 
-export function runPrompt(taskId: string, input: TaskInput, approval?: { comment?: string; by: string }): string {
+export function runPrompt(taskId: string, input: TaskInput, createdAt: string, approval?: { comment?: string; by: string }): string {
   const lines = [
     header(taskId, input),
     '## Your job in this step: EXECUTE',
@@ -48,7 +48,10 @@ export function runPrompt(taskId: string, input: TaskInput, approval?: { comment
   ];
   if (approval?.comment) lines.push(`The plan was approved by ${approval.by} with this comment: ${approval.comment}`);
   if (input.type === 'report' || input.type === 'analysis') {
-    lines.push(`Write the main result to \`reports/${stepFileName(taskId)}.md\` unless the plan names a different output path.`);
+    lines.push(
+      `Write the main result to \`${reportPath(input.title, createdAt)}\` unless the plan names a different output path. ` +
+        'If a file with that name already exists from another task, add a numeric suffix (-2, -3, …) instead of overwriting it.',
+    );
     lines.push(
       'The report must contain the actual answer itself — the concrete results, numbers, tables and conclusions the request asks for — ' +
         'written for the requester. Do not only describe what you did or where the result is.',

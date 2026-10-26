@@ -479,6 +479,9 @@ importers:
       '@cw/shared':
         specifier: workspace:*
         version: link:../shared
+      monaco-editor:
+        specifier: 0.52.2
+        version: 0.52.2
     devDependencies:
       '@emotion/react':
         specifier: 11.14.0
@@ -3448,6 +3451,9 @@ packages:
 
   module-details-from-path@1.0.4:
     resolution: {integrity: sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==}
+
+  monaco-editor@0.52.2:
+    resolution: {integrity: sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -7649,6 +7655,8 @@ snapshots:
   mkdirp-classic@0.5.3: {}
 
   module-details-from-path@1.0.4: {}
+
+  monaco-editor@0.52.2: {}
 
   ms@2.1.3: {}
 

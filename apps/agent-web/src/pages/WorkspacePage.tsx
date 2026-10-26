@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
@@ -26,8 +26,8 @@ import FolderOutlined from '@mui/icons-material/FolderOutlined';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
 import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
-import { EmptyState, ErrorAlert, Loading, PageHeader, formatBytes, formatRelative } from '@cw/ui';
-import { api } from '../api';
+import { AgentsMdEditor, EmptyState, ErrorAlert, Loading, PageHeader, formatBytes, formatRelative } from '@cw/ui';
+import { api, hasRole, useMe } from '../api';
 import { CommitList } from '../components/CommitList';
 import { FilePreview, previewLabel } from '../components/FilePreview';
 
@@ -71,11 +71,14 @@ export function WorkspacePage() {
   const [params, setParams] = useSearchParams();
   const file = params.get('file') ?? undefined;
   const dir = params.get('dir') ?? (file ? file.split('/').slice(0, -1).join('/') : '');
+  const me = useMe();
+  const qc = useQueryClient();
   const [tab, setTab] = useState(0);
   const [uploading, setUploading] = useState(false);
   // files change while tasks run: refresh the listing regularly
   const tree = useQuery({ queryKey: ['tree', dir], queryFn: () => api.tree(dir), refetchInterval: 10_000 });
   const history = useQuery({ queryKey: ['history', file ?? dir], queryFn: () => api.commits({ path: file ?? (dir || undefined), limit: 50 }), enabled: tab === 1 || !file });
+  const canEditAgentsMd = file === 'AGENTS.md' && hasRole(me.data, 'admin');
   const crumbs = dir ? dir.split('/') : [];
   const open = (p: { dir?: string; file?: string }) => setParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)) as Record<string, string>);
 
@@ -141,8 +144,26 @@ export function WorkspacePage() {
               <Tabs value={tab} onChange={(_, v: number) => setTab(v)} sx={{ px: 2 }}>
                 <Tab label="Preview" />
                 <Tab label="History" />
+                {canEditAgentsMd && <Tab label="Edit" />}
               </Tabs>
-              <CardContent>{tab === 0 ? <FilePreview path={file} /> : history.data ? <CommitList commits={history.data} /> : <Loading />}</CardContent>
+              <CardContent>
+                {tab === 0 ? (
+                  <FilePreview path={file} />
+                ) : tab === 2 && canEditAgentsMd ? (
+                  <AgentsMdEditor
+                    load={async () => (await api.agentsMd()).content}
+                    save={async (content) => {
+                      await api.saveAgentsMd(content);
+                      void qc.invalidateQueries({ queryKey: ['file'] });
+                      void qc.invalidateQueries({ queryKey: ['history'] });
+                    }}
+                  />
+                ) : history.data ? (
+                  <CommitList commits={history.data} />
+                ) : (
+                  <Loading />
+                )}
+              </CardContent>
             </Card>
           ) : (
             <Card>

@@ -47,6 +47,7 @@ export function TasksPage() {
     refetchInterval: 10_000,
   });
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
+  const names = new Map(items.flatMap((t) => (t.requestedByName ? [[t.requestedBy, t.requestedByName] as const] : [])));
 
   return (
     <>
@@ -105,8 +106,8 @@ export function TasksPage() {
                       <StatusChip status={String(t.status)} />
                     </TableCell>
                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t.type}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t.requestedBy}</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t.approvedBy.join(', ') || '–'}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t.requestedByName || names.get(t.requestedBy) || t.requestedBy}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t.approvedBy.map((u) => names.get(u) ?? u).join(', ') || '–'}</TableCell>
                     <TableCell>
                       <RelativeTime iso={t.startTime} />
                     </TableCell>

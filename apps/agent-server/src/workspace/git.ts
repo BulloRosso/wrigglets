@@ -91,6 +91,19 @@ export class Git {
     return (await this.head())!;
   }
 
+  /** Commits only the given paths, leaving any other (e.g. task-in-progress) changes untouched. */
+  async commitPaths(
+    paths: string[],
+    opts: { subject: string; trailers: Trailers; author: { name: string; email: string } },
+  ): Promise<string | undefined> {
+    await this.run(['add', '--', ...paths]);
+    const diff = await this.run(['diff', '--cached', '--name-only', '--', ...paths]);
+    if (!diff.stdout.trim()) return undefined;
+    const message = formatCommitMessage(opts.subject, undefined, opts.trailers);
+    await this.run(['commit', '-q', '--no-verify', '-F', '-', `--author=${opts.author.name} <${opts.author.email}>`, '--only', '--', ...paths], { input: message });
+    return this.head();
+  }
+
   async findCommitByTrailer(key: string, value: string): Promise<string | undefined> {
     if (!(await this.head())) return undefined;
     const r = await this.run(['log', '--all', '-F', `--grep=${key}: ${value}`, `--format=%H${FIELD}%(trailers:key=${key},valueonly,separator=%x1d)`]);

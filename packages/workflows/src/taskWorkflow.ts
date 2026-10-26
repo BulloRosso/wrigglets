@@ -455,7 +455,7 @@ export async function taskWorkflow(input: TaskInput): Promise<TaskResult> {
 
     // 2. RUN
     setStatus('running');
-    await stepWithDelegations('run', runPrompt(taskId, input, approval));
+    await stepWithDelegations('run', runPrompt(taskId, input, state.createdAt, approval));
 
     // 3. VERIFY ↔ FIX
     for (let round = 1; ; round++) {

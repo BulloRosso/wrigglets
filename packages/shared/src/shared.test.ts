@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TASK_ID_PATTERN, calendarToCron, createScheduleBody, decisionBody, parseDuration, slugify, stepFileName, workspacePaths } from './index.js';
+import { TASK_ID_PATTERN, calendarToCron, createScheduleBody, decisionBody, parseDuration, reportPath, slugify, stepFileName, workspacePaths } from './index.js';
 
 describe('shared helpers', () => {
   it('parses durations', () => {
@@ -22,6 +22,11 @@ describe('shared helpers', () => {
   it('slugifies titles', () => {
     expect(slugify('Monatliche Angebotsauswertung (Ü)')).toBe('monatliche-angebotsauswertung-u');
     expect(slugify('***')).toBe('schedule');
+  });
+
+  it('derives readable report paths from the task title', () => {
+    expect(reportPath('Steam RPG Watch Report', '2026-10-26T10:00:00.000Z')).toBe('reports/steam-rpg-watch-report-2026-10-26.md');
+    expect(reportPath('***', '2026-10-26T10:00:00.000Z')).toBe('reports/report-2026-10-26.md');
   });
 
   it('converts calendar choices to cron', () => {

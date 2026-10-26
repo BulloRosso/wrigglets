@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@cw/shared": "workspace:*"
+    "@cw/shared": "workspace:*",
+    "monaco-editor": "0.52.2"
   },
   "peerDependencies": {
     "@emotion/react": "^11.14.0",

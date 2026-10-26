@@ -167,6 +167,34 @@ export function createAdminApp(deps: AdminDeps): Express {
   api.get('/agents/:id/stats', async (req, res) => {
     res.json((await runtime.stats(req.params.id)) ?? null);
   });
+  // AGENTS.md lives in the agent's workspace: proxied to the agent with its control-plane token; the agent commits as the admin.
+  const agentsMd = async (agentId: string, init: { method: 'GET' } | { method: 'PUT'; body: unknown }) => {
+    const entry = registry.get(agentId);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    let res: Response;
+    try {
+      res = await fetch(`${runtime.internalUrl(agentId)}/internal/agents-md`, {
+        method: init.method,
+        headers: { authorization: `Bearer ${entry.secrets.internalToken}`, ...(init.method === 'PUT' ? { 'content-type': 'application/json' } : {}) },
+        body: init.method === 'PUT' ? JSON.stringify(init.body) : undefined,
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new HttpError(502, 'agent not reachable (is it running?)');
+    }
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) throw new HttpError(res.status === 401 ? 502 : res.status, json.error ?? 'agent request failed');
+    return json;
+  };
+  api.get('/agents/:id/agents-md', async (req, res) => {
+    res.json(await agentsMd(req.params.id, { method: 'GET' }));
+  });
+  api.put('/agents/:id/agents-md', async (req, res) => {
+    const { content } = z.object({ content: z.string().max(256 * 1024) }).parse(req.body);
+    const r = await agentsMd(req.params.id, { method: 'PUT', body: { content, by: { upn: req.user!.upn, name: req.user!.name } } });
+    await audit.write({ by: by(req), action: 'agent.agents-md', target: req.params.id, details: r });
+    res.json(r);
+  });
   api.get('/agents/:id/logs', async (req, res) => {
     if (!registry.get(req.params.id)) throw new HttpError(404, 'agent not found');
     const follow = req.query.follow !== 'false';

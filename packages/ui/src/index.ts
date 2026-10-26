@@ -5,6 +5,7 @@ export { Logo } from './components/Logo';
 export { AppShell, type AppShellProps, type NavItem } from './components/AppShell';
 export { StatusChip, statusLabel } from './components/StatusChip';
 export { PageHeader, EmptyState, Loading, ErrorAlert, RelativeTime, KeyValueList, ConfirmDialog, type ConfirmDialogProps } from './components/common';
+export { AgentsMdEditor, type AgentsMdEditorProps } from './components/AgentsMdEditor';
 export { Sparkline } from './components/Sparkline';
 export { TimelineChart, TimelineLegend, SPAN_COLORS, MARKER_COLORS } from './components/TimelineChart';
 export { KillSwitchChip, AgentPortrait, KILL_LEVEL_META } from './components/Safety';

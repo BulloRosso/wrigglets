@@ -189,6 +189,8 @@ export interface TaskListItem {
   type: TaskType | 'maintenance';
   status: TaskStatus | string;
   requestedBy: string;
+  /** Display name of the requester (from the workflow memo); absent for older or scheduled tasks. */
+  requestedByName?: string;
   trigger: string;
   scheduleId?: string;
   approvedBy: string[];

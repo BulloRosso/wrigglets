@@ -31,6 +31,12 @@ export function slugify(text: string, max = 40): string {
 /** Pattern of task ids: `task-<ULID>` or `task-sched-…-<RFC3339 timestamp>` for scheduled runs. */
 export const TASK_ID_PATTERN = /^task-[A-Za-z0-9:._-]{3,120}$/;
 
+/** Human-readable report path derived from the task title: `reports/steam-rpg-watch-report-2026-10-26.md`. */
+export function reportPath(title: string, createdAt: string): string {
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(createdAt)?.[0] ?? new Date().toISOString().slice(0, 10);
+  return `reports/${slugify(title, 60).replace(/^schedule$/, 'report')}-${day}.md`;
+}
+
 /** File-system safe variant of a step id (`task-X:run:1` → `task-X_run_1`). */
 export const stepFileName = (stepId: string) => stepId.replace(/[:/\\]/g, '_');
 

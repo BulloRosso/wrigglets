@@ -53,6 +53,7 @@ export function toListItem(w: WorkflowExecutionInfo): TaskListItem {
     type: (sa.get(SA.TaskType) ?? 'analysis') as TaskListItem['type'],
     status: sa.get(SA.TaskStatus) ?? w.status.name.toLowerCase(),
     requestedBy: sa.get(SA.RequestedBy) ?? '',
+    requestedByName: typeof w.memo?.requestedByName === 'string' ? w.memo.requestedByName : undefined,
     trigger: sa.get(SA.Trigger) ?? 'user',
     scheduleId: sa.get(SA.ScheduleId),
     approvedBy: sa.get(SA.ApprovedBy) ?? [],
@@ -100,6 +101,7 @@ export async function startTaskWorkflow(
       { key: SA.TaskTitle, value: input.title },
       { key: SA.Trigger, value: trigger.kind },
     ],
+    memo: { requestedByName: user.name },
     staticSummary: input.title.slice(0, 200),
   });
   metrics.tasksStarted.add(1, { type: input.type });

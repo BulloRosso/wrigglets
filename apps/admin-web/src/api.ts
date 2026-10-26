@@ -103,6 +103,8 @@ export const api = {
   deleteAgent: (agentId: string, purgeData: boolean, removeAccess: boolean) =>
     apiFetch<{ schedules: number; workflows: number }>(`/api/agents/${id(agentId)}?purgeData=${purgeData}&removeAccess=${removeAccess}`, { method: 'DELETE' }),
   stats: (agentId: string) => apiFetch<AgentStats | null>(`/api/agents/${id(agentId)}/stats`),
+  agentsMd: (agentId: string) => apiFetch<{ content: string }>(`/api/agents/${id(agentId)}/agents-md`),
+  saveAgentsMd: (agentId: string, content: string) => apiFetch<{ commit: string | null }>(`/api/agents/${id(agentId)}/agents-md`, { method: 'PUT', json: { content } }),
   access: (agentId: string) => apiFetch<AccessRow[]>(`/api/agents/${id(agentId)}/access`),
   setAccess: (agentId: string, userId: string, roles: string[]) => apiFetch<UserDto>(`/api/agents/${id(agentId)}/access/${id(userId)}`, { method: 'PUT', json: { roles } }),
   images: () => apiFetch<ImageInfo[]>('/api/images'),

@@ -54,6 +54,8 @@ export const api = {
   triggerSchedule: (id: string) => apiFetch<void>(`/api/schedules/${encodeURIComponent(id)}/trigger`, { method: 'POST' }),
   deleteSchedule: (id: string) => apiFetch<void>(`/api/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   tree: (path: string) => apiFetch<{ path: string; entries: WorkspaceEntry[] }>(`/api/workspace/tree?path=${encodeURIComponent(path)}`),
+  agentsMd: () => apiFetch<{ content: string }>('/api/workspace/agents-md'),
+  saveAgentsMd: (content: string) => apiFetch<{ commit: string | null }>('/api/workspace/agents-md', { method: 'PUT', json: { content } }),
   fileUrl: (path: string, download = false) => `/api/workspace/file?path=${encodeURIComponent(path)}${download ? '&download=1' : ''}`,
   fileText: async (path: string) => {
     const res = await fetch(`/api/workspace/file?path=${encodeURIComponent(path)}`, { credentials: 'same-origin' });

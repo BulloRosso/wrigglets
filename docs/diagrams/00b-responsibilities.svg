@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Responsibilities in the application</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .o { font-size: 11px; font-weight: 600; fill: #5b6777; }
+    .sh { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .sd { font-size: 11px; fill: #37414f; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .sup { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .chip { fill: #ffffff; stroke: #c5ccd6; stroke-width: 1; }
+    .ar { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="880" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Wrigglets — responsibilities in the application</text>
+  <text x="32" y="66" class="st">Who does what, independent of containers. The strip shows the life of a task; the cards group the responsibilities. Containers: 00a.</text>
+
+  <!-- life of a task -->
+  <g>
+    <rect class="usr" x="32" y="86" width="176" height="76" rx="10"/>
+    <text x="46" y="108" class="sh">1 · Ask</text>
+    <text x="46" y="126" class="sd">A colleague signs in and</text>
+    <text x="46" y="140" class="sd">creates a task</text>
+    <text x="46" y="154" class="o">agent UI · oauth</text>
+
+    <rect class="cp" x="236" y="86" width="176" height="76" rx="10"/>
+    <text x="250" y="108" class="sh">2 · Frame</text>
+    <text x="250" y="126" class="sd">Temporal records who asked,</text>
+    <text x="250" y="140" class="sd">queues for the workspace</text>
+    <text x="250" y="154" class="o">Temporal workflows</text>
+
+    <rect class="usr" x="440" y="86" width="176" height="76" rx="10"/>
+    <text x="454" y="108" class="sh">3 · Approve</text>
+    <text x="454" y="126" class="sd">Plan is reviewed by people,</text>
+    <text x="454" y="140" class="sd">notified by e-mail</text>
+    <text x="454" y="154" class="o">agent UI · control plane mail</text>
+
+    <rect class="ag" x="644" y="86" width="176" height="76" rx="10"/>
+    <text x="658" y="108" class="sh">4 · Work</text>
+    <text x="658" y="126" class="sd">Harness + model use tools</text>
+    <text x="658" y="140" class="sd">through the gateway</text>
+    <text x="658" y="154" class="o">agent · gateway · LiteLLM</text>
+
+    <rect class="ag" x="848" y="86" width="150" height="76" rx="10"/>
+    <text x="862" y="108" class="sh">5 · Verify</text>
+    <text x="862" y="126" class="sd">Checks, commit per</text>
+    <text x="862" y="140" class="sd">step in Git</text>
+    <text x="862" y="154" class="o">agent</text>
+
+    <rect class="cp" x="1026" y="86" width="142" height="76" rx="10"/>
+    <text x="1040" y="108" class="sh">6 · Account</text>
+    <text x="1040" y="126" class="sd">Audit export, history</text>
+    <text x="1040" y="140" class="sd">stay reconstructable</text>
+    <text x="1040" y="154" class="o">Temporal · agent Git</text>
+
+    <path class="ar" d="M208,124 L234,124" marker-end="url(#a)"/>
+    <path class="ar" d="M412,124 L438,124" marker-end="url(#a)"/>
+    <path class="ar" d="M616,124 L642,124" marker-end="url(#a)"/>
+    <path class="ar" d="M820,124 L846,124" marker-end="url(#a)"/>
+    <path class="ar" d="M998,124 L1024,124" marker-end="url(#a)"/>
+  </g>
+
+  <!-- cards: 3 x 3, 368 wide, 170 high -->
+  <!-- row 1 -->
+  <rect class="cp" x="32" y="190" width="368" height="170" rx="10"/>
+  <text x="48" y="214" class="h">Identity and access</text>
+  <text x="48" y="238" class="d">• Sign-in for every UI with OpenID Connect</text>
+  <text x="48" y="256" class="d">• Roles per agent: User, Approver, Admin</text>
+  <text x="48" y="274" class="d">• Platform.Admin for the admin console</text>
+  <text x="48" y="292" class="d">• Users and OIDC clients are managed centrally</text>
+  <rect class="chip" x="48" y="318" width="200" height="26" rx="13"/>
+  <text x="62" y="335" class="o">Owner: oauth · control plane</text>
+
+  <rect class="ag" x="416" y="190" width="368" height="170" rx="10"/>
+  <text x="432" y="214" class="h">Collaboration with people</text>
+  <text x="432" y="238" class="d">• Tasks, plan approval, deviations, revisions</text>
+  <text x="432" y="256" class="d">• Task conversation and chat with the agent</text>
+  <text x="432" y="274" class="d">• Workspace browser with file preview</text>
+  <text x="432" y="292" class="d">• Approval mails to everybody with access</text>
+  <rect class="chip" x="432" y="318" width="236" height="26" rx="13"/>
+  <text x="446" y="335" class="o">Owner: agent UI/API · control plane</text>
+
+  <rect class="cp" x="800" y="190" width="368" height="170" rx="10"/>
+  <text x="816" y="214" class="h">Orchestration and traceability</text>
+  <text x="816" y="238" class="d">• Task workflows: plan, run, verify, finalize</text>
+  <text x="816" y="256" class="d">• One workspace lock per agent, FIFO queue</text>
+  <text x="816" y="274" class="d">• Schedules, reminders, cancellation, retries</text>
+  <text x="816" y="292" class="d">• Full history: who asked, approved, what ran</text>
+  <rect class="chip" x="816" y="318" width="230" height="26" rx="13"/>
+  <text x="830" y="335" class="o">Owner: Temporal (server + workers)</text>
+
+  <!-- row 2 -->
+  <rect class="ag" x="32" y="376" width="368" height="170" rx="10"/>
+  <text x="48" y="400" class="h">Doing the work</text>
+  <text x="48" y="424" class="d">• Agent Harness (opencode) with the AI model</text>
+  <text x="48" y="442" class="d">• Fixed permissions: files and read-only commands</text>
+  <text x="48" y="460" class="d">• Shared Git workspace, one commit per step</text>
+  <text x="48" y="478" class="d">• Verification scripts and deviation checks</text>
+  <rect class="chip" x="48" y="504" width="190" height="26" rx="13"/>
+  <text x="62" y="521" class="o">Owner: agent container</text>
+
+  <rect class="gw" x="416" y="376" width="368" height="170" rx="10"/>
+  <text x="432" y="400" class="h">Tools and agent-to-agent work</text>
+  <text x="432" y="424" class="d">• One MCP endpoint; per-agent tool allow-lists</text>
+  <text x="432" y="442" class="d">• Rate and size limits, audit of every call</text>
+  <text x="432" y="460" class="d">• Company systems and internet as upstreams</text>
+  <text x="432" y="478" class="d">• A2A delegation inside each agent's discovery set</text>
+  <rect class="chip" x="432" y="504" width="290" height="26" rx="13"/>
+  <text x="446" y="521" class="o">Owner: mcp-gateway · mcp-demo · mcp-web</text>
+
+  <rect class="cp" x="800" y="376" width="368" height="170" rx="10"/>
+  <text x="816" y="400" class="h">AI model and cost</text>
+  <text x="816" y="424" class="d">• Real OpenAI models through LiteLLM</text>
+  <text x="816" y="442" class="d">• One virtual key per agent; agents never see</text>
+  <text x="832" y="458" class="d">the OpenAI key</text>
+  <text x="816" y="478" class="d">• USD spend limit per 30 days, current prices</text>
+  <rect class="chip" x="816" y="504" width="190" height="26" rx="13"/>
+  <text x="830" y="521" class="o">Owner: litellm (+ db)</text>
+
+  <!-- row 3 -->
+  <rect class="gw" x="32" y="562" width="368" height="170" rx="10"/>
+  <text x="48" y="586" class="h">Safety and containment</text>
+  <text x="48" y="610" class="d">• Kill switch: tools off, paused, stopped</text>
+  <text x="48" y="628" class="d">• Automatic rules (token spikes, denials, failures)</text>
+  <text x="48" y="646" class="d">• Exfiltration guard: a small model checks every</text>
+  <text x="64" y="662" class="d">tool call; a block cancels the task, stops the agent</text>
+  <text x="64" y="678" class="d">and raises a security alert</text>
+  <rect class="chip" x="48" y="696" width="300" height="26" rx="13"/>
+  <text x="62" y="713" class="o">Owner: control plane · agent guard · gateway</text>
+
+  <rect class="sup" x="416" y="562" width="368" height="170" rx="10"/>
+  <text x="432" y="586" class="h">Secrets</text>
+  <text x="432" y="610" class="d">• Upstream credentials live in Key Vault</text>
+  <text x="432" y="628" class="d">• The gateway resolves them per call; agents</text>
+  <text x="448" y="644" class="d">never receive them</text>
+  <text x="432" y="664" class="d">• Admins set secrets write-only in the console</text>
+  <rect class="chip" x="432" y="696" width="250" height="26" rx="13"/>
+  <text x="446" y="713" class="o">Owner: keyvault · gateway · control plane</text>
+
+  <rect class="cp" x="800" y="562" width="368" height="170" rx="10"/>
+  <text x="816" y="586" class="h">Platform operation</text>
+  <text x="816" y="610" class="d">• Create, start, stop and monitor agents</text>
+  <text x="816" y="628" class="d">• Users, access, portraits, mail outbox</text>
+  <text x="816" y="646" class="d">• Dashboard: health, tasks, security alerts</text>
+  <text x="816" y="664" class="d">• Admin audit log of every platform change</text>
+  <rect class="chip" x="816" y="696" width="190" height="26" rx="13"/>
+  <text x="830" y="713" class="o">Owner: control plane</text>
+
+  <!-- trust note -->
+  <rect class="sup" x="32" y="752" width="1136" height="96" rx="10"/>
+  <text x="48" y="776" class="h">Principles behind the split</text>
+  <text x="48" y="798" class="d">• The agent has no direct access to anything outside its container except through the gateway (tools, other agents) and LiteLLM (model).</text>
+  <text x="48" y="816" class="d">• Decisions that matter are made outside the agent: Temporal frames the work, people approve it, the gateway permits tools, the guard checks calls.</text>
+  <text x="48" y="834" class="d">• Everything is reconstructable: Temporal history, Git commits per step, gateway tool-call audit, admin audit log.</text>
+</svg>

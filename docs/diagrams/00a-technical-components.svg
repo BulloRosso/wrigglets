@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1180" viewBox="0 0 1200 1180" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Technical components of the local stack</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .img { font-size: 11px; fill: #5b6777; font-family: Consolas, monospace; }
+    .d { font-size: 12px; fill: #37414f; }
+    .bl { font-size: 13px; font-weight: 600; fill: #5b6777; }
+    .lg { font-size: 12px; fill: #37414f; }
+    .lgh { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .ln2 { fill: none; stroke: #00796b; stroke-width: 2; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .sup { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ext { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .bd { fill: #1d2733; }
+    .bn { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .lbl { font-size: 11px; fill: #37414f; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00796b"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="1180" rx="16" fill="#ffffff"/>
+  <text x="32" y="44" class="t">Wrigglets — technical components</text>
+  <text x="32" y="66" class="st">Containers of the local stack (docker-compose.yml), their ports and how they talk to each other. Numbers refer to the table below. Responsibilities: 00b.</text>
+
+  <!-- People -->
+  <rect class="usr" x="32" y="86" width="560" height="54" rx="10"/>
+  <text x="48" y="110" class="h">Team members (browser)</text>
+  <text x="48" y="128" class="d">agent web UI · e-mail links into the approval dialog</text>
+  <rect class="usr" x="608" y="86" width="560" height="54" rx="10"/>
+  <text x="624" y="110" class="h">Platform admin (browser)</text>
+  <text x="624" y="128" class="d">admin console · Temporal Web UI</text>
+
+  <rect class="bnd" x="16" y="166" width="1168" height="640" rx="12"/>
+  <text x="32" y="188" class="bl">Docker network "coworking"</text>
+
+  <!-- Row A -->
+  <rect class="ag" x="32" y="204" width="340" height="196" rx="10"/>
+  <text x="48" y="228" class="h">agent-&lt;id&gt;   (one per agent)</text>
+  <text x="48" y="245" class="img">coworking/agent · 127.0.0.1:81xx → 8080</text>
+  <text x="48" y="270" class="d">• Node process: web UI + API (OIDC)</text>
+  <text x="48" y="290" class="d">• Temporal worker (workflows, activities)</text>
+  <text x="48" y="310" class="d">• Agent Harness (opencode) + guard plugin</text>
+  <text x="48" y="330" class="d">• Git workspace + artifacts (volume)</text>
+  <text x="48" y="350" class="d">• A2A server · exfiltration guard service</text>
+  <text x="48" y="370" class="d">• file preview (md, PDF, images, Excel …)</text>
+
+  <rect class="cp" x="430" y="204" width="340" height="196" rx="10"/>
+  <text x="446" y="228" class="h">temporal   (control plane)</text>
+  <text x="446" y="245" class="img">coworking/control-plane · :8080 · :8233 · :7233</text>
+  <text x="446" y="270" class="d">• Temporal dev server + Temporal Web UI</text>
+  <text x="446" y="290" class="d">• admin console + API (agents, users, safety)</text>
+  <text x="446" y="310" class="d">• Docker API: create / start / stop agents</text>
+  <text x="446" y="330" class="d">• kill switch, safety rules, security alerts</text>
+  <text x="446" y="350" class="d">• mail, portraits, payload codec server</text>
+  <text x="446" y="370" class="d">• data volume: registry, DB, audit, mail_out</text>
+
+  <rect class="cp" x="830" y="204" width="338" height="196" rx="10"/>
+  <text x="846" y="228" class="h">oauth</text>
+  <text x="846" y="245" class="img">coworking/oauth · 127.0.0.1:9000</text>
+  <text x="846" y="270" class="d">• OpenID Connect provider (node-oidc-provider)</text>
+  <text x="846" y="290" class="d">• sign-in pages</text>
+  <text x="846" y="310" class="d">• users, per-agent roles, OIDC clients</text>
+  <text x="846" y="330" class="d">• administered by the control plane</text>
+  <text x="846" y="350" class="d">• data volume: users, clients</text>
+
+  <!-- Row B -->
+  <rect class="gw" x="32" y="470" width="340" height="170" rx="10"/>
+  <text x="48" y="494" class="h">mcp-gateway</text>
+  <text x="48" y="511" class="img">coworking/mcp-gateway · internal :7400</text>
+  <text x="48" y="536" class="d">• the only MCP endpoint agents can use</text>
+  <text x="48" y="556" class="d">• tool allow-lists, limits, kill switch</text>
+  <text x="48" y="576" class="d">• A2A broker between agents</text>
+  <text x="48" y="596" class="d">• credential lookup in Key Vault</text>
+  <text x="48" y="616" class="d">• audit of every tool call (volume)</text>
+
+  <rect class="sup" x="430" y="470" width="340" height="170" rx="10"/>
+  <text x="446" y="494" class="h">keyvault   (+ keyvault-certs)</text>
+  <text x="446" y="511" class="img">nagyesta/lowkey-vault · internal :8443</text>
+  <text x="446" y="536" class="d">• Azure Key Vault emulator, local CA</text>
+  <text x="446" y="556" class="d">• upstream credentials as secrets</text>
+  <text x="446" y="576" class="d">• managed-identity token endpoint</text>
+  <text x="446" y="596" class="d">• agents never read from it</text>
+
+  <rect class="cp" x="830" y="470" width="338" height="170" rx="10"/>
+  <text x="846" y="494" class="h">litellm   (+ litellm-db)</text>
+  <text x="846" y="511" class="img">litellm/litellm:v1.102.0 · 127.0.0.1:4000</text>
+  <text x="846" y="536" class="d">• AI gateway in front of OpenAI</text>
+  <text x="846" y="556" class="d">• one virtual key per agent</text>
+  <text x="846" y="576" class="d">• cost per request, USD limit per 30 days</text>
+  <text x="846" y="596" class="d">• PostgreSQL: keys and spend logs</text>
+
+  <!-- Row C -->
+  <rect class="sup" x="32" y="684" width="164" height="84" rx="10"/>
+  <text x="46" y="708" class="h">mcp-demo</text>
+  <text x="46" y="725" class="img">internal :7500</text>
+  <text x="46" y="746" class="d">company systems</text>
+  <text x="46" y="760" class="d">(suppliers, FX)</text>
+  <rect class="sup" x="208" y="684" width="164" height="84" rx="10"/>
+  <text x="222" y="708" class="h">mcp-web</text>
+  <text x="222" y="725" class="img">internal :7600</text>
+  <text x="222" y="746" class="d">internet access</text>
+  <text x="222" y="760" class="d">(search, fetch)</text>
+
+  <rect class="sup" x="430" y="684" width="540" height="84" rx="10"/>
+  <text x="446" y="708" class="h">Docker volumes</text>
+  <text x="446" y="729" class="d">agent-&lt;id&gt;-home: Git workspace, artifacts · control-plane-data:</text>
+  <text x="446" y="745" class="d">Temporal DB, registry, mail_out · oauth-data · mcp-gateway-data ·</text>
+  <text x="446" y="761" class="d">keyvault-certs · litellm-db-data</text>
+
+  <!-- External -->
+  <text x="430" y="828" class="bl">External services (outbound HTTPS)</text>
+  <rect class="ext" x="830" y="840" width="338" height="64" rx="10"/>
+  <text x="846" y="864" class="h">OpenAI API</text>
+  <text x="846" y="884" class="d">11 · only LiteLLM calls it (key from host env)</text>
+  <rect class="ext" x="430" y="840" width="170" height="64" rx="10"/>
+  <text x="446" y="864" class="h">Mail API (optional)</text>
+  <text x="446" y="884" class="d">12 · else: outbox files</text>
+  <rect class="ext" x="616" y="840" width="170" height="64" rx="10"/>
+  <text x="632" y="864" class="h">OpenAI Images</text>
+  <text x="632" y="884" class="d">12 · agent portraits</text>
+
+  <!-- arrows -->
+  <path class="ln" d="M202,140 L202,202" marker-end="url(#a)"/>
+  <path class="ln" d="M700,140 L700,202" marker-end="url(#a)"/>
+  <path class="ln" d="M372,262 L428,262" marker-end="url(#a)"/>
+  <path class="ln" d="M372,338 L428,338" marker-start="url(#a)" marker-end="url(#a)"/>
+  <path class="ln" d="M770,262 L828,262" marker-end="url(#a)"/>
+  <path class="ln" d="M130,400 L130,468" marker-end="url(#a)"/>
+  <path class="ln" d="M290,468 L290,402" marker-end="url(#a)"/>
+  <path class="ln2" d="M220,400 L220,434 L1000,434 L1000,468" marker-end="url(#g)"/>
+  <path class="ln" d="M372,555 L428,555" marker-end="url(#a)"/>
+  <path class="ln" d="M100,640 L100,682" marker-end="url(#a)"/>
+  <path class="ln" d="M290,640 L290,682" marker-end="url(#a)"/>
+  <path class="ln" d="M1000,640 L1000,838" marker-end="url(#a)"/>
+  <path class="ln" d="M440,400 L360,468" marker-end="url(#a)"/>
+  <path class="ln" d="M780,400 L860,468" marker-end="url(#a)"/>
+
+  <!-- badges -->
+  <g>
+    <circle class="bd" cx="202" cy="153" r="10"/><text class="bn" x="202" y="157">1</text>
+    <circle class="bd" cx="700" cy="153" r="10"/><text class="bn" x="700" y="157">2</text>
+    <circle class="bd" cx="400" cy="262" r="10"/><text class="bn" x="400" y="266">3</text>
+    <circle class="bd" cx="400" cy="338" r="10"/><text class="bn" x="400" y="342">4</text>
+    <circle class="bd" cx="799" cy="262" r="10"/><text class="bn" x="799" y="266">5</text>
+    <circle class="bd" cx="130" cy="434" r="10"/><text class="bn" x="130" y="438">6</text>
+    <circle class="bd" cx="290" cy="440" r="10"/><text class="bn" x="290" y="444">7</text>
+    <circle class="bd" cx="620" cy="434" r="10"/><text class="bn" x="620" y="438">8</text>
+    <circle class="bd" cx="400" cy="555" r="10"/><text class="bn" x="400" y="559">9</text>
+    <circle class="bd" cx="100" cy="661" r="10"/><text class="bn" x="100" y="665">10</text>
+    <circle class="bd" cx="290" cy="661" r="10"/><text class="bn" x="290" y="665">10</text>
+    <circle class="bd" cx="1000" cy="740" r="10"/><text class="bn" x="1000" y="744">11</text>
+    <circle class="bd" cx="404" cy="440" r="10"/><text class="bn" x="404" y="444">13</text>
+    <circle class="bd" cx="820" cy="434" r="10"/><text class="bn" x="820" y="438">14</text>
+  </g>
+
+  <!-- legend -->
+  <text x="32" y="944" class="lgh">Connections</text>
+  <g class="lg">
+    <text x="32" y="970"><tspan font-weight="700">1</tspan>  Browser → agent: HTTPS, UI and API, signed in with OIDC</text>
+    <text x="32" y="990"><tspan font-weight="700">2</tspan>  Browser → control plane: admin console (Platform.Admin), Temporal UI</text>
+    <text x="32" y="1010"><tspan font-weight="700">3</tspan>  Agent worker → Temporal: gRPC :7233, workflows, activities, signals</text>
+    <text x="32" y="1030"><tspan font-weight="700">4</tspan>  Agent ↔ control plane: internal HTTP (safety stats, approval mail,</text>
+    <text x="52" y="1046">guard policy, security alerts) and Docker API (start/stop agents)</text>
+    <text x="32" y="1066"><tspan font-weight="700">5</tspan>  Control plane → oauth: user, role and client administration</text>
+    <text x="32" y="1086"><tspan font-weight="700">6</tspan>  Agent harness → gateway: MCP over HTTP, bearer token per agent</text>
+    <text x="32" y="1106"><tspan font-weight="700">7</tspan>  Gateway → agent: A2A calls for delegated tasks</text>
+    <text x="32" y="1126"><tspan font-weight="700">8</tspan>  Agent → LiteLLM: model calls with the agent's virtual key (green)</text>
+    <text x="32" y="1146"><tspan font-weight="700">9</tspan>  Gateway → Key Vault: upstream credentials by reference</text>
+    <text x="620" y="970"><tspan font-weight="700">10</tspan>  Gateway → upstream MCP servers (company systems, internet)</text>
+    <text x="620" y="990"><tspan font-weight="700">11</tspan>  LiteLLM → OpenAI API: the real model, current prices</text>
+    <text x="620" y="1010"><tspan font-weight="700">12</tspan>  Control plane → Mail API / OpenAI Images (outbound only)</text>
+    <text x="620" y="1030"><tspan font-weight="700">13</tspan>  Control plane → gateway: pushes tool lists, allow-lists, kill</text>
+    <text x="646" y="1046">switch; reads the tool-call audit</text>
+    <text x="620" y="1066"><tspan font-weight="700">14</tspan>  Control plane → LiteLLM: creates keys, reads spend per agent</text>
+    <text x="620" y="1096" class="d">Also: all UIs and the admin console sign users in through</text>
+    <text x="620" y="1112" class="d">oauth (browser redirects). Everything runs on Docker Desktop;</text>
+    <text x="620" y="1128" class="d">Azure equivalents (Container Apps, APIM, Key Vault) in docs/azure.md.</text>
+  </g>
+</svg>

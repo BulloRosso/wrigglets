@@ -34,7 +34,13 @@ Desktop** environment, extended to a small platform:
 
 ## Architecture
 
-<img src="docs/diagrams/00-containers.svg" alt="Containers of the local stack and their responsibilities" width="100%">
+**a) Technical components:** the containers of the local stack, their ports and connections.
+
+<img src="docs/diagrams/00a-technical-components.svg" alt="Technical components of the local stack: containers, ports and connections" width="100%">
+
+**b) Responsibilities:** who does what in the application, along the life of a task.
+
+<img src="docs/diagrams/00b-responsibilities.svg" alt="Responsibilities in the application, grouped by concern" width="100%">
 
 More detail: [docs/architecture.md](docs/architecture.md); safety, gateway and A2A in
 [diagram 10](docs/diagrams/10-killswitch-gateway.svg).

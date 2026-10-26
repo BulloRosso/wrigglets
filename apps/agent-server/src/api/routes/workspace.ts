@@ -5,11 +5,14 @@ import { Router, type RequestHandler } from 'express';
 import multer from 'multer';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-import type { StagingFile, WorkspaceEntry } from '@cw/shared';
+import { agentWorkflowId, type CommitInfo, type RestorePoint, type StagingFile, type WorkspaceEntry } from '@cw/shared';
+import { collectNames, groupChanges, isRestorePointCommit, type TaskMeta } from '../../workspace/changes.js';
+import { SA, q } from '@cw/shared/search-attributes';
+import { agentStatusQuery } from '@cw/workflows/messages';
 import { isProtectedPath, resolveWorkspacePath, uploadFileName } from '../../workspace/paths.js';
 import { HttpError, type ApiDeps } from '../context.js';
 import { requireRole } from '../auth.js';
-import { startTaskWorkflow } from './tasks.js';
+import { listExecutions, startTaskWorkflow } from './tasks.js';
 
 const MAX_FILE = 20 * 1024 * 1024;
 const MIME: Record<string, string> = {
@@ -110,6 +113,76 @@ export function workspaceRouter(deps: ApiDeps): Router {
     const p = req.query.path ? (await resolveWorkspacePath(config.workspaceDir, String(req.query.path), { mustExist: false })).rel : undefined;
     const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
     res.json(await git.log({ path: p, limit, files: true, grep: req.query.taskId ? `Task-Id: ${String(req.query.taskId)}` : undefined }));
+  });
+
+  /** Title and status of tasks (Temporal visibility); tasks beyond retention are simply missing. */
+  const taskMeta = async (commits: CommitInfo[]): Promise<Map<string, TaskMeta>> => {
+    const ids = [...new Set(commits.map((c) => c.trailers['Task-Id']?.[0]).filter((x): x is string => !!x))].slice(0, 100);
+    const meta = new Map<string, TaskMeta>();
+    if (!ids.length) return meta;
+    for (const w of await listExecutions(deps, `WorkflowId IN (${ids.map(q).join(',')})`, ids.length * 2)) {
+      meta.set(w.workflowId, {
+        title: w.typedSearchAttributes.get(SA.TaskTitle),
+        status: w.typedSearchAttributes.get(SA.TaskStatus) ?? w.status.name.toLowerCase(),
+        requestedBy: w.typedSearchAttributes.get(SA.RequestedBy),
+        requestedByName: typeof w.memo?.requestedByName === 'string' ? w.memo.requestedByName : undefined,
+      });
+    }
+    return meta;
+  };
+
+  /** Workspace history for business users: one entry per task instead of the raw commits. */
+  r.get('/workspace/activity', async (req, res) => {
+    const p = req.query.path ? (await resolveWorkspacePath(config.workspaceDir, String(req.query.path), { mustExist: false })).rel : undefined;
+    const all = await git.log({ limit: 500 });
+    const finalizeByTask = new Map<string, string>();
+    for (const c of all) {
+      const t = c.trailers['Task-Id']?.[0];
+      if (t && c.trailers['Audit-Export'] && !finalizeByTask.has(t)) finalizeByTask.set(t, c.hash);
+    }
+    const commits = p ? await git.log({ path: p, limit: 300, files: true }) : await git.log({ limit: 300, files: true });
+    const tasks = await taskMeta(commits);
+    const changes = groupChanges(commits, tasks, finalizeByTask, collectNames([...all, ...commits], tasks));
+    // Tasks that touched no files are hidden, so the current state is that of the newest visible change.
+    res.json(changes.map((c, i) => ({ ...c, current: !p && i === 0 })));
+  });
+
+  /** Timeline for non-Git users: one marker per finished task, plus the start and earlier restores. */
+  r.get('/workspace/restore-points', async (_req, res) => {
+    const commits = await git.log({ limit: 300 });
+    const picked = commits.filter(isRestorePointCommit);
+    const titles = new Map([...(await taskMeta(picked))].map(([id, m]) => [id, m.title] as const));
+    const head = commits[0]?.hash;
+    // A state only matters once per hash; the newest commit is the "current" marker even when it is a finalize commit.
+    const points: RestorePoint[] = picked.map((c) => {
+      const taskId = c.trailers['Task-Id']?.[0];
+      const kind: RestorePoint['kind'] = c.trailers['Restored-To'] ? 'restore' : taskId ? 'task' : 'start';
+      const label =
+        kind === 'start'
+          ? 'Workspace created'
+          : kind === 'restore'
+            ? 'Workspace was reset to an earlier state'
+            : (titles.get(taskId!) ?? c.subject.replace(/^[^:]*:\s*/, '').slice(0, 80));
+      return { hash: c.hash, date: c.date, kind, label, taskId, outcome: c.trailers['Outcome']?.[0], current: c.hash === head };
+    });
+    res.json(points);
+  });
+
+  /** Sets the workspace files back to a restore point (as a new commit, history stays). Only while no task runs. */
+  r.post('/workspace/restore', async (req, res) => {
+    const { hash } = z.object({ hash: z.string().regex(/^[0-9a-f]{40}$/i) }).parse(req.body);
+    const status = await deps.temporal.workflow.getHandle(agentWorkflowId(config.AGENT_ID)).query(agentStatusQuery);
+    if (status.holder) throw new HttpError(409, 'A task is currently working on the workspace. Please try again when it has finished.');
+    const target = (await git.log({ limit: 300 })).find((c) => c.hash === hash);
+    if (!target || !isRestorePointCommit(target)) throw new HttpError(400, 'not a restore point');
+    const by = req.user!;
+    const commit = await git.restoreTo(hash, {
+      subject: `restore: workspace reset to state of ${target.date.slice(0, 16).replace('T', ' ')}`,
+      trailers: { 'Requested-By': by.upn, Trigger: 'restore', 'Restored-To': hash },
+      author: { name: by.name || by.upn, email: by.upn },
+    });
+    await deps.audit.write({ by: by.upn, action: 'workspace.restore', target: hash, details: { commit } });
+    res.json({ commit: commit ?? null });
   });
 
   r.get('/workspace/commits/:hash', async (req, res) => {

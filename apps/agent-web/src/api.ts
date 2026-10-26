@@ -10,12 +10,14 @@ import type {
   NotificationDto,
   PatchScheduleBody,
   Principal,
+  RestorePoint,
   ScheduleDto,
   TaskDetail,
   TaskChatMessage,
   TaskListItem,
   TaskState,
   Timeline,
+  WorkspaceChange,
   WorkspaceEntry,
 } from '@cw/shared';
 
@@ -74,6 +76,9 @@ export const api = {
     qs.set('limit', String(params.limit ?? 50));
     return apiFetch<CommitInfo[]>(`/api/workspace/commits?${qs}`);
   },
+  activity: (path?: string) => apiFetch<WorkspaceChange[]>(`/api/workspace/activity${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+  restorePoints: () => apiFetch<RestorePoint[]>('/api/workspace/restore-points'),
+  restore: (hash: string) => apiFetch<{ commit: string | null }>('/api/workspace/restore', { method: 'POST', json: { hash } }),
   commitDiff: (hash: string) => apiFetch<string>(`/api/workspace/commits/${hash}`),
   upload: async (files: File[], targetDir: string) => {
     const form = new FormData();

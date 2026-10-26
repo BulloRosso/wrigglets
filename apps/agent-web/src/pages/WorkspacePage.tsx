@@ -28,8 +28,10 @@ import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import { AgentsMdEditor, EmptyState, ErrorAlert, Loading, PageHeader, formatBytes, formatRelative } from '@cw/ui';
 import { api, hasRole, useMe } from '../api';
-import { CommitList } from '../components/CommitList';
+import { WorkspaceHistory } from '../components/WorkspaceHistory';
 import { FilePreview, previewLabel } from '../components/FilePreview';
+import { RestoreDialog } from '../components/RestoreDialog';
+import HistoryOutlined from '@mui/icons-material/HistoryOutlined';
 
 function UploadDialog({ open, dir, onClose }: { open: boolean; dir: string; onClose: () => void }) {
   const navigate = useNavigate();
@@ -75,9 +77,10 @@ export function WorkspacePage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   // files change while tasks run: refresh the listing regularly
   const tree = useQuery({ queryKey: ['tree', dir], queryFn: () => api.tree(dir), refetchInterval: 10_000 });
-  const history = useQuery({ queryKey: ['history', file ?? dir], queryFn: () => api.commits({ path: file ?? (dir || undefined), limit: 50 }), enabled: tab === 1 || !file });
+  const history = useQuery({ queryKey: ['history', file ?? dir], queryFn: () => api.activity(file ?? (dir || undefined)), enabled: tab === 1 || !file });
   const canEditAgentsMd = file === 'AGENTS.md' && hasRole(me.data, 'admin');
   const crumbs = dir ? dir.split('/') : [];
   const open = (p: { dir?: string; file?: string }) => setParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)) as Record<string, string>);
@@ -88,9 +91,14 @@ export function WorkspacePage() {
         title="Workspace"
         subtitle="The shared data set of the agent (a Git repository). Read-only here; changes happen through tasks and uploads."
         actions={
-          <Button variant="contained" startIcon={<UploadFileOutlined />} onClick={() => setUploading(true)}>
-            Upload
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" startIcon={<HistoryOutlined />} onClick={() => setRestoring(true)}>
+              Restore earlier state
+            </Button>
+            <Button variant="contained" startIcon={<UploadFileOutlined />} onClick={() => setUploading(true)}>
+              Upload
+            </Button>
+          </Stack>
         }
       />
       <Breadcrumbs sx={{ mb: 2 }}>
@@ -159,7 +167,7 @@ export function WorkspacePage() {
                     }}
                   />
                 ) : history.data ? (
-                  <CommitList commits={history.data} />
+                  <WorkspaceHistory changes={history.data} />
                 ) : (
                   <Loading />
                 )}
@@ -167,13 +175,14 @@ export function WorkspacePage() {
             </Card>
           ) : (
             <Card>
-              <CardHeader title={`History of /${dir}`} subheader="Who requested, who approved, which task" />
-              <CardContent sx={{ pt: 0 }}>{history.data ? <CommitList commits={history.data} /> : <Loading />}</CardContent>
+              <CardHeader title={dir ? `What happened in ${dir}` : 'What happened in the workspace'} subheader="Tasks and uploads, newest first" />
+              <CardContent sx={{ pt: 0 }}>{history.data ? <WorkspaceHistory changes={history.data} /> : <Loading />}</CardContent>
             </Card>
           )}
         </Grid>
       </Grid>
       {uploading && <UploadDialog open dir={dir} onClose={() => setUploading(false)} />}
+      <RestoreDialog open={restoring} onClose={() => setRestoring(false)} />
     </>
   );
 }

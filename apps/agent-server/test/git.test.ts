@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Git, formatCommitMessage, parseTrailers } from '../src/workspace/git.js';
@@ -65,5 +65,26 @@ describe('Git', () => {
     expect(await git.isDirty()).toBe(true);
     await git.resetToHead();
     expect(await git.isDirty()).toBe(false);
+  });
+
+  it('restores an earlier state as a new commit, keeping history and .agent records', async () => {
+    const author = { name: 'Anna', email: 'anna@example.com' };
+    const old = (await git.head())!;
+    await writeFile(path.join(dir, 'a.txt'), 'later');
+    await writeFile(path.join(dir, 'later.txt'), 'new file');
+    await mkdir(path.join(dir, '.agent'), { recursive: true });
+    await writeFile(path.join(dir, '.agent', 'record.json'), '{}');
+    const later = await git.commitAll({ subject: 'change: later', trailers: {} });
+
+    const restored = await git.restoreTo(old, { subject: 'restore: test', trailers: { 'Restored-To': old }, author });
+    expect(restored).toBeDefined();
+    expect(await readFile(path.join(dir, 'a.txt'), 'utf8')).toBe('hello');
+    await expect(readFile(path.join(dir, 'later.txt'), 'utf8')).rejects.toThrow();
+    expect(await readFile(path.join(dir, '.agent', 'record.json'), 'utf8')).toBe('{}');
+    expect(await git.isDirty()).toBe(false);
+    // history is intact: the later commit is still reachable and the restore sits on top of it
+    expect((await git.log({ limit: 2 })).map((c) => c.hash)).toEqual([restored, later]);
+    // restoring to the same state again changes nothing
+    expect(await git.restoreTo(old, { subject: 'restore: again', trailers: {}, author })).toBeUndefined();
   });
 });

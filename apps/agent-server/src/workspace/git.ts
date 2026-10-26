@@ -23,6 +23,9 @@ export class GitError extends Error {
 
 export type Trailers = Record<string, string | string[] | undefined>;
 
+/** Paths a restore leaves as they are: records of what was done and protected platform files. */
+const KEEP_ON_RESTORE = ['.agent', 'AGENTS.md', 'opencode.json', 'opencode.jsonc', '.opencode'];
+
 const FIELD = '\x1f';
 const RECORD = '\x1e';
 
@@ -128,6 +131,31 @@ export class Git {
       .split(RECORD)
       .filter((s) => s.trim())
       .map((rec) => parseLogRecord(rec, !!opts.files));
+  }
+
+  /**
+   * Sets the working files to the state of `hash` as a NEW commit on top of the current history, so nothing is lost
+   * and the audit trail stays complete. Platform records (`.agent/`, AGENTS.md, opencode config) keep their current
+   * state. Returns undefined when the workspace already matches.
+   */
+  async restoreTo(
+    hash: string,
+    opts: { subject: string; trailers: Trailers; author: { name: string; email: string } },
+  ): Promise<string | undefined> {
+    if (!/^[0-9a-f]{7,40}$/i.test(hash)) throw new Error('invalid commit hash');
+    await this.run(['cat-file', '-e', `${hash}^{commit}`]);
+    if (await this.isDirty()) await this.resetToHead();
+    await this.run(['read-tree', '-u', '--reset', hash]);
+    for (const p of KEEP_ON_RESTORE) {
+      await this.run(['rm', '-rfq', '--ignore-unmatch', '--', p]);
+      await this.run(['checkout', 'HEAD', '--', p], { allowFail: true });
+    }
+    await this.run(['add', '-A']);
+    if (!(await this.run(['diff', '--cached', '--name-only'])).stdout.trim()) return undefined;
+    await this.run(['commit', '-q', '--no-verify', '-F', '-', `--author=${opts.author.name} <${opts.author.email}>`], {
+      input: formatCommitMessage(opts.subject, undefined, opts.trailers),
+    });
+    return this.head();
   }
 
   async show(hash: string): Promise<string> {

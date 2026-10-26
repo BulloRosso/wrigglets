@@ -20,6 +20,7 @@ import DnsOutlined from '@mui/icons-material/DnsOutlined';
 import { AgentPortrait, EmptyState, ErrorAlert, KillSwitchChip, Loading, PageHeader, RelativeTime, StatusChip } from '@cw/ui';
 import { api, avatarSrc } from '../api';
 import { AiGatewayCard, AiNotConfiguredAlert } from '../components/Ai';
+import { SecurityAlertBanner } from '../components/Security';
 
 function Metric({ label, value, tone }: { label: string; value: ReactNode; tone?: 'warning' | 'error' | 'success' }) {
   return (
@@ -54,6 +55,7 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle="State of the platform: Temporal, identity provider, agent runtime and the work of all agents." />
+      <SecurityAlertBanner />
       <AiNotConfiguredAlert />
       <ErrorAlert error={overview.error} />
       {!o ? (

@@ -3,6 +3,7 @@ import type { ActivityDeps } from './deps.js';
 import { createFinalizeTask } from './finalize.js';
 import { createIsWorkflowRunning, createMaintenance, createNotify } from './misc.js';
 import { createRunAgentStep } from './runAgentStep.js';
+import { createReportSecurityAlert } from './security.js';
 import { createApplyUpload } from './upload.js';
 import { createVerify } from './verify.js';
 
@@ -16,6 +17,7 @@ export function createActivities(deps: ActivityDeps): AgentActivities & AgentLoc
     applyUpload: createApplyUpload(deps),
     finalizeTask: createFinalizeTask(deps),
     notify: createNotify(deps),
+    reportSecurityAlert: createReportSecurityAlert(deps),
     isWorkflowRunning: createIsWorkflowRunning(deps),
     checkDelegations: ({ delegations }) => deps.gateway.delegationStatus(delegations),
     gitMaintenance: () => maintenance.gitMaintenance(),

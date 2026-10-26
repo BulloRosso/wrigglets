@@ -75,6 +75,14 @@ export function createRunAgentStep(deps: ActivityDeps) {
       log.info({ sessionId, recovered: !!preamble }, 'harness session created');
     }
 
+    // The exfiltration guard stopped this session (ADR-0033): end the step as cancelled; the guard has cancelled the task.
+    const stoppedByGuard = () => {
+      const halt = deps.guard?.haltOf(sessionId!);
+      if (!halt) return;
+      deps.guard!.clearHalt(sessionId!);
+      throw new CancelledFailure(`Stopped by the security guard: ${halt.reason}`);
+    };
+
     // 3. Heartbeats on every harness event, at least every 30 s
     let lastEventType = 'none';
     let toolEvents = 0;
@@ -95,11 +103,14 @@ export function createRunAgentStep(deps: ActivityDeps) {
     const footer = `\n\n---\nWhen finished, write a 3–6 sentence summary of this step to \`${summaryRel}\`. Do not commit.`;
     const startedAt = new Date();
     let turn;
-    await deps.gateway.setStepContext({ taskId: input.taskId, requestedBy: input.requestedBy });
+    const guardedBefore = deps.guard?.evaluationsOf(sessionId) ?? 0;
+    // `interactive`: a signed-in user is behind the task (not a schedule or A2A delegation) — decides Entra OBO vs. agent-only
+    await deps.gateway.setStepContext({ taskId: input.taskId, requestedBy: input.requestedBy, interactive: input.meta.trigger === 'user' });
     try {
       heartbeat();
       turn = await harness.prompt({ sessionId, text: `${preamble}${input.prompt}${footer}`, signal: ctx.cancellationSignal });
     } catch (err) {
+      stoppedByGuard();
       if (ctx.cancellationSignal.aborted) throw new CancelledFailure('Step cancelled');
       safetyStats.recordStepFailure();
       throw ApplicationFailure.retryable(`Harness request failed: ${String(err)}`, ACTIVITY_ERRORS.harnessUnavailable);
@@ -110,7 +121,19 @@ export function createRunAgentStep(deps: ActivityDeps) {
       events.endStep(sessionId);
       ctx.cancellationSignal.removeEventListener('abort', abortHarness);
     }
+    stoppedByGuard();
     if (ctx.cancellationSignal.aborted) throw new CancelledFailure('Step cancelled');
+
+    // The harness plugin must have shown every tool call to the exfiltration guard. If tools ran successfully and the guard
+    // saw none, the hook is not active (e.g. the harness did not load the plugin): fail loudly instead of running unguarded
+    // (ADR-0033). Calls refused by the harness's own permissions never reach the hook, hence only successful ones count.
+    if (deps.guard && turn.toolCalls.some((t) => t.status === 'ok') && deps.guard.evaluationsOf(sessionId) === guardedBefore && (await deps.guard.getConfig()).enabled) {
+      log.error({ toolCalls: turn.toolCalls.length }, 'exfiltration guard saw no tool call — harness plugin inactive');
+      throw ApplicationFailure.nonRetryable(
+        'The exfiltration guard did not see any of the tool calls of this step, so the harness plugin is not active. The step was stopped; an administrator must check the harness (see docs/exfiltration-guard.md).',
+        ACTIVITY_ERRORS.guardInactive,
+      );
+    }
 
     // 6. Evaluate
     if (events.permissionViolations.has(sessionId)) {

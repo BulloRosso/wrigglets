@@ -96,6 +96,8 @@ export class GatewayConfigService {
         peers: spec.peers ?? [],
         allowedTools: this.allowedTools(spec.agentId),
         url: this.runtime.internalUrl(spec.agentId),
+        obo: spec.entra?.enabled === true,
+        oboAllowAgentOnly: spec.entra?.enabled === true && spec.entra.allowAgentOnly,
       })),
       upstreams: this.data.upstreams,
       limits: this.data.limits,

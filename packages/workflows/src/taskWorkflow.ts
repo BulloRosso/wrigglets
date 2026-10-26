@@ -508,7 +508,9 @@ export async function taskWorkflow(input: TaskInput): Promise<TaskResult> {
   try {
     return await mainScope.run(run);
   } catch (err) {
-    if (isCancellation(err)) {
+    // A requested cancellation always ends as cancelled, also if the running activity reports its stop as a plain failure
+    // (e.g. the exfiltration guard stopped the step before Temporal's cancel request reached the activity).
+    if (isCancellation(err) || state.cancelRequested) {
       await CancellationScope.nonCancellable(() => cleanup('cancelled'));
       if (state.cancelRequested) return finish('cancelled');
       setStatus('cancelled');

@@ -6,6 +6,7 @@ import { AvatarService } from './avatars.js';
 import { GatewayConfigService } from './gateway.js';
 import { KillSwitchService } from './killswitch.js';
 import { SafetyRuleEngine } from './safety.js';
+import { SecurityGuardService } from './security.js';
 import { createAdminApp } from './api.js';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
@@ -49,7 +50,7 @@ async function main() {
     openaiKeyPresent: !!config.OPENAI_API_KEY,
     defaultModel: config.AI_GATEWAY_MODEL,
   });
-  const agents = new AgentService(config, registry, runtime, oauth, temporal, ai);
+  const agents = new AgentService(config, registry, runtime, oauth, temporal, ai, SecretStore.fromEnv());
   const audit = new AdminAudit(config.DATA_DIR);
 
   // Safety: kill switch, MCP gateway configuration, rules; secrets in Key Vault; portraits
@@ -61,10 +62,13 @@ async function main() {
     {
       upstreams: [
         ...(config.DEMO_UPSTREAM_URL
-          ? [{ name: 'demo', description: 'Demo company systems (supplier directory, FX rates)', url: config.DEMO_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-demo-authorization' } }, enabled: true }]
+          ? [{ name: 'demo', description: 'Demo company systems (supplier directory, FX rates)', url: config.DEMO_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-demo-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
         ...(config.WEB_UPSTREAM_URL
-          ? [{ name: 'web', description: 'Internet access: web search and reading public pages (ADR-0031)', url: config.WEB_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-web-authorization' } }, enabled: true }]
+          ? [{ name: 'web', description: 'Internet access: web search and reading public pages (ADR-0031)', url: config.WEB_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-web-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          : []),
+        ...(config.REDTEAM_UPSTREAM_URL
+          ? [{ name: 'redteam', description: 'Red-team mock: CRM, tickets with prompt injections and a recording mail tool (no authentication)', url: config.REDTEAM_UPSTREAM_URL, headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
       ],
     },
@@ -80,6 +84,9 @@ async function main() {
   const safety = new SafetyRuleEngine(config.DATA_DIR, registry, runtime, temporal, gateway, killSwitch);
   await safety.load();
   safety.start();
+  const guard = new SecurityGuardService(config.DATA_DIR, registry, killSwitch, audit);
+  await guard.load();
+  agents.extraAiModels = () => (guard.getConfig().model ? [guard.getConfig().model] : []);
   const avatars = new AvatarService({
     dataDir: config.DATA_DIR,
     defaultReference: config.AVATAR_DEFAULT_REFERENCE,
@@ -92,7 +99,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

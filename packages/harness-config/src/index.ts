@@ -11,6 +11,8 @@
  *    AGENTS.md discovery, so AGENTS.md is referenced explicitly via `instructions`.
  */
 
+export { GUARD_ENV, GUARD_PLUGIN_FILENAME, GUARD_PLUGIN_SOURCE } from './guardPlugin.js';
+
 export interface HarnessConfigInput {
   workspaceDir: string;
   /** Model reference `<provider>/<model>`; provider must be `aigateway`. */
@@ -21,6 +23,8 @@ export interface HarnessConfigInput {
   extraModels?: string[];
   /** MCP gateway endpoint of this agent (ADR-0021); the only MCP server the harness may use. */
   mcpGatewayUrl?: string;
+  /** Absolute path of the exfiltration-guard plugin (`tool.execute.before`, ADR-0033); loaded by opencode as a local plugin. */
+  guardPluginPath?: string;
 }
 
 export const HARNESS_PROVIDER_ID = 'aigateway';
@@ -48,6 +52,7 @@ export function renderHarnessConfig(input: HarnessConfigInput): Record<string, u
     model: `${HARNESS_PROVIDER_ID}/${modelId(input.model)}`,
     small_model: `${HARNESS_PROVIDER_ID}/${modelId(input.smallModel ?? input.model)}`,
     instructions: [`${ws}/AGENTS.md`],
+    ...(input.guardPluginPath ? { plugin: [`file://${input.guardPluginPath}`] } : {}),
     ...(input.mcpGatewayUrl
       ? {
           mcp: {

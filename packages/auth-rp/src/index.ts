@@ -38,6 +38,21 @@ export interface OidcRpOptions {
   requiredRole?: string;
   accessDenied?: (user: Principal) => string;
   onSignIn?: (user: Principal) => void;
+  /**
+   * Replaces the HTTP Basic client authentication of the token request (e.g. certificate or federated
+   * client assertions for Entra ID). Returns extra form fields; `client_id` is added automatically.
+   */
+  clientAuth?: () => Promise<Record<string, string>>;
+  /** Receives the tokens of a successful sign-in (never stored in the session cookie by this library). */
+  onTokens?: (user: Principal, tokens: SignInTokens) => void | Promise<void>;
+  onSignOut?: (user: Principal) => void | Promise<void>;
+}
+
+export interface SignInTokens {
+  accessToken?: string;
+  refreshToken?: string;
+  /** Epoch milliseconds. */
+  expiresAt?: number;
 }
 
 export interface OidcRp {
@@ -141,12 +156,18 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
             method: 'POST',
             headers: {
               'content-type': 'application/x-www-form-urlencoded',
-              authorization: `Basic ${Buffer.from(`${encodeURIComponent(o.clientId)}:${encodeURIComponent(o.clientSecret)}`).toString('base64')}`,
+              ...(o.clientAuth ? {} : { authorization: `Basic ${Buffer.from(`${encodeURIComponent(o.clientId)}:${encodeURIComponent(o.clientSecret)}`).toString('base64')}` }),
             },
-            body: new URLSearchParams({ grant_type: 'authorization_code', code: req.query.code, redirect_uri: redirectUri, code_verifier: flow.verifier }),
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: req.query.code,
+              redirect_uri: redirectUri,
+              code_verifier: flow.verifier,
+              ...(o.clientAuth ? { client_id: o.clientId, ...(await o.clientAuth()) } : {}),
+            }),
           });
           if (!tokenRes.ok) throw new Error(`token exchange failed: ${tokenRes.status} ${await tokenRes.text()}`);
-          const tokens = (await tokenRes.json()) as { id_token?: string };
+          const tokens = (await tokenRes.json()) as { id_token?: string; access_token?: string; refresh_token?: string; expires_in?: number };
           if (!tokens.id_token) throw new Error('no id_token in token response');
           const { payload } = await jwtVerify(tokens.id_token, jwks!, { issuer: d.issuer, audience: o.clientId });
           if (payload.nonce !== flow.nonce) throw new Error('nonce mismatch');
@@ -159,6 +180,11 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
           if (o.requiredRole && !user.roles.includes(o.requiredRole)) {
             return res.status(403).type('html').send(o.accessDenied?.(user) ?? `<p>Access denied (role ${escapeHtml(o.requiredRole)} required).</p><p><a href="/auth/logout">Sign out</a></p>`);
           }
+          await o.onTokens?.(user, {
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            expiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined,
+          });
           res.cookie(o.cookieName, await seal({ ...user }, Math.floor(o.sessionTtlMs / 1000)), cookieOpts(o.sessionTtlMs));
           o.onSignIn?.(user);
           res.redirect(flow.returnTo);
@@ -167,7 +193,9 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
         }
       });
 
-      app.get('/auth/logout', async (_req, res) => {
+      app.get('/auth/logout', async (req, res) => {
+        const current = o.onSignOut ? await sessionUser(req) : undefined;
+        if (current) await Promise.resolve(o.onSignOut?.(current)).catch(() => undefined);
         res.clearCookie(o.cookieName, { path: '/' });
         const d = await discover().catch(() => undefined);
         if (!d?.end_session_endpoint) return res.redirect('/');

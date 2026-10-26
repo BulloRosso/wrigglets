@@ -6,7 +6,12 @@ import { z } from 'zod';
 import type { SecretStore } from '@cw/secrets';
 import {
   AVATAR_MOODS,
+  agentEntra,
+  DEFAULT_GUARD_CONFIG,
+  DEFAULT_GUARD_SYSTEM_PROMPT,
+  guardConfig,
   safetyRules,
+  securityWarningBody,
   setKillSwitchBody,
   upstreamServer,
   type AgentSummary,
@@ -23,6 +28,7 @@ import { approvalMailHtml, notifyMailBody, type MailService } from './mail.js';
 import type { OAuthAdmin } from './oauthAdmin.js';
 import type { AdminAudit, AgentRegistry } from './registry.js';
 import type { SafetyRuleEngine } from './safety.js';
+import type { SecurityGuardService } from './security.js';
 
 export interface ExtensionDeps {
   config: Config;
@@ -32,11 +38,12 @@ export interface ExtensionDeps {
   killSwitch: KillSwitchService;
   gateway: GatewayConfigService;
   safety: SafetyRuleEngine;
+  guard: SecurityGuardService;
   secrets?: SecretStore;
   mail: MailService;
   ai: LiteLLMService;
   spendLimit: (spec: AgentSummary['spec']) => number;
-  agents: Pick<import('./agents.js').AgentService, 'update' | 'rotateAiKey' | 'aiModels'>;
+  agents: Pick<import('./agents.js').AgentService, 'update' | 'rotateAiKey' | 'aiModels' | 'setEntra' | 'syncAiKeys'>;
   smallModel: string;
   oauth: Pick<OAuthAdmin, 'users'>;
 }
@@ -110,6 +117,33 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
     res.json({ rules: d.safety.get() });
   });
   r.post('/safety/run', async (_req, res) => res.json({ observations: await d.safety.run(), lastRun: d.safety.lastRun }));
+
+  /* ------------------------------------------------------------ exfiltration guard (ADR-0033) */
+  r.get('/security/guard', (_req, res) =>
+    res.json({ config: d.guard.getConfig(), defaultSystemPrompt: DEFAULT_GUARD_SYSTEM_PROMPT, defaults: DEFAULT_GUARD_CONFIG, platformModel: d.smallModel }),
+  );
+  r.put('/security/guard', async (req, res) => {
+    const before = d.guard.getConfig().model;
+    const next = guardConfig.parse(req.body?.config);
+    if (next.model) {
+      const ai = await d.ai.status();
+      if (ai.reachable && !ai.models.some((m) => m.name === next.model)) throw new HttpError(400, `Model "${next.model}" is not configured in the AI gateway (LiteLLM).`);
+    }
+    const config = await d.guard.setConfig(next, by(req));
+    // the agents' virtual keys may only use the models they are given
+    if (config.model !== before) await d.agents.syncAiKeys();
+    res.json({ config });
+  });
+  r.get('/security/alerts', (req, res) => {
+    const status = req.query.status === 'open' || req.query.status === 'acknowledged' ? req.query.status : undefined;
+    res.json({ open: d.guard.openCount(), alerts: d.guard.list(status).slice(0, 200) });
+  });
+  r.post('/security/alerts/:id/acknowledge', async (req, res) => {
+    const note = z.object({ note: z.string().max(1000).optional() }).parse(req.body ?? {}).note;
+    const alert = await d.guard.acknowledge(req.params.id, by(req), note);
+    if (!alert) throw new HttpError(404, 'alert not found');
+    res.json(alert);
+  });
 
   /* ------------------------------------------------------------ MCP gateway */
   r.get('/gateway', async (_req, res) => {
@@ -226,6 +260,27 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
     await d.audit.write({ by: by(req), action: 'agent.ai', target: req.params.id, details: { spendLimitUsd: body.spendLimitUsd, model: body.model, previousModel: before.model, previousLimit: before.spendLimitUsd } });
     res.json({ ok: true, redeployed: body.model !== undefined && body.model !== before.model });
   });
+  /* ------------------------------------------------------------ Entra OBO identity (optional capability) */
+  r.get('/entra', (_req, res) => res.json({ available: !!d.config.ENTRA_TENANT_ID, tenantId: d.config.ENTRA_TENANT_ID ?? null }));
+  r.get('/agents/:id/entra', (req, res) => {
+    const entry = d.registry.get(req.params.id);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    res.json({ available: !!d.config.ENTRA_TENANT_ID, entra: entry.spec.entra ?? null });
+  });
+  r.put('/agents/:id/entra', async (req, res) => {
+    if (!d.registry.get(req.params.id)) throw new HttpError(404, 'agent not found');
+    const entra = agentEntra.nullable().parse(req.body?.entra ?? null) ?? undefined;
+    await d.agents.setEntra(req.params.id, entra);
+    void d.gateway.push();
+    // credential references and ids only — never secret values
+    await d.audit.write({
+      by: by(req),
+      action: 'agent.entra',
+      target: req.params.id,
+      details: entra ? { enabled: entra.enabled, clientId: entra.clientId, tenantId: entra.tenantId, credentialKind: entra.credential.kind, allowAgentOnly: entra.allowAgentOnly } : { removed: true },
+    });
+    res.json({ ok: true });
+  });
   r.post('/agents/:id/ai/rotate', async (req, res) => {
     await d.agents.rotateAiKey(req.params.id);
     await d.audit.write({ by: by(req), action: 'agent.ai.rotate', target: req.params.id });
@@ -269,6 +324,19 @@ export function internalRouter(d: ExtensionDeps): Router {
   r.get('/gateway-config', (req, res) => {
     if (!safeEqual(bearer(req), d.config.GATEWAY_TOKEN)) return res.status(401).json({ error: 'unauthorized' });
     res.json(d.gateway.build());
+  });
+  /** Guard policy for the evaluation agent of one agent container (fetched and cached by the agent). */
+  r.get('/agents/:agentId/guard-config', (req, res) => {
+    const entry = d.registry.get(req.params.agentId);
+    if (!entry || !safeEqual(bearer(req), entry.secrets.internalToken)) return res.status(401).json({ error: 'unauthorized' });
+    res.json(d.guard.getConfig());
+  });
+  /** An agent's guard blocked a tool call: record the alert and stop the agent. Idempotent on the alert id. */
+  r.post('/agents/:agentId/security-alerts', express.json({ limit: '32kb' }), async (req, res) => {
+    const entry = d.registry.get(req.params.agentId);
+    if (!entry || !safeEqual(bearer(req), entry.secrets.internalToken)) return res.status(401).json({ error: 'unauthorized' });
+    const { alert, created } = await d.guard.raise(entry.spec.agentId, securityWarningBody.parse(req.body));
+    res.status(created ? 202 : 200).json({ id: alert.id, status: alert.status });
   });
   r.get('/avatars/:agentId/:mood', async (req, res) => {
     const entry = d.registry.get(req.params.agentId);

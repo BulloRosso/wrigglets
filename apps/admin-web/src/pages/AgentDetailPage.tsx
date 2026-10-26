@@ -50,6 +50,7 @@ import {
 import { api, avatarSrc, useMe } from '../api';
 import { CollaborationTab, PortraitTab, SafetyTab } from '../components/AgentTabs';
 import { AiBudgetTab } from '../components/AiBudgetTab';
+import { IdentityTab } from '../components/IdentityTab';
 
 function Overview({ a }: { a: AgentSummary }) {
   const h = a.health;
@@ -424,7 +425,7 @@ function AgentAudit({ agentId }: { agentId: string }) {
   );
 }
 
-const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Portrait', 'Collaboration', 'Safety', 'Settings', 'Audit'] as const;
+const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Settings', 'Audit'] as const;
 
 export function AgentDetailPage() {
   const { id = '' } = useParams();
@@ -498,6 +499,7 @@ export function AgentDetailPage() {
       {tab === 'Tasks' && <Tasks a={a} />}
       {tab === 'Access' && <Access agentId={id} />}
       {tab === 'AI & budget' && <AiBudgetTab a={a} />}
+      {tab === 'Identity' && <IdentityTab a={a} />}
       {tab === 'Portrait' && <PortraitTab a={a} />}
       {tab === 'Collaboration' && <CollaborationTab a={a} />}
       {tab === 'Safety' && <SafetyTab a={a} />}

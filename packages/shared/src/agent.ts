@@ -1,4 +1,5 @@
 import type { Identity } from './identity.js';
+import type { SecurityWarning } from './guard.js';
 import type { KillLevel } from './killswitch.js';
 
 export interface LockHolder {
@@ -15,9 +16,11 @@ export interface AgentState {
   lastForceRelease?: { taskId: string; by: Identity; at: string };
   /** Effective kill-switch level of this agent (set by the control plane, ADR-0022). */
   killSwitch?: { level: KillLevel; reason?: string; by: string; at: string };
+  /** Warnings of the exfiltration guard received by this workflow (most recent last, ADR-0033). */
+  securityWarnings?: SecurityWarning[];
 }
 
-export type AgentStatus = Pick<AgentState, 'holder' | 'waiting' | 'stats' | 'killSwitch'>;
+export type AgentStatus = Pick<AgentState, 'holder' | 'waiting' | 'stats' | 'killSwitch' | 'securityWarnings'>;
 
 export interface HealthReport {
   status: 'ok' | 'degraded' | 'down';

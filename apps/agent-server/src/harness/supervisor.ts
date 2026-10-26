@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { HARNESS_HARDENING_ENV, renderHarnessConfig } from '@cw/harness-config';
+import { GUARD_ENV, GUARD_PLUGIN_FILENAME, GUARD_PLUGIN_SOURCE, HARNESS_HARDENING_ENV, renderHarnessConfig } from '@cw/harness-config';
 import type { Config } from '../config.js';
 import { logger } from '../logger.js';
 import { metrics } from '../telemetry.js';
@@ -26,9 +26,19 @@ export class HarnessSupervisor {
   private backoffMs = 1000;
   private healthTimer?: NodeJS.Timeout;
   private listeners = new Set<(s: HarnessState) => void>();
+  private guard?: { url: string; token: string };
 
   constructor(private readonly config: Config) {
     this.baseUrl = `http://127.0.0.1:${config.HARNESS_PORT}`;
+  }
+
+  /** Exfiltration guard (ADR-0033): endpoint and token of the evaluation service the harness plugin calls before every tool. */
+  setGuard(guard: { url: string; token: string }) {
+    this.guard = guard;
+  }
+
+  private get guardPluginPath() {
+    return path.join(path.dirname(this.config.HARNESS_CONFIG_PATH), GUARD_PLUGIN_FILENAME);
   }
 
   get authHeader(): string {
@@ -47,9 +57,11 @@ export class HarnessSupervisor {
       model: this.config.AI_GATEWAY_MODEL,
       smallModel: this.config.AI_GATEWAY_SMALL_MODEL,
       mcpGatewayUrl: this.config.MCP_GATEWAY_URL,
+      guardPluginPath: this.guard ? this.guardPluginPath : undefined,
     });
     const content = `${JSON.stringify(cfg, null, 2)}\n`;
     await mkdir(path.dirname(this.config.HARNESS_CONFIG_PATH), { recursive: true });
+    if (this.guard) await writeFile(this.guardPluginPath, GUARD_PLUGIN_SOURCE, { mode: 0o600 });
     const current = await readFile(this.config.HARNESS_CONFIG_PATH, 'utf8').catch(() => '');
     if (current !== content) {
       await writeFile(this.config.HARNESS_CONFIG_PATH, content, { mode: 0o600 });
@@ -75,6 +87,7 @@ export class HarnessSupervisor {
       AI_GATEWAY_BASE_URL: this.config.AI_GATEWAY_BASE_URL,
       AI_GATEWAY_API_KEY: this.config.AI_GATEWAY_API_KEY,
       ...(this.config.MCP_GATEWAY_TOKEN ? { MCP_GATEWAY_TOKEN: this.config.MCP_GATEWAY_TOKEN } : {}),
+      ...(this.guard ? { [GUARD_ENV.url]: this.guard.url, [GUARD_ENV.token]: this.guard.token } : {}),
       ...HARNESS_HARDENING_ENV,
     };
     this.setState('starting');

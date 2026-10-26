@@ -39,6 +39,48 @@ Desktop** environment, extended to a small platform:
 More detail: [docs/architecture.md](docs/architecture.md); safety, gateway and A2A in
 [diagram 10](docs/diagrams/10-killswitch-gateway.svg).
 
+## Microsoft Entra On-Behalf-Of (optional)
+
+MCP servers can receive a **Microsoft Entra token that carries two identities**: the **agent** (`azp`) and the **user** it
+works for (`oid`, `upn`). This is the identity model of Microsoft Foundry, obtained through the Entra *On-Behalf-Of* flow.
+It is off by default; the local stack keeps working with static upstream credentials.
+
+- Each agent can have its own **Entra identity** (app registration with a secret, certificate or federated credential),
+  set in the admin console on the agent's **Identity** tab. The agent signs users in and keeps their tokens encrypted.
+- An upstream MCP server is switched to **Entra On-Behalf-Of** in the gateway settings. For every tool call the gateway gets a
+  short-lived token from the agent and uses it for that call only; user tokens never leave the agent.
+- **Fail closed**: no valid user sign-in means no call, and an OBO upstream never falls back to static credentials.
+  Scheduled and agent-to-agent tasks have no user; they are denied, or, if explicitly allowed per upstream and agent,
+  use the agent's own token without a user identity.
+- Agents have **no access to Key Vault**; the control plane hands them their credential.
+
+Needs a real Entra tenant (`ENTRA_TENANT_ID`). Model, set-up, rules and operations: **[docs/entra-obo.md](docs/entra-obo.md)**
+([ADR-0032](docs/adr/0032-entra-obo-for-mcp.md)).
+
+## Security: exfiltration guard
+
+Background agents read untrusted text, so a **multi-turn prompt injection** can plant a goal early and let a later call
+of an allowed tool (for example an e-mail tool) carry data out. The guard checks every tool call before it runs:
+
+1. **Pre-tool hook:** an opencode plugin (`tool.execute.before`) sends every tool call of the Agent Harness to the
+   agent server, which asks an **evaluation agent**. If that cannot be reached, the call is refused.
+2. **Evaluation agent:** a nano-class model (default `gpt-5.4-nano`, on the agent's own LiteLLM key). It sees the **last
+   5 model round-trips** of the task conversation (prompts, tool calls, tool results) and the pending call, and
+   answers `allow` or `block` with a category and a reason.
+3. **On a block:** the tool never runs, the user's task is **cancelled**, the harness is aborted, and a **warning goes
+   to Temporal** (the agent's `AgentWorkflow`). It stops the agent at once and delivers a **security alert** to the
+   control plane, which stops all tasks of the agent (kill switch) and shows the alert on the **admin dashboard**.
+4. **Tailored, editable policy:** the system prompt of the evaluation agent targets multi-turn injection and data
+   extraction and is edited in the admin console under *Safety & tools → Exfiltration guard*, together with model,
+   context size, halt level and fail mode.
+
+The guard is one layer next to tool allow-lists, the MCP gateway and the kill switch; it is probabilistic and does not
+cover what happens with the agent's output afterwards.
+
+Details, sequence diagram, configuration and limits: **[docs/exfiltration-guard.md](docs/exfiltration-guard.md)**
+([ADR-0033](docs/adr/0033-exfiltration-guard.md)). A runnable attack suite with a mock MCP server:
+[docs/red-teaming.md](docs/red-teaming.md).
+
 ## Quick start
 
 ```bash
@@ -74,6 +116,7 @@ Details: [docs/getting-started.md](docs/getting-started.md). New here? Follow th
 
 - [Guided tour](guided-tour.md): set up an agent and work with it, step by step with screenshots
 - [Technical documentation](docs/architecture.md) (architecture, diagrams, APIs, configuration, verification)
+- [Exfiltration guard](docs/exfiltration-guard.md): protection against multi-turn prompt injection
 - [Azure target and resource types](docs/azure.md)
 - [Runbook](docs/runbook.md)
 - [Architecture Decision Records](docs/adr/README.md)

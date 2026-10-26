@@ -13,3 +13,4 @@ export * from './killswitch.js';
 export * from './gateway.js';
 export * from './ai.js';
 export * from './chat.js';
+export * from './guard.js';

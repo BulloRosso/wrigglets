@@ -58,6 +58,8 @@ services:
       AI_GATEWAY_MODEL: ${AI_GATEWAY_MODEL:-gpt-5.4-mini}
       AI_GATEWAY_SMALL_MODEL: ${AI_GATEWAY_SMALL_MODEL:-gpt-5.4-nano}
       AGENT_SPEND_LIMIT_USD: ${AGENT_SPEND_LIMIT_USD:-25}
+      # Optional: Microsoft Entra ID On-Behalf-Of for MCP calls (docs/entra-obo.md). Unset = capability off.
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
       APPROVAL_REMINDER_AFTER: ${APPROVAL_REMINDER_AFTER:-4h}
       APPROVAL_EXPIRE_AFTER: ${APPROVAL_EXPIRE_AFTER:-7d}
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:?run scripts/stack.mjs to add GATEWAY_TOKEN}

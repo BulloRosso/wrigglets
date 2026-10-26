@@ -1,4 +1,5 @@
-import type { AgentSpec, AgentSummary, CreateAgentBody, HealthReport, UpdateAgentBody } from '@cw/shared';
+import type { SecretStore } from '@cw/secrets';
+import type { AgentEntra, AgentSpec, AgentSummary, CreateAgentBody, HealthReport, UpdateAgentBody } from '@cw/shared';
 import type { Config } from './config.js';
 import { logger } from './logger.js';
 import type { OAuthAdmin } from './oauthAdmin.js';
@@ -28,15 +29,27 @@ export class AgentService {
     private readonly oauth: OAuthAdmin,
     private readonly temporal: TemporalPlatform,
     private readonly ai?: LiteLLMService,
+    private readonly secretStore?: SecretStore,
   ) {}
 
   spendLimit(spec: AgentSpec) {
     return spec.spendLimitUsd ?? this.config.AGENT_SPEND_LIMIT_USD;
   }
 
-  /** Models the agent's key may use: its model and the small model (titles, summaries). */
+  /** Extra models every agent key may use, e.g. the model of the exfiltration guard's evaluation agent (ADR-0033). */
+  extraAiModels: () => string[] = () => [];
+
+  /** Models the agent's key may use: its model, the small model (titles, summaries) and the guard's evaluation model. */
   aiModels(spec: AgentSpec) {
-    return [...new Set([spec.model, this.config.AI_GATEWAY_SMALL_MODEL])];
+    return [...new Set([spec.model, this.config.AI_GATEWAY_SMALL_MODEL, ...this.extraAiModels()])];
+  }
+
+  /** Pushes the current model list to all agents' LiteLLM keys (no redeploy needed). */
+  async syncAiKeys() {
+    for (const spec of this.registry.list()) {
+      const entry = this.registry.get(spec.agentId);
+      if (entry) await this.ensureAiKey(entry.spec, entry.secrets);
+    }
   }
 
   /** Replaces the agent's virtual key: new key with the same budget and models, redeploy, then delete the old key. */
@@ -48,7 +61,7 @@ export class AgentService {
     const key = await this.ai.rotateKey(entry.spec, this.spendLimit(entry.spec), this.aiModels(entry.spec));
     const secrets = { ...entry.secrets, aiKey: key };
     await this.registry.put(entry.spec, secrets);
-    await this.runtime.deploy(entry.spec, this.env(entry.spec, secrets), { start: true });
+    await this.runtime.deploy(entry.spec, await this.deployEnv(entry.spec, secrets), { start: true });
     await this.ai.deleteKey(old);
     return key;
   }
@@ -78,7 +91,7 @@ export class AgentService {
   }
 
   /** Environment of the agent container (spec §4; secrets would be Key Vault references on Azure). */
-  env(spec: AgentSpec, secrets: AgentSecrets): Record<string, string> {
+  env(spec: AgentSpec, secrets: AgentSecrets, entraCredential?: string): Record<string, string> {
     const c = this.config;
     return {
       NODE_ENV: 'production',
@@ -114,7 +127,53 @@ export class AgentService {
       A2A_GATEWAY_TOKEN: c.GATEWAY_TOKEN,
       CONTROL_PLANE_URL: c.AGENT_CONTROL_PLANE_URL,
       CONTROL_PLANE_TOKEN: secrets.internalToken,
+      ...this.entraEnv(spec, entraCredential),
     };
+  }
+
+  /**
+   * Entra OBO identity of the agent (optional capability); nothing is passed when disabled.
+   * Agents never access Key Vault: the control plane resolves the credential and hands it over as env.
+   */
+  private entraEnv(spec: AgentSpec, credential?: string): Record<string, string> {
+    const e = spec.entra;
+    if (!e?.enabled) return {};
+    return {
+      ENTRA_ENABLED: 'true',
+      ENTRA_AUTHORITY_HOST: this.config.ENTRA_AUTHORITY_HOST,
+      ENTRA_TENANT_ID: e.tenantId ?? this.config.ENTRA_TENANT_ID ?? '',
+      ENTRA_CLIENT_ID: e.clientId,
+      ENTRA_CREDENTIAL_KIND: e.credential.kind,
+      ...(e.credential.kind === 'federated' && this.config.ENTRA_FEDERATED_TOKEN_FILE ? { ENTRA_FEDERATED_TOKEN_FILE: this.config.ENTRA_FEDERATED_TOKEN_FILE } : {}),
+      ...(e.credential.kind === 'secret' && credential ? { ENTRA_CLIENT_SECRET: credential } : {}),
+      ...(e.credential.kind === 'cert' && credential ? { ENTRA_CLIENT_CERT_PEM: credential } : {}),
+      ENTRA_ALLOW_AGENT_ONLY: String(e.allowAgentOnly),
+    };
+  }
+
+  /** Container environment incl. the Entra credential resolved from Key Vault (fails instead of deploying a broken agent). */
+  private async deployEnv(spec: AgentSpec, secrets: AgentSecrets): Promise<Record<string, string>> {
+    const ref = spec.entra?.enabled ? spec.entra.credential.secretRef : undefined;
+    if (!ref) return this.env(spec, secrets);
+    if (!this.secretStore) throw new HttpError(409, 'Entra credential configured but no Key Vault is available to resolve it');
+    let credential: string;
+    try {
+      credential = await this.secretStore.get(ref);
+    } catch {
+      throw new HttpError(409, `Entra credential secret "${ref}" could not be read from Key Vault`);
+    }
+    return this.env(spec, secrets, credential);
+  }
+
+  /** Enables, changes or removes (`undefined`) the agent's Entra identity; the container is re-created. */
+  async setEntra(agentId: string, entra: AgentEntra | undefined) {
+    const entry = this.registry.get(agentId);
+    if (!entry) throw new HttpError(404, 'agent not found');
+    if (entra?.enabled && !(entra.tenantId ?? this.config.ENTRA_TENANT_ID)) throw new HttpError(400, 'No Entra tenant configured: set tenantId or ENTRA_TENANT_ID');
+    const spec: AgentSpec = { ...entry.spec, entra, updatedAt: new Date().toISOString() };
+    await this.registry.put(spec, entry.secrets);
+    const runtime = await this.runtime.deploy(spec, await this.deployEnv(spec, entry.secrets), { start: true });
+    return { spec, runtime };
   }
 
   private async registerClient(spec: AgentSpec, secrets: AgentSecrets) {
@@ -155,7 +214,7 @@ export class AgentService {
     };
     const secrets = await this.ensureAiKey(spec, (await this.registry.put(spec)).secrets);
     await this.registerClient(spec, secrets);
-    const runtime = await this.runtime.deploy(spec, this.env(spec, secrets), { start: body.start });
+    const runtime = await this.runtime.deploy(spec, await this.deployEnv(spec, secrets), { start: body.start });
     logger.info({ agentId: spec.agentId, port: spec.hostPort, image: spec.image }, 'agent deployed');
     return { spec, runtime };
   }
@@ -185,7 +244,7 @@ export class AgentService {
     if (!runtimeFields.some((k) => patch[k] !== undefined)) return { spec, runtime: await this.runtime.inspect(agentId) };
     await this.registerClient(spec, secrets);
     // Re-create the container; the /home volume (workspace) is kept. Temporal retries in-flight steps.
-    const runtime = await this.runtime.deploy(spec, this.env(spec, secrets), { start: true });
+    const runtime = await this.runtime.deploy(spec, await this.deployEnv(spec, secrets), { start: true });
     return { spec, runtime };
   }
 
@@ -195,7 +254,7 @@ export class AgentService {
     if (!entry) throw new HttpError(404, 'agent not found');
     const secrets = await this.ensureAiKey(entry.spec, entry.secrets);
     await this.registerClient(entry.spec, secrets);
-    return this.runtime.deploy(entry.spec, this.env(entry.spec, secrets), { start: true });
+    return this.runtime.deploy(entry.spec, await this.deployEnv(entry.spec, secrets), { start: true });
   }
 
   async remove(agentId: string, opts: { purgeData: boolean; removeAccess: boolean }) {

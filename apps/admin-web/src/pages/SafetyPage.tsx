@@ -35,6 +35,7 @@ import { KILL_LEVELS, type SafetyRule, type UpstreamServer } from '@cw/shared';
 import { AgentPortrait, EmptyState, ErrorAlert, KILL_LEVEL_META, KillSwitchChip, Loading, PageHeader, RelativeTime, StatusChip, errorMessage, formatNumber, userLocale } from '@cw/ui';
 import { api, avatarSrc } from '../api';
 import { KillSwitchDialog } from '../components/KillSwitch';
+import { GuardConfigCard, SecurityAlertsCard } from '../components/Security';
 
 const RULE_TEXT: Record<SafetyRule['kind'], { label: string; unit: string }> = {
   permission_violation: { label: 'Harness permission requests', unit: 'requests / hour' },
@@ -235,7 +236,7 @@ function Rules() {
   );
 }
 
-const emptyUpstream: UpstreamServer = { name: '', url: '', headers: {}, enabled: true };
+const emptyUpstream: UpstreamServer = { name: '', url: '', headers: {}, enabled: true, auth: 'static', oboFallback: 'deny' };
 
 function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose: () => void }) {
   const qc = useQueryClient();
@@ -243,9 +244,13 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
   const [headers, setHeaders] = useState(
     Object.entries(initial.headers).map(([k, v]) => ({ name: k, value: typeof v === 'string' ? v : v.secretRef, secret: typeof v !== 'string' })),
   );
+  // Entra OBO is optional: offered only when a tenant is configured (or the upstream already uses it)
+  const entra = useQuery({ queryKey: ['entra'], queryFn: api.entraAvailable, staleTime: 60_000 });
+  const oboOffered = entra.data?.available === true || initial.auth === 'obo';
+  const obo = u.auth === 'obo';
   const save = useMutation({
     mutationFn: () =>
-      api.saveUpstream({ ...u, headers: Object.fromEntries(headers.filter((h) => h.name).map((h) => [h.name, h.secret ? { secretRef: h.value } : h.value])) }),
+      api.saveUpstream({ ...u, oboScope: obo ? u.oboScope : undefined, oboFallback: obo ? u.oboFallback : 'deny', headers: obo ? {} : Object.fromEntries(headers.filter((h) => h.name).map((h) => [h.name, h.secret ? { secretRef: h.value } : h.value])) }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['gateway'] });
       onClose();
@@ -259,8 +264,41 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
           <TextField label="Name" value={u.name} disabled={!!initial.name} onChange={(e) => setU({ ...u, name: e.target.value })} helperText="Tool prefix: <name>__<tool>" />
           <TextField label="Description" value={u.description ?? ''} onChange={(e) => setU({ ...u, description: e.target.value })} />
           <TextField label="URL (Streamable HTTP)" value={u.url} onChange={(e) => setU({ ...u, url: e.target.value })} />
-          <Typography variant="subtitle2">Headers</Typography>
-          {headers.map((h, i) => (
+          {oboOffered && (
+            <TextField
+              select
+              label="Authentication"
+              value={u.auth}
+              onChange={(e) => setU({ ...u, auth: e.target.value as UpstreamServer['auth'] })}
+              helperText={obo ? 'The gateway sends an Entra token per call that identifies the agent and the user (On-Behalf-Of).' : 'Static headers below, the same for every call.'}
+            >
+              <MenuItem value="static">Static headers</MenuItem>
+              <MenuItem value="obo">Entra On-Behalf-Of (agent + user identity)</MenuItem>
+            </TextField>
+          )}
+          {obo && (
+            <>
+              <TextField
+                label="Scope"
+                value={u.oboScope ?? ''}
+                onChange={(e) => setU({ ...u, oboScope: e.target.value })}
+                placeholder="api://<mcp-server-app-id>/.default"
+                helperText="Resource the token is issued for (the MCP server's Entra application)."
+              />
+              <TextField
+                select
+                label="Tasks without a signed-in user (schedules, agent-to-agent)"
+                value={u.oboFallback}
+                onChange={(e) => setU({ ...u, oboFallback: e.target.value as UpstreamServer['oboFallback'] })}
+                helperText="Agent-only additionally requires the agent to allow it on its Identity tab. A task with a user never falls back."
+              >
+                <MenuItem value="deny">Deny</MenuItem>
+                <MenuItem value="agent-only">Use the agent's own token (no user identity)</MenuItem>
+              </TextField>
+            </>
+          )}
+          {!obo && <Typography variant="subtitle2">Headers</Typography>}
+          {!obo && headers.map((h, i) => (
             <Stack key={i} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <TextField size="small" label="Header" value={h.name} onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
               <TextField
@@ -278,9 +316,9 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
               </IconButton>
             </Stack>
           ))}
-          <Button startIcon={<AddOutlined />} onClick={() => setHeaders([...headers, { name: 'Authorization', value: '', secret: true }])} sx={{ alignSelf: 'flex-start' }}>
+          {!obo && <Button startIcon={<AddOutlined />} onClick={() => setHeaders([...headers, { name: 'Authorization', value: '', secret: true }])} sx={{ alignSelf: 'flex-start' }}>
             Add header
-          </Button>
+          </Button>}
           <Stack direction="row" sx={{ alignItems: 'center' }}>
             <Switch checked={u.enabled} onChange={(e) => setU({ ...u, enabled: e.target.checked })} />
             <Typography variant="body2">Enabled</Typography>
@@ -290,7 +328,7 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => save.mutate()} disabled={!u.name || !u.url || save.isPending}>
+        <Button variant="contained" onClick={() => save.mutate()} disabled={!u.name || !u.url || save.isPending || (obo && !u.oboScope)}>
           Save
         </Button>
       </DialogActions>
@@ -453,8 +491,11 @@ function Secrets() {
 export function SafetyPage() {
   return (
     <>
-      <PageHeader title="Safety & tools" subtitle="Kill switch, automatic triggers, MCP gateway, credentials and agent collaboration" />
+      <PageHeader title="Safety & tools" subtitle="Security alerts, kill switch, automatic triggers, exfiltration guard, MCP gateway, credentials and agent collaboration" />
       <Grid container spacing={3}>
+        <Grid size={{ xs: 12 }}>
+          <SecurityAlertsCard />
+        </Grid>
         <Grid size={{ xs: 12, lg: 8 }}>
           <KillSwitchOverview />
         </Grid>
@@ -463,6 +504,9 @@ export function SafetyPage() {
         </Grid>
         <Grid size={{ xs: 12 }}>
           <Rules />
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <GuardConfigCard />
         </Grid>
         <Grid size={{ xs: 12, lg: 7 }}>
           <Gateway />

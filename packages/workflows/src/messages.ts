@@ -6,6 +6,7 @@ import type {
   DecisionInput,
   Identity,
   KillLevel,
+  SecurityWarning,
   TaskState,
 } from '@cw/shared';
 
@@ -29,6 +30,12 @@ export const forceReleaseSignal = defineSignal<[{ taskId: string; by: Identity }
 export const agentStatusQuery = defineQuery<AgentStatus>('status');
 /** Control plane → lock manager: effective kill-switch level of this agent (ADR-0022). */
 export const setKillSwitchSignal = defineSignal<[{ level: KillLevel; reason?: string; by: string; at: string }]>('setKillSwitch');
+
+/**
+ * Agent → lock manager: the exfiltration guard blocked a tool call (ADR-0033). The agent is stopped at once
+ * (kill-switch level from the warning) and the warning is delivered to the control plane as a security alert.
+ */
+export const securityWarningSignal = defineSignal<[SecurityWarning]>('securityWarning');
 
 /* ------------------------------------------------------- Lock holders (task / maintenance) */
 

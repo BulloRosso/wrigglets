@@ -23,7 +23,7 @@ export class GatewayClient {
   }
 
   /** What the agent works on right now (steps are serialized per agent). Best effort. */
-  async setStepContext(ctx: { taskId: string; requestedBy?: Identity } | undefined) {
+  async setStepContext(ctx: { taskId: string; requestedBy?: Identity; interactive?: boolean } | undefined) {
     if (!this.enabled) return;
     try {
       await this.call('PUT', '/step-context', ctx ?? {});

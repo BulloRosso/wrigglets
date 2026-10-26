@@ -3,6 +3,8 @@ import path from 'node:path';
 import express, { type Express } from 'express';
 import cookieParser from 'cookie-parser';
 import { mountA2a } from '../a2a/server.js';
+import { mountGuard } from '../guard/route.js';
+import { mountObo } from '../obo/route.js';
 import { safetyStats } from '../safetyStats.js';
 import type { Auth } from './auth.js';
 import { errorHandler, type ApiDeps } from './context.js';
@@ -31,6 +33,8 @@ export function createApp(deps: ApiDeps, auth: Auth): Express {
     res.json(safetyStats.snapshot());
   });
   mountA2a(app, deps);
+  mountGuard(app, deps.guard);
+  mountObo(app, deps.obo, deps.config.A2A_GATEWAY_TOKEN);
 
   // Codec server (CORS for the Temporal Web UI, then auth)
   app.use('/codec', codecRouter(deps), auth.middleware, express.json({ limit: '4mb' }), codecHandlers(deps));

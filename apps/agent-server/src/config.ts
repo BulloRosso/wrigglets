@@ -102,6 +102,18 @@ const schema = z
     CONTROL_PLANE_TOKEN: z.string().optional(),
     WEB_DIST_DIR: z.string().optional(),
     TRUST_PROXY: bool,
+
+    /* Microsoft Entra ID On-Behalf-Of towards MCP servers (optional; ADR-0032). Handed over by the control plane. */
+    ENTRA_ENABLED: bool,
+    ENTRA_AUTHORITY_HOST: z.string().url().default('https://login.microsoftonline.com'),
+    ENTRA_TENANT_ID: z.string().optional(),
+    ENTRA_CLIENT_ID: z.string().optional(),
+    ENTRA_CREDENTIAL_KIND: z.enum(['secret', 'cert', 'federated']).optional(),
+    ENTRA_CLIENT_SECRET: z.string().optional(),
+    ENTRA_CLIENT_CERT_PEM: z.string().optional(),
+    /** Federated credential: file holding the workload identity assertion (re-read on every exchange). */
+    ENTRA_FEDERATED_TOKEN_FILE: z.string().optional(),
+    ENTRA_ALLOW_AGENT_ONLY: bool,
   })
   .superRefine((c, ctx) => {
     if (c.AUTH_MODE === 'oidc') {
@@ -111,6 +123,14 @@ const schema = z
     }
     if (c.AUTH_MODE === 'dev' && c.NODE_ENV !== 'development') {
       ctx.addIssue({ code: 'custom', path: ['AUTH_MODE'], message: 'AUTH_MODE=dev is only allowed with NODE_ENV=development' });
+    }
+    if (c.ENTRA_ENABLED) {
+      for (const k of ['ENTRA_TENANT_ID', 'ENTRA_CLIENT_ID', 'ENTRA_CREDENTIAL_KIND'] as const) {
+        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `${k} is required when ENTRA_ENABLED=true` });
+      }
+      const need = { secret: 'ENTRA_CLIENT_SECRET', cert: 'ENTRA_CLIENT_CERT_PEM', federated: 'ENTRA_FEDERATED_TOKEN_FILE' } as const;
+      const k = c.ENTRA_CREDENTIAL_KIND ? need[c.ENTRA_CREDENTIAL_KIND] : undefined;
+      if (k && !c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `${k} is required for credential kind ${c.ENTRA_CREDENTIAL_KIND}` });
     }
     if (c.BACKUP_TARGET === 'azure-blob' && !c.BACKUP_CONTAINER_URL) {
       ctx.addIssue({ code: 'custom', path: ['BACKUP_CONTAINER_URL'], message: 'required for BACKUP_TARGET=azure-blob' });
@@ -137,6 +157,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     stagingDir: c.STAGING_DIR ?? `${home}/staging`,
     harnessDataDir: c.HARNESS_DATA_DIR ?? `${home}/.oc`,
     backupDir: c.BACKUP_DIR ?? `${home}/backups`,
+    /** Encrypted per-user Entra tokens (refresh tokens never go into cookies or Temporal). */
+    oboDir: `${home}/.obo`,
     taskQueue: c.TEMPORAL_TASK_QUEUE ?? agentTaskQueue(c.AGENT_ID),
     codecCorsOrigins: c.CODEC_CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     roles: { user: c.ROLE_USER, approver: c.ROLE_APPROVER, admin: c.ROLE_ADMIN },

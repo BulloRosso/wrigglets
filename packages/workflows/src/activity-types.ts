@@ -3,7 +3,7 @@
  * `apps/agent-server/src/activities`. Inputs and outputs MUST stay small (< 50 KB):
  * large content goes to the artifacts directory and is referenced by relative path.
  */
-import type { DelegationStatus, Identity, StagingFile, StepKind, TaskState, TaskStatus, TaskType } from '@cw/shared';
+import type { DelegationStatus, Identity, SecurityWarning, StagingFile, StepKind, TaskState, TaskStatus, TaskType } from '@cw/shared';
 
 /** Values written as Git trailers. Task-Id, Workflow-Id, Run-Id and Step-Id are added by the activity. */
 export interface CommitMeta {
@@ -135,6 +135,8 @@ export interface AgentActivities {
   gitMaintenance(input: { summary: string }): Promise<MaintenanceResult>;
   backupWorkspace(input: { date: string; summary: string }): Promise<MaintenanceResult>;
   cleanupArtifacts(input: { olderThanDays: number; summary: string }): Promise<MaintenanceResult>;
+  /** Delivers a security warning to the control plane (admin dashboard); retried until it arrives. */
+  reportSecurityAlert(input: SecurityWarning): Promise<void>;
 }
 
 export interface AgentLocalActivities {
@@ -148,4 +150,5 @@ export const ACTIVITY_ERRORS = {
   harnessUnavailable: 'HarnessUnavailable',
   provider: 'ProviderError',
   aiNotConfigured: 'AiNotConfigured',
+  guardInactive: 'GuardInactive',
 } as const;

@@ -713,7 +713,15 @@ and from the conversation.
 - **No SSRF:** only public `http(s)` addresses; private, loopback, link-local and metadata addresses are refused; every
   redirect hop is checked again.
 
-## 24. Smaller behaviour notes
+## 24. Entra On-Behalf-Of for MCP calls ([ADR-0032](adr/0032-entra-obo-for-mcp.md))
+
+Optional. An agent with an Entra identity (*Identity* tab) signs users in as its Entra application and keeps their tokens
+encrypted in the agent. For an upstream with `auth: obo` the gateway asks the agent for a token per call
+(`POST /internal/obo-token`), so the MCP server receives a token with the agent (`azp`) and the user (`oid`). Tasks without a
+signed-in user can use an agent-only token if upstream and agent allow it. Full description, set-up and operations:
+[entra-obo.md](entra-obo.md).
+
+## 25. Smaller behaviour notes
 
 - **Locale:** dates and numbers in all UIs follow the browser's locale (e.g. de-DE "25.10.2026, 16:29:04"); ISO
   timestamps inside agent-written Markdown are shown the same way. The UI language stays English.

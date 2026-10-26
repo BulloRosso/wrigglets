@@ -47,6 +47,13 @@ const schema = z.object({
   AGENT_OIDC_INTERNAL_URL: z.string().url().default('http://oauth:9000'),
   AGENT_LOG_LEVEL: z.string().default('info'),
 
+  /* Microsoft Entra ID On-Behalf-Of for MCP calls (optional capability; off when unset) */
+  /** Default tenant for agents' Entra identities. Unset = the OBO feature is hidden in the admin UI. */
+  ENTRA_TENANT_ID: z.string().optional(),
+  ENTRA_AUTHORITY_HOST: z.string().url().default('https://login.microsoftonline.com'),
+  /** Path of the workload-identity assertion inside agent containers (federated credentials; provided by the platform). */
+  ENTRA_FEDERATED_TOKEN_FILE: z.string().optional(),
+
   /* Defaults handed to new agents (AI gateway or the mock) */
   /** AI gateway = LiteLLM proxy (ADR-0029); agents get virtual keys created with the master key. */
   LITELLM_URL: z.string().url().default('http://litellm:4000'),
@@ -72,6 +79,8 @@ const schema = z.object({
   /** Web access upstream (search, fetch); token seeded into Key Vault as `mcp-web-authorization` (ADR-0031). */
   WEB_UPSTREAM_URL: z.string().url().optional(),
   MCP_WEB_TOKEN: z.string().optional(),
+  /** Red-team example (docs/red-teaming.md): mock MCP upstream without authentication. Unset = not registered. */
+  REDTEAM_UPSTREAM_URL: z.string().url().optional().or(z.literal('')),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

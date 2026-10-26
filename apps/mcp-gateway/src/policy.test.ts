@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_GATEWAY_LIMITS, type GatewayConfig } from '@cw/shared';
-import { authenticateAgent, decideDelegation, decideToolCall, sha256, visiblePeers } from './policy.js';
+import { authenticateAgent, decideDelegation, decideToolCall, decideUpstreamAuth, sha256, visiblePeers } from './policy.js';
 
 const at = '2026-10-25T00:00:00Z';
 const config = (over: Partial<GatewayConfig> = {}): GatewayConfig => ({
@@ -66,5 +66,28 @@ describe('gateway policy', () => {
     // max → lara is open; lara must not delegate back to max
     expect(decideDelegation(c, c.agents[1]!, 'max', [['max', 'lara']]).allowed).toBe(false);
     expect(decideDelegation(c, c.agents[1]!, 'max', []).allowed).toBe(true);
+  });
+
+  describe('decideUpstreamAuth (Entra OBO)', () => {
+    const obo = { name: 'crm', auth: 'obo' as const, oboFallback: 'deny' as const };
+    const agentOn = { obo: true, oboAllowAgentOnly: false };
+    it('keeps static upstreams untouched', () => {
+      expect(decideUpstreamAuth({ name: 'demo', auth: 'static', oboFallback: 'deny' }, {}, { interactive: true, hasUserAssertion: false })).toEqual({ allowed: true, mode: 'static' });
+    });
+    it('denies obo upstreams for agents without OBO', () => {
+      expect(decideUpstreamAuth(obo, {}, { interactive: true, hasUserAssertion: true }).allowed).toBe(false);
+    });
+    it('uses obo for interactive tasks with a user assertion, never downgrades without one', () => {
+      expect(decideUpstreamAuth(obo, agentOn, { interactive: true, hasUserAssertion: true })).toEqual({ allowed: true, mode: 'obo' });
+      const noAssertion = { ...obo, oboFallback: 'agent-only' as const };
+      expect(decideUpstreamAuth(noAssertion, { obo: true, oboAllowAgentOnly: true }, { interactive: true, hasUserAssertion: false }).allowed).toBe(false);
+    });
+    it('non-interactive: agent-only only when both upstream and agent opt in', () => {
+      const task = { interactive: false, hasUserAssertion: false };
+      expect(decideUpstreamAuth(obo, agentOn, task).allowed).toBe(false);
+      expect(decideUpstreamAuth({ ...obo, oboFallback: 'agent-only' }, agentOn, task).allowed).toBe(false);
+      expect(decideUpstreamAuth(obo, { obo: true, oboAllowAgentOnly: true }, task).allowed).toBe(false);
+      expect(decideUpstreamAuth({ ...obo, oboFallback: 'agent-only' }, { obo: true, oboAllowAgentOnly: true }, task)).toEqual({ allowed: true, mode: 'agent-only' });
+    });
   });
 });

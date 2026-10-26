@@ -5,6 +5,27 @@ import { AGENT_ID_PATTERN } from './ids.js';
 
 /* ------------------------------------------------------------------ agents */
 
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Optional Microsoft Entra identity of an agent: it is the confidential client of the On-Behalf-Of
+ * exchange towards MCP servers (Foundry-compatible: token carries agent and user identity).
+ * The credential itself is never stored here — only a Key Vault secret reference.
+ */
+export const agentEntra = z.object({
+  enabled: z.boolean(),
+  tenantId: z.string().regex(GUID, 'tenant id (GUID)').optional(),
+  clientId: z.string().regex(GUID, 'application (client) id (GUID)'),
+  credential: z.object({
+    kind: z.enum(['secret', 'cert', 'federated']),
+    /** Key Vault secret holding the client secret / certificate (PEM+key). Not used for `federated`. */
+    secretRef: z.string().regex(/^[0-9a-zA-Z-]{1,127}$/).optional(),
+  }),
+  /** Non-interactive tasks (schedules, A2A) may use an agent-only client-credentials token. */
+  allowAgentOnly: z.boolean().default(false),
+}).refine((e) => e.credential.kind === 'federated' || !!e.credential.secretRef, { message: 'secretRef is required for secret/cert credentials', path: ['credential', 'secretRef'] });
+export type AgentEntra = z.infer<typeof agentEntra>;
+
 /** Desired configuration of one agent instance (one container / one App Service). */
 export interface AgentSpec {
   agentId: string;
@@ -27,6 +48,8 @@ export interface AgentSpec {
    * Default empty = isolated (ADR-0023).
    */
   peers?: string[];
+  /** Entra OBO identity (optional capability, off when undefined or `enabled: false`). */
+  entra?: AgentEntra;
   createdAt: string;
   createdBy: string;
   updatedAt: string;

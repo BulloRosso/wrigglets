@@ -25,6 +25,10 @@ export interface ApiDeps {
   health: () => Promise<HealthReport>;
   /** 30-day USD spend and AI model status (ADR-0029). */
   spend: Pick<SpendClient, 'get'>;
+  /** Exfiltration guard (ADR-0033): evaluation endpoint for the harness plugin; absent when the harness is disabled. */
+  guard?: Pick<import('../guard/service.js').GuardService, 'evaluate' | 'token'>;
+  /** Optional Entra OBO capability (ADR-0032); undefined when not enabled for this agent. */
+  obo?: import('../obo/oboService.js').OboService;
 }
 
 export class HttpError extends Error {

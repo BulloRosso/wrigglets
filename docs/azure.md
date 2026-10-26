@@ -89,6 +89,9 @@ infra/bicep/
 - [ ] Deploy network, Key Vault, monitoring, PostgreSQL, Temporal (schema job → server → UI).
 - [ ] Decide identity: Entra ID (app registrations per agent or shared, app roles `Agent.User/Approver/Admin`) vs.
       hosting the OAuth server.
+- [ ] Optional, for Foundry-compatible identity (agent + user in MCP tokens): app registration per agent (`api://<id>/access_as_user`),
+      federated credential from the App Service managed identity (no secret), `ENTRA_TENANT_ID` and `ENTRA_FEDERATED_TOKEN_FILE` on the
+      control plane, APIM `validate-jwt` on `azp` and `oid` for the MCP servers. See [entra-obo.md](entra-obo.md).
 - [ ] Deploy control plane with `TEMPORAL_MODE=external`, `RUNTIME=azure-app-service`, Key Vault references.
 - [ ] Implement and test `AzureAppServiceRuntime`; create the first agent; run the spec §19 scenario on staging.
 - [ ] Run SMB/harness data test (§6.6), restart-during-step test (M8), backup restore rehearsal.

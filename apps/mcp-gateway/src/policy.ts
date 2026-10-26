@@ -7,6 +7,7 @@ import {
   type GatewayAgentConfig,
   type GatewayConfig,
   type KillLevel,
+  type UpstreamServer,
 } from '@cw/shared';
 
 /*
@@ -41,6 +42,31 @@ export function decideToolCall(config: GatewayConfig | undefined, stale: boolean
     return agent.peers.length ? { allowed: true } : { allowed: false, reason: 'This agent is isolated: no other agents are in its discovery set.' };
   }
   return toolAllowed(agent.allowedTools, tool) ? { allowed: true } : { allowed: false, reason: `Tool ${tool} is not allowed for this agent.` };
+}
+
+export type UpstreamAuthDecision =
+  | { allowed: true; mode: 'static' | 'obo' | 'agent-only' }
+  | { allowed: false; reason: string };
+
+/**
+ * How is the upstream call authenticated? Fail-closed: an `obo` upstream never falls back to static
+ * headers, and an interactive task whose user assertion is missing is never downgraded to agent-only.
+ * `interactive` = the task has a signed-in user (not a schedule / A2A-delegated task).
+ */
+export function decideUpstreamAuth(
+  upstream: Pick<UpstreamServer, 'name' | 'auth' | 'oboFallback'>,
+  agent: Pick<GatewayAgentConfig, 'obo' | 'oboAllowAgentOnly'>,
+  task: { interactive: boolean; hasUserAssertion: boolean },
+): UpstreamAuthDecision {
+  if (upstream.auth !== 'obo') return { allowed: true, mode: 'static' };
+  if (!agent.obo) return { allowed: false, reason: `Upstream ${upstream.name} requires Entra OBO, which is not enabled for this agent.` };
+  if (task.interactive) {
+    return task.hasUserAssertion
+      ? { allowed: true, mode: 'obo' }
+      : { allowed: false, reason: `No valid user sign-in for Entra OBO towards ${upstream.name}; the user must sign in again.` };
+  }
+  if (upstream.oboFallback === 'agent-only' && agent.oboAllowAgentOnly) return { allowed: true, mode: 'agent-only' };
+  return { allowed: false, reason: `Upstream ${upstream.name} needs a signed-in user; agent-only access is not permitted for this non-interactive task.` };
 }
 
 /** May `caller` delegate to `peer`? */

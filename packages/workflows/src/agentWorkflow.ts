@@ -4,19 +4,21 @@ import {
   continueAsNew,
   getExternalWorkflowHandle,
   log,
+  proxyActivities,
   proxyLocalActivities,
   setHandler,
   workflowInfo,
 } from '@temporalio/workflow';
 import type { Duration } from '@temporalio/common';
 import type { AgentState } from '@cw/shared';
-import type { AgentLocalActivities } from './activity-types.js';
+import type { AgentActivities, AgentLocalActivities } from './activity-types.js';
 import {
   acquireSignal,
   agentStatusQuery,
   forceReleaseSignal,
   grantedSignal,
   releaseSignal,
+  securityWarningSignal,
   setKillSwitchSignal,
   suspendSignal,
 } from './messages.js';
@@ -24,6 +26,12 @@ import {
 const { isWorkflowRunning } = proxyLocalActivities<AgentLocalActivities>({
   startToCloseTimeout: '10 seconds',
   retry: { maximumAttempts: 3 },
+});
+
+// The control plane must learn about a security warning even if it is down for a while: retry with a capped backoff.
+const alerts = proxyActivities<AgentActivities>({
+  startToCloseTimeout: '30 seconds',
+  retry: { initialInterval: '2 seconds', backoffCoefficient: 2, maximumInterval: '1 minute', maximumAttempts: 30 },
 });
 
 const STALE_CHECK_INTERVAL = '5 minutes';
@@ -89,7 +97,28 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
     if (blocked() && state.holder && state.holder.purpose !== 'cleanup') suspendPending = true;
   });
 
-  setHandler(agentStatusQuery, () => ({ holder: state.holder, waiting: state.waiting, stats: state.stats, killSwitch: state.killSwitch }));
+  /**
+   * Exfiltration guard (ADR-0033): the agent reports a blocked tool call. The lock manager reacts at once, without
+   * waiting for the control plane: it applies the halt level like a kill switch (no new lock grants except cleanup, so
+   * the cancelled task can still write its audit export) and keeps the warning in its state. The control plane is then
+   * told through an activity, which raises the dashboard alert and sets the agent-wide kill switch, cancelling all
+   * running tasks of the agent. A reset of the kill switch lifts the halt.
+   */
+  setHandler(securityWarningSignal, async (w) => {
+    if (state.securityWarnings?.some((x) => x.id === w.id)) return;
+    state.securityWarnings = [...(state.securityWarnings ?? []), w].slice(-20);
+    const level = w.haltLevel;
+    if (state.killSwitch?.level !== 'stopped') {
+      state.killSwitch = { level, reason: `Security guard: ${w.reason}`.slice(0, 500), by: 'security-guard', at: w.at };
+    }
+    try {
+      await alerts.reportSecurityAlert(w);
+    } catch (err) {
+      log.error('security alert could not be delivered', { id: w.id, error: String(err) });
+    }
+  });
+
+  setHandler(agentStatusQuery, () => ({ holder: state.holder, waiting: state.waiting, stats: state.stats, killSwitch: state.killSwitch, securityWarnings: state.securityWarnings }));
 
   const staleCheckInterval = (input.tuning?.staleCheckInterval ?? STALE_CHECK_INTERVAL) as Duration;
   const maxHistoryEvents = input.tuning?.maxHistoryEvents ?? MAX_HISTORY_EVENTS;

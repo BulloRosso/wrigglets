@@ -9,9 +9,10 @@ import { A2A_TOOL, toolAllowed, type GatewayAgentConfig, type Identity } from '@
 import { A2aBroker } from './a2a.js';
 import { Audit } from './audit.js';
 import { loadConfig } from './config.js';
-import { authenticateAgent, decideDelegation, decideToolCall, visiblePeers } from './policy.js';
+import { OboClient } from './oboClient.js';
+import { authenticateAgent, decideDelegation, decideToolCall, decideUpstreamAuth, visiblePeers } from './policy.js';
 import { ConfigSync } from './sync.js';
-import { UpstreamPool } from './upstreams.js';
+import { UpstreamPool, upstreamFor } from './upstreams.js';
 
 const log = pino({ level: process.env.LOG_LEVEL ?? 'info', base: { service: 'mcp-gateway' }, timestamp: pino.stdTimeFunctions.isoTime });
 const env = loadConfig();
@@ -20,9 +21,11 @@ const secrets = SecretStore.fromEnv();
 const upstreams = new UpstreamPool(secrets, log);
 const audit = new Audit(env.DATA_DIR);
 const broker = new A2aBroker(env.GATEWAY_TOKEN, env.DATA_DIR);
+const obo = new OboClient(env.GATEWAY_TOKEN);
 
 /** What the agent is currently working on (registered by runAgentStep; steps are serialized per agent). */
-const stepContext = new Map<string, { taskId: string; requestedBy: Identity }>();
+/** `interactive`: a signed-in user is behind the task (not a schedule or A2A delegation) — only then Entra OBO applies. */
+const stepContext = new Map<string, { taskId: string; requestedBy: Identity; interactive: boolean }>();
 
 const A2A_TOOLS: Tool[] = [
   {
@@ -62,7 +65,13 @@ function mcpServer(agent: GatewayAgentConfig): Server {
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const config = sync.config;
     if (!config || sync.stale) return { tools: [] };
-    const upstreamTools = (await upstreams.listTools(config.upstreams)).filter((t) => toolAllowed(agent.allowedTools, t.name));
+    // OBO upstreams are discovered with the agent's own token, if the agent and upstream allow agent-only access
+    const discover = async (u: (typeof config.upstreams)[number]) => {
+      if (!decideUpstreamAuth(u, agent, { interactive: false, hasUserAssertion: false }).allowed || !u.oboScope) return undefined;
+      const r = await obo.token(agent, { mode: 'agent-only', scope: u.oboScope });
+      return r.ok ? r.accessToken : undefined;
+    };
+    const upstreamTools = (await upstreams.listTools(config.upstreams, discover)).filter((t) => toolAllowed(agent.allowedTools, t.name));
     // A2A tools are always listed (the harness reads the tool list once); calls are checked live.
     return { tools: [...upstreamTools, ...A2A_TOOLS] };
   });
@@ -73,7 +82,7 @@ function mcpServer(agent: GatewayAgentConfig): Server {
     const argBytes = Buffer.byteLength(JSON.stringify(args));
     const started = Date.now();
     const config = sync.config;
-    const record = (outcome: 'ok' | 'error' | 'denied', extra: { reason?: string; resultBytes?: number; peer?: string; remoteTaskId?: string } = {}) =>
+    const record = (outcome: 'ok' | 'error' | 'denied', extra: { reason?: string; resultBytes?: number; peer?: string; remoteTaskId?: string; authMode?: 'static' | 'obo' | 'agent-only'; userOid?: string } = {}) =>
       audit.write({ at: new Date().toISOString(), agentId: agent.agentId, tool, outcome, durationMs: Date.now() - started, argBytes, ...extra });
 
     const decision = decideToolCall(config, sync.stale, agent, tool);
@@ -137,8 +146,31 @@ function mcpServer(agent: GatewayAgentConfig): Server {
         await record('ok', { peer: peerId, remoteTaskId: s.taskId });
         return text(JSON.stringify(s, null, 2));
       }
-      const result = await upstreams.call(config!.upstreams, tool, args, limits.callTimeoutMs);
-      await record(result.isError ? 'error' : 'ok', { resultBytes: Buffer.byteLength(JSON.stringify(result.content ?? '')) });
+      // Entra OBO (optional): per-upstream authentication mode, fail-closed (ADR-0032)
+      let accessToken: string | undefined;
+      let authAudit: { authMode?: 'static' | 'obo' | 'agent-only'; userOid?: string } = {};
+      const upstream = upstreamFor(config!.upstreams, tool);
+      if (upstream?.auth === 'obo') {
+        const ctx = stepContext.get(agent.agentId);
+        const oid = ctx?.requestedBy?.oid;
+        const interactive = ctx?.interactive === true && !!oid;
+        const auth = decideUpstreamAuth(upstream, agent, { interactive, hasUserAssertion: true });
+        if (!auth.allowed || auth.mode === 'static') {
+          const reason = auth.allowed ? 'OBO upstream resolved to static authentication' : auth.reason;
+          await record('denied', { reason, userOid: oid });
+          return text(reason, true);
+        }
+        const t = await obo.token(agent, { mode: auth.mode, scope: upstream.oboScope!, oid: auth.mode === 'obo' ? oid : undefined });
+        if (!t.ok) {
+          // no user sign-in, or consent needed: never downgrade an interactive task to agent-only
+          await record('denied', { reason: `${t.code}: ${t.message}`, authMode: auth.mode, userOid: oid });
+          return text(t.message, true);
+        }
+        accessToken = t.accessToken;
+        authAudit = { authMode: auth.mode, userOid: oid };
+      }
+      const result = await upstreams.call(config!.upstreams, tool, args, limits.callTimeoutMs, accessToken);
+      await record(result.isError ? 'error' : 'ok', { resultBytes: Buffer.byteLength(JSON.stringify(result.content ?? '')), ...authAudit });
       return result;
     } catch (err) {
       await record('error', { reason: String(err).slice(0, 300) });
@@ -187,7 +219,7 @@ const agentAuth = (req: Request, res: Response): GatewayAgentConfig | undefined 
 app.put('/agents/:agentId/step-context', (req, res) => {
   const agent = agentAuth(req, res);
   if (!agent) return;
-  if (req.body?.taskId) stepContext.set(agent.agentId, { taskId: String(req.body.taskId), requestedBy: req.body.requestedBy as Identity });
+  if (req.body?.taskId) stepContext.set(agent.agentId, { taskId: String(req.body.taskId), requestedBy: req.body.requestedBy as Identity, interactive: req.body.interactive === true });
   else stepContext.delete(agent.agentId);
   res.status(204).end();
 });

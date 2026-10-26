@@ -3,6 +3,7 @@ import { createOidcRp, escapeHtml } from '@cw/auth-rp';
 import type { Principal } from '@cw/shared';
 import type { Config } from '../config.js';
 import { logger } from '../logger.js';
+import type { Obo } from '../obo/index.js';
 
 export { requireRole } from '@cw/auth-rp';
 
@@ -70,13 +71,26 @@ function devAuth(config: Config): Auth {
 
 /* ------------------------------------------------------------------ OIDC */
 
-function oidcAuth(config: Config): Auth {
+function oidcAuth(config: Config, obo?: Obo): Auth {
   const rp = createOidcRp({
     issuer: config.OIDC_ISSUER!,
     internalUrl: config.OIDC_INTERNAL_URL,
-    clientId: config.OIDC_CLIENT_ID!,
+    // With Entra OBO the agent signs users in as its Entra application (same identity as in the exchange)
+    clientId: obo ? config.ENTRA_CLIENT_ID! : config.OIDC_CLIENT_ID!,
     clientSecret: config.OIDC_CLIENT_SECRET!,
-    scopes: config.OIDC_SCOPES,
+    scopes: obo ? `${config.OIDC_SCOPES} offline_access ${obo.userScope}` : config.OIDC_SCOPES,
+    clientAuth: obo ? () => obo.client.clientAuthParams() : undefined,
+    onTokens: obo
+      ? async (user, t) => {
+          if (!t.accessToken) return logger.warn({ upn: user.upn }, 'Entra sign-in returned no access token for the agent API; OBO will not work for this user');
+          try {
+            await obo.service.saveSignIn(user.oid, { accessToken: t.accessToken, refreshToken: t.refreshToken, expiresAt: t.expiresAt ?? Date.now() + 3_600_000, upn: user.upn });
+          } catch (err) {
+            logger.error({ err: String(err) }, 'could not store Entra tokens'); // sign-in itself still works
+          }
+        }
+      : undefined,
+    onSignOut: obo ? (user) => obo.service.signOut(user.oid) : undefined,
     sessionSecret: config.SESSION_SECRET!,
     sessionTtlMs: config.sessionTtlMs,
     cookieName: `cw_${config.AGENT_ID.replace(/-/g, '_')}`,
@@ -89,13 +103,13 @@ function oidcAuth(config: Config): Auth {
   return { routes: rp.routes, middleware: rp.middleware };
 }
 
-export function createAuth(config: Config): Auth {
+export function createAuth(config: Config, obo?: Obo): Auth {
   switch (config.AUTH_MODE) {
     case 'easyauth':
       return easyAuth();
     case 'dev':
       return devAuth(config);
     default:
-      return oidcAuth(config);
+      return oidcAuth(config, obo);
   }
 }

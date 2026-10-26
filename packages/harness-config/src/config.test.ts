@@ -1,5 +1,11 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { HARNESS_HARDENING_ENV, renderAgentsMd, renderHarnessConfig } from './index.js';
+import { GUARD_PLUGIN_SOURCE, HARNESS_HARDENING_ENV, renderAgentsMd, renderHarnessConfig } from './index.js';
 
 describe('renderHarnessConfig', () => {
   const cfg = renderHarnessConfig({ workspaceDir: '/home/workspace/', model: 'aigateway/gpt-x', smallModel: 'mini' }) as any;
@@ -47,5 +53,47 @@ describe('renderHarnessConfig with MCP gateway', () => {
   });
   it('has no MCP block without a gateway', () => {
     expect((renderHarnessConfig({ workspaceDir: '/w', model: 'x' }) as any).mcp).toBeUndefined();
+  });
+
+  it('loads the exfiltration guard as a local plugin only when a path is given', () => {
+    expect((renderHarnessConfig({ workspaceDir: '/home/workspace', model: 'm' }) as any).plugin).toBeUndefined();
+    const withGuard = renderHarnessConfig({ workspaceDir: '/home/workspace', model: 'm', guardPluginPath: '/tmp/harness/exfiltration-guard.mjs' }) as any;
+    expect(withGuard.plugin).toEqual(['file:///tmp/harness/exfiltration-guard.mjs']);
+  });
+
+  it('the guard plugin hooks tool.execute.before and fails closed', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'guard-'));
+    const file = path.join(dir, 'p.mjs');
+    await writeFile(file, GUARD_PLUGIN_SOURCE);
+    const mod = (await import(pathToFileURL(file).href)) as { ExfiltrationGuard: () => Promise<Record<string, (i: unknown, o: unknown) => Promise<void>>> };
+    const hook = (await mod.ExfiltrationGuard())['tool.execute.before']!;
+    const call = { sessionID: 's', callID: 'c', tool: 'gateway_mail__send' };
+    delete process.env.GUARD_URL;
+    await expect(hook(call, { args: {} })).rejects.toThrow(/not configured/);
+
+    const seen: unknown[] = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        seen.push({ auth: req.headers.authorization, body: JSON.parse(body) });
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(seen.length === 1 ? { decision: 'allow' } : { decision: 'block', message: 'nope' }));
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    try {
+      process.env.GUARD_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+      process.env.GUARD_TOKEN = 'tok';
+      await expect(hook(call, { args: { to: 'a@b.c' } })).resolves.toBeUndefined();
+      await expect(hook(call, { args: {} })).rejects.toThrow('nope');
+      expect(seen[0]).toEqual({ auth: 'Bearer tok', body: { sessionID: 's', callID: 'c', tool: 'gateway_mail__send', args: { to: 'a@b.c' } } });
+      process.env.GUARD_URL = 'http://127.0.0.1:1/';
+      await expect(hook(call, { args: {} })).rejects.toThrow(/unavailable/);
+    } finally {
+      server.close();
+      delete process.env.GUARD_URL;
+      delete process.env.GUARD_TOKEN;
+    }
   });
 });

@@ -36,3 +36,5 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0029](0029-litellm-ai-gateway-and-spend-limits.md) | LiteLLM as AI gateway, virtual keys per agent, USD spend limits | Accepted |
 | [0030](0030-chat-with-the-agent.md) | Chat with the agent about a task | Accepted |
 | [0031](0031-internet-access-via-mcp.md) | Internet access for agents through an MCP upstream behind the gateway | Accepted |
+| [0033](0033-exfiltration-guard.md) | Exfiltration guard: an evaluation agent in the harness's pre-tool hook | Accepted |
+| [0032](0032-entra-obo-for-mcp.md) | Optional Microsoft Entra On-Behalf-Of for MCP calls | Accepted |

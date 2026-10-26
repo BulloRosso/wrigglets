@@ -1,0 +1,25 @@
+# Red-team example (docs/red-teaming.md): a mock MCP server without authentication that serves tickets containing
+# prompt injections and records the e-mails an agent "sends". Registered in the MCP gateway as upstream `redteam`.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.redteam.yml up -d
+#   node scripts/redteam/run.mjs
+#
+# Remove it again with: docker compose -f docker-compose.yml -f docker-compose.redteam.yml rm -sf mcp-redteam
+# (and delete the upstream `redteam` under Safety & tools).
+
+services:
+  temporal:
+    environment:
+      REDTEAM_UPSTREAM_URL: http://mcp-redteam:7650/mcp
+
+  mcp-redteam:
+    image: node:24.22.1-bookworm-slim
+    container_name: cw-mcp-redteam
+    hostname: mcp-redteam
+    restart: unless-stopped
+    command: ["node", "/app/mock-mcp.mjs"]
+    volumes:
+      - ./scripts/redteam/mock-mcp.mjs:/app/mock-mcp.mjs:ro
+    ports:
+      - "127.0.0.1:7650:7650" # outbox inspection from the host (the runner)
+    networks: [coworking]

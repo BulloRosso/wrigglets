@@ -4,7 +4,9 @@ import type { HealthReport } from '@cw/shared';
 import { AppAuditLog } from './api/appAudit.js';
 import { createApp } from './api/app.js';
 import { createAuth } from './api/auth.js';
+import { createObo } from './obo/index.js';
 import { GatewayClient } from './gatewayClient.js';
+import { GuardService } from './guard/service.js';
 import { SpendClient } from './spend.js';
 import { loadConfig } from './config.js';
 import { OpencodeHarnessClient } from './harness/client.js';
@@ -32,6 +34,11 @@ async function main() {
   const supervisor = new HarnessSupervisor(config);
   const harness = new OpencodeHarnessClient(supervisor.baseUrl, () => supervisor.authHeader, config.workspaceDir);
   const events = new HarnessEventBus(harness, config.workspaceDir);
+  // Exfiltration guard (ADR-0033): the evaluation agent behind the harness plugin's `tool.execute.before` hook
+  let temporalClient: Client | undefined;
+  const appAudit = new AppAuditLog(config.artifactsDir);
+  const guard = new GuardService({ config, harness, stepOf: (s) => events.stepOf(s), temporal: () => temporalClient, audit: appAudit });
+  supervisor.setGuard(guard.connection(config.port));
   if (config.HARNESS_ENABLED) {
     await supervisor.start();
     if (!(await supervisor.waitUntilHealthy(60_000))) throw new Error('Agent Harness did not become healthy within 60 s');
@@ -43,6 +50,7 @@ async function main() {
   const dataConverter = createDataConverter(config);
   const codec = dataConverter.payloadCodecs![0]!;
   const client: Client = await connectClient(config, dataConverter);
+  temporalClient = client;
   const workerConnection = await connectWorker(config);
 
   // 7.+8. Singleton lock manager + system schedules
@@ -81,8 +89,10 @@ async function main() {
   // 9. HTTP
   const notifications = new NotificationStore(config.artifactsDir);
   const spend = new SpendClient(config);
-  const deps = { config, temporal: client, codec, git, events, notifications, audit: new AppAuditLog(config.artifactsDir), health, spend };
-  const app = createApp(deps, createAuth(config));
+  const obo = createObo(config);
+  if (obo) logger.info({ scope: obo.userScope, agentOnly: config.ENTRA_ALLOW_AGENT_ONLY }, 'Entra OBO enabled');
+  const deps = { config, temporal: client, codec, git, events, notifications, audit: appAudit, health, spend, guard: config.HARNESS_ENABLED ? guard : undefined, obo: obo?.service };
+  const app = createApp(deps, createAuth(config, obo));
   const server: Server = app.listen(config.port, () => logger.info({ port: config.port, url: config.publicBaseUrl }, 'http server listening'));
   server.keepAliveTimeout = 65_000;
 
@@ -98,6 +108,7 @@ async function main() {
     notifications,
     gateway: new GatewayClient(config.MCP_GATEWAY_BASE_URL, config.AGENT_ID, config.MCP_GATEWAY_TOKEN),
     spend,
+    guard,
   });
 
   let workerDone: Promise<void> | undefined;

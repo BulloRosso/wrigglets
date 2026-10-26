@@ -80,6 +80,11 @@ export class HarnessEventBus {
     }
   }
 
+  /** The step a harness session is working on right now (undefined between steps). */
+  stepOf(sessionId: string): ActiveStep | undefined {
+    return this.sessions.get(sessionId);
+  }
+
   isTaskActive(taskId: string): boolean {
     return [...this.sessions.values()].some((s) => s.taskId === taskId);
   }

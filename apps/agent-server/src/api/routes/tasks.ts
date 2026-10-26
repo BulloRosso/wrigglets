@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import type { WorkflowExecutionInfo } from '@temporalio/client';
 import {
   taskChatBody,
+  scheduleProposalDecisionBody,
   UNLIMITED_TOKENS,
   TASK_ID_PATTERN,
   agentWorkflowId,
@@ -203,6 +204,11 @@ export function taskRouter(deps: ApiDeps): Router {
     const body = taskChatBody.parse(req.body);
     const state = await loadTaskState(deps, req.params.id);
     res.status(201).json(await chat.ask(req.params.id, state, req.user!, body.text));
+  });
+
+  r.post('/tasks/:id/chat/:messageId/proposal', async (req, res) => {
+    const body = scheduleProposalDecisionBody.parse(req.body);
+    res.json(await chat.decideProposal(req.params.id, req.params.messageId, req.user!, body.decision));
   });
 
   r.post('/tasks/:id/comments', async (req, res) => {

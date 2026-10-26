@@ -1,36 +1,19 @@
 import { Router } from 'express';
-import { ScheduleNotFoundError, ScheduleOverlapPolicy, type ScheduleDescription, type ScheduleOptions, type ScheduleSpec } from '@temporalio/client';
+import { ScheduleOverlapPolicy, type ScheduleDescription } from '@temporalio/client';
 import {
-  UNLIMITED_TOKENS,
   SCHEDULE_TIMEZONE,
   calendarToCron,
   createScheduleBody,
   patchScheduleBody,
-  scheduledTaskIdPrefix,
-  slugify,
   toIdentity,
-  userScheduleId,
-  type CalendarSpec,
   type ScheduleDto,
   type ScheduleMemo,
   type TaskInput,
 } from '@cw/shared';
-import { SA } from '@cw/shared/search-attributes';
 import { HttpError, type ApiDeps } from '../context.js';
-import { taskSettings } from './tasks.js';
+import { createUserSchedule, toScheduleSpec } from '../../schedules/create.js';
 
-const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'] as const;
-
-export function toScheduleSpec(c: CalendarSpec): ScheduleSpec {
-  if (c.kind === 'once') {
-    const d = new Date(c.at);
-    return {
-      calendars: [{ year: d.getUTCFullYear(), month: MONTHS[d.getUTCMonth()], dayOfMonth: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes(), second: 0 }],
-      timezone: 'UTC',
-    };
-  }
-  return { cronExpressions: [calendarToCron(c)!], timezone: SCHEDULE_TIMEZONE };
-}
+export { toScheduleSpec };
 
 /**
  * Schedules for future work (spec §7.7). Temporal does not allow updating a schedule's memo,
@@ -96,60 +79,7 @@ export function scheduleRouter(deps: ApiDeps): Router {
 
   r.post('/schedules', async (req, res) => {
     const body = createScheduleBody.parse(req.body);
-    const user = req.user!;
-    const owner = toIdentity(user);
-    let scheduleId = userScheduleId(config.AGENT_ID, slugify(body.title));
-    for (let i = 2; ; i++) {
-      try {
-        await temporal.schedule.getHandle(scheduleId).describe();
-        scheduleId = `${userScheduleId(config.AGENT_ID, slugify(body.title))}-${i}`;
-      } catch (err) {
-        if (err instanceof ScheduleNotFoundError) break;
-        throw err;
-      }
-    }
-    const input: TaskInput = {
-      agentId: config.AGENT_ID,
-      title: body.title,
-      instructions: body.instructions,
-      type: body.type,
-      requestedBy: owner,
-      trigger: { kind: 'schedule', scheduleId, owner },
-      approval: body.approval,
-      budget: { maxTokens: UNLIMITED_TOKENS }, // spend limit in USD per agent instead (ADR-0029)
-      settings: taskSettings(deps),
-    };
-    const memo: ScheduleMemo = { owner, createdBy: owner, createdAt: new Date().toISOString(), calendar: body.calendar, history: [] };
-    const options: ScheduleOptions = {
-      scheduleId,
-      spec: toScheduleSpec(body.calendar),
-      action: {
-        type: 'startWorkflow',
-        workflowType: 'taskWorkflow',
-        workflowId: scheduledTaskIdPrefix(scheduleId),
-        taskQueue: config.taskQueue,
-        args: [input],
-        typedSearchAttributes: [
-          { key: SA.AgentId, value: config.AGENT_ID },
-          { key: SA.RequestedBy, value: owner.upn },
-          { key: SA.TaskType, value: body.type },
-          { key: SA.TaskStatus, value: 'queued' },
-          { key: SA.TaskTitle, value: body.title },
-          { key: SA.Trigger, value: 'schedule' },
-          { key: SA.ScheduleId, value: scheduleId },
-        ],
-        staticSummary: body.title,
-      },
-      policies: { overlap: ScheduleOverlapPolicy.SKIP, catchupWindow: '1 hour' },
-      memo: memo as unknown as Record<string, unknown>,
-      typedSearchAttributes: [
-        { key: SA.AgentId, value: config.AGENT_ID },
-        { key: SA.RequestedBy, value: owner.upn },
-      ],
-      state: body.calendar.kind === 'once' ? { remainingActions: 1, note: `created by ${owner.upn}` } : { note: `created by ${owner.upn}` },
-    };
-    await temporal.schedule.create(options);
-    await deps.audit.write({ by: user.upn, action: 'schedule.created', target: scheduleId, details: { title: body.title, calendar: body.calendar } });
+    const scheduleId = await createUserSchedule(deps, body, toIdentity(req.user!));
     res.status(201).json({ scheduleId });
   });
 

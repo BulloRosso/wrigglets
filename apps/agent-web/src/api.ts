@@ -46,6 +46,8 @@ export const api = {
   comment: (id: string, text: string) => apiFetch<TaskState>(`/api/tasks/${encodeURIComponent(id)}/comments`, { method: 'POST', json: { text } }),
   taskTimeline: (id: string) => apiFetch<Timeline>(`/api/tasks/${encodeURIComponent(id)}/timeline`),
   timeline: (from: string, to: string) => apiFetch<Timeline & { range: { from: string; to: string } }>(`/api/timeline?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  decideScheduleProposal: (id: string, messageId: string, decision: 'approve' | 'reject') =>
+    apiFetch<TaskChatMessage>(`/api/tasks/${encodeURIComponent(id)}/chat/${encodeURIComponent(messageId)}/proposal`, { method: 'POST', json: { decision } }),
   schedules: () => apiFetch<ScheduleDto[]>('/api/schedules'),
   createSchedule: (body: CreateScheduleBody) => apiFetch<{ scheduleId: string }>('/api/schedules', { method: 'POST', json: body }),
   patchSchedule: (id: string, body: PatchScheduleBody) => apiFetch<ScheduleDto>(`/api/schedules/${encodeURIComponent(id)}`, { method: 'PATCH', json: body }),

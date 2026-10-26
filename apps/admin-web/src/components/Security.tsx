@@ -123,7 +123,7 @@ export function SecurityAlertsCard() {
           </TableHead>
           <TableBody>
             {q.data.alerts.map((a) => (
-              <TableRow key={a.id} hover sx={a.status === 'open' ? { bgcolor: 'error.light', '& td': { color: 'error.contrastText' }, '& a': { color: 'inherit' } } : undefined}>
+              <TableRow key={a.id} sx={a.status === 'open' ? { bgcolor: 'error.light', '& td': { color: 'error.contrastText' }, '& a': { color: 'inherit' } } : undefined}>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
                   <RelativeTime iso={a.at} />
                 </TableCell>

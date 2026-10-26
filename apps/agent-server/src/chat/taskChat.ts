@@ -1,10 +1,12 @@
-import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ulid } from 'ulid';
-import { formatUsd, type Principal, type TaskChatMessage, type TaskState } from '@cw/shared';
+import { z } from 'zod';
+import { SCHEDULE_TIMEZONE, createScheduleBody, formatUsd, toIdentity, type Principal, type TaskChatMessage, type TaskState } from '@cw/shared';
 import type { ApiDeps } from '../api/context.js';
 import { HttpError } from '../api/context.js';
 import { logger } from '../logger.js';
+import { createUserSchedule } from '../schedules/create.js';
 import { resolveWorkspacePath } from '../workspace/paths.js';
 
 /*
@@ -12,6 +14,9 @@ import { resolveWorkspacePath } from '../workspace/paths.js';
  * the spend limit) from the task as context: request, plan, step reports, decisions, colleagues' answers, result and
  * the task's files — text files as text, images as images. The chat is read-only: it never changes the workspace.
  * Messages are stored per task (ARTIFACTS_DIR/chat/<taskId>.jsonl) and every question is written to the audit log.
+ *
+ * The one thing the agent can do here is *propose* a recurring task (tool `propose_schedule`, ADR-0034). A proposal is
+ * only a chat message with status "pending": the schedule is created when the person who asked clicks "Approve".
  */
 
 const TEXT = new Set(['md', 'markdown', 'txt', 'csv', 'json', 'yaml', 'yml', 'mmd', 'mermaid', 'log', 'py', 'xml', 'html', 'ts', 'js']);
@@ -27,6 +32,19 @@ interface ChatCompletionMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | Part[];
 }
+
+const { $schema: _schema, ...SCHEDULE_PARAMETERS } = z.toJSONSchema(createScheduleBody, { io: 'input' }) as Record<string, unknown>;
+const PROPOSE_SCHEDULE = {
+  type: 'function',
+  function: {
+    name: 'propose_schedule',
+    description:
+      'Propose a recurring (or one-time future) task for the person to approve. Nothing is scheduled until they approve it with a button. ' +
+      'Use it when the person asks to repeat this task or to run something on a schedule. The instructions must be complete and self-contained: ' +
+      `a scheduled run does not see this chat. Times are in ${SCHEDULE_TIMEZONE}; weekly dayOfWeek is 0 = Sunday … 6 = Saturday.`,
+    parameters: SCHEDULE_PARAMETERS,
+  },
+} as const;
 
 const ext = (p: string) => (p.includes('.') ? p.split('.').pop()!.toLowerCase() : '');
 
@@ -51,9 +69,46 @@ export class TaskChat {
       .map((l) => JSON.parse(l) as TaskChatMessage);
   }
 
-  private async append(taskId: string, m: TaskChatMessage) {
-    await mkdir(this.dir, { recursive: true });
-    await appendFile(this.file(taskId), `${JSON.stringify(m)}\n`);
+  /** Appends and rewrites of one chat file never interleave (a proposal is changed in place when it is decided). */
+  private readonly locks = new Map<string, Promise<unknown>>();
+  private locked<T>(taskId: string, fn: () => Promise<T>): Promise<T> {
+    const run = (this.locks.get(taskId) ?? Promise.resolve()).then(fn, fn);
+    this.locks.set(taskId, run.catch(() => undefined));
+    return run;
+  }
+
+  private append(taskId: string, ...ms: TaskChatMessage[]) {
+    return this.locked(taskId, async () => {
+      await mkdir(this.dir, { recursive: true });
+      await appendFile(this.file(taskId), ms.map((m) => `${JSON.stringify(m)}\n`).join(''));
+    });
+  }
+
+  /**
+   * Approve or reject a schedule the agent proposed. Only the person whose question led to the proposal (or an admin)
+   * may decide; on approval they become the owner of the schedule, so it runs with their name and approvals.
+   */
+  decideProposal(taskId: string, messageId: string, user: Principal, decision: 'approve' | 'reject'): Promise<TaskChatMessage> {
+    return this.locked(taskId, async () => {
+      const all = await this.list(taskId);
+      const m = all.find((x) => x.id === messageId);
+      const p = m?.proposal;
+      if (!m || !p) throw new HttpError(404, 'proposal not found');
+      if (p.status !== 'pending') throw new HttpError(409, `This proposal was already ${p.status}`);
+      if (p.requestedBy.upn !== user.upn && !user.roles.includes(this.deps.config.roles.admin)) throw new HttpError(403, 'Only the person who asked for the schedule (or an admin) may decide');
+      const by = toIdentity(user);
+      p.decidedBy = by;
+      p.decidedAt = new Date().toISOString();
+      if (decision === 'approve') {
+        p.scheduleId = await createUserSchedule(this.deps, p.schedule, by, { via: 'chat', taskId, proposalId: messageId });
+        p.status = 'approved';
+      } else {
+        p.status = 'rejected';
+        await this.deps.audit.write({ by: user.upn, action: 'schedule.proposal_rejected', target: taskId, details: { title: p.schedule.title, proposalId: messageId } });
+      }
+      await writeFile(this.file(taskId), all.map((x) => `${JSON.stringify(x)}\n`).join(''));
+      return m;
+    });
   }
 
   private rateLimit(upn: string) {
@@ -149,11 +204,21 @@ export class TaskChat {
           'Base your answers on the given context; say clearly when something is not in it. Do not invent facts.',
           'This chat is read-only: you cannot change files or start work here. If the person wants changes, suggest',
           '"Request changes" on a waiting plan or a new task.',
+          'The only thing you can do is call propose_schedule when the person wants this task repeated or run at a later time.',
+          'It shows them a card with Approve and Reject buttons; you cannot create a schedule yourself. Until they approve,',
+          'never say that a schedule exists. Ask when day or time is unclear instead of guessing. After proposing, say in one',
+          'or two sentences what you proposed and that it needs their approval.',
+          `Now: ${new Date().toISOString()} (UTC); schedule times are in ${SCHEDULE_TIMEZONE}.`,
         ].join('\n'),
       },
       { role: 'user', content: [{ type: 'text', text: `${this.describe(state)}\n\n## Files of the task` }, ...parts] },
       { role: 'assistant', content: 'I have read the task and its files. What would you like to know?' },
-      ...history.filter((m) => !m.error).map((m): ChatCompletionMessage => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+      ...history
+        .filter((m) => !m.error)
+        .map((m): ChatCompletionMessage => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.proposal ? `${m.text}\n\n[Schedule proposal "${m.proposal.schedule.title}": ${m.proposal.status}]` : m.text,
+        })),
       { role: 'user', content: question },
     ];
 
@@ -162,21 +227,36 @@ export class TaskChat {
       const res = await fetch(`${c.AI_GATEWAY_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: { authorization: `Bearer ${c.AI_GATEWAY_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ model: c.AI_GATEWAY_MODEL, messages }),
+        body: JSON.stringify({ model: c.AI_GATEWAY_MODEL, messages, tools: [PROPOSE_SCHEDULE] }),
         signal: AbortSignal.timeout(180_000),
       });
       const body = (await res.json().catch(() => ({}))) as {
-        choices?: Array<{ message?: { content?: string } }>;
+        choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> } }>;
         usage?: { total_tokens?: number };
         error?: { message?: string };
       };
       if (!res.ok) throw new Error(body.error?.message ?? `AI gateway returned ${res.status}`);
       const cost = Number(res.headers.get('x-litellm-response-cost'));
+      const message = body.choices?.[0]?.message;
+      let text = message?.content?.trim() ?? '';
+      let proposal: TaskChatMessage['proposal'];
+      const call = message?.tool_calls?.find((t) => t.function?.name === 'propose_schedule');
+      if (call) {
+        try {
+          const schedule = createScheduleBody.parse(JSON.parse(call.function?.arguments ?? '{}'));
+          proposal = { schedule, status: 'pending', requestedBy: toIdentity(user) };
+          text ||= `I propose to run **${schedule.title}** on a schedule. Please approve or reject it below.`;
+        } catch (err) {
+          logger.warn({ taskId, err: String(err) }, 'invalid schedule proposal');
+          text ||= 'I tried to propose a schedule but it was not valid. Could you tell me the day, time and what should be done each time?';
+        }
+      }
       answer = {
         id: ulid(),
         at: new Date().toISOString(),
         role: 'agent',
-        text: body.choices?.[0]?.message?.content?.trim() || '(no answer)',
+        text: text || '(no answer)',
+        proposal,
         model: c.AI_GATEWAY_MODEL,
         tokens: body.usage?.total_tokens,
         costUsd: Number.isFinite(cost) ? cost : undefined,
@@ -186,9 +266,13 @@ export class TaskChat {
       logger.warn({ taskId, err: String(err) }, 'chat answer failed');
       answer = { id: ulid(), at: new Date().toISOString(), role: 'agent', text: `I could not answer: ${String(err instanceof Error ? err.message : err).slice(0, 400)}`, error: true };
     }
-    await this.append(taskId, userMsg);
-    await this.append(taskId, answer);
-    await this.deps.audit.write({ by: user.upn, action: 'task.chat', target: taskId, details: { tokens: answer.tokens, costUsd: answer.costUsd, files: files.length, error: answer.error } });
+    await this.append(taskId, userMsg, answer);
+    await this.deps.audit.write({
+      by: user.upn,
+      action: 'task.chat',
+      target: taskId,
+      details: { tokens: answer.tokens, costUsd: answer.costUsd, files: files.length, error: answer.error, proposedSchedule: answer.proposal?.schedule.title },
+    });
     return [userMsg, answer];
   }
 }

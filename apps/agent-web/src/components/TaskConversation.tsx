@@ -19,8 +19,9 @@ import SendOutlined from '@mui/icons-material/SendOutlined';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import CloseOutlined from '@mui/icons-material/CloseOutlined';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
+import EventRepeatOutlined from '@mui/icons-material/EventRepeatOutlined';
 import { Link as RouterLink } from 'react-router';
-import { formatUsd, isTerminalStatus, moodForTaskStatus, type AvatarMood, type Identity, type TaskChatMessage, type TaskState } from '@cw/shared';
+import { describeCalendar, formatUsd, isTerminalStatus, moodForTaskStatus, type AvatarMood, type Identity, type ScheduleProposal, type TaskChatMessage, type TaskState } from '@cw/shared';
 import { AgentPortrait, ErrorAlert, formatBytes, formatDateTime } from '@cw/ui';
 import { api, avatarUrl } from '../api';
 import { Markdown } from './Markdown';
@@ -33,7 +34,7 @@ import { Markdown } from './Markdown';
 
 type Entry =
   | { side: 'human'; at: string; who: Identity; text?: string; badge?: { label: string; color: ChipProps['color'] } }
-  | { side: 'agent'; at: string; text: string; badge?: { label: string; color: ChipProps['color'] }; mood?: AvatarMood; files?: string[]; colleague?: string; footnote?: string; thinking?: boolean; filesLabel?: string }
+  | { side: 'agent'; at: string; text: string; badge?: { label: string; color: ChipProps['color'] }; mood?: AvatarMood; files?: string[]; colleague?: string; footnote?: string; thinking?: boolean; filesLabel?: string; proposal?: { id: string; p: ScheduleProposal } }
   | { side: 'system'; at: string; text: string };
 
 const STEP_LABEL: Record<string, string> = { plan: 'Plan ready', run: 'Work done', fix: 'Fixed', upload: 'Upload applied' };
@@ -55,9 +56,10 @@ export function conversationOf(state: TaskState, agentName: string, chat: TaskCh
         at: m.at,
         text: m.text,
         mood: m.error ? 'fearful' : 'happy',
-        badge: m.error ? { label: 'No answer', color: 'error' } : { label: 'Answer', color: 'secondary' },
+        badge: m.error ? { label: 'No answer', color: 'error' } : m.proposal ? { label: 'Schedule proposal', color: 'info' } : { label: 'Answer', color: 'secondary' },
         files: m.context,
         filesLabel: 'Read for this answer:',
+        proposal: m.proposal ? { id: m.id, p: m.proposal } : undefined,
         footnote: [m.model, m.tokens !== undefined ? `${m.tokens} tokens` : '', m.costUsd !== undefined ? formatUsd(m.costUsd) : ''].filter(Boolean).join(' · ') || undefined,
       });
   }
@@ -136,7 +138,75 @@ const initials = (who: Identity) =>
     .map((s) => s[0]!.toUpperCase())
     .join('');
 
-function Bubble({ entry, agentName, onOpenFile }: { entry: Entry; agentName: string; onOpenFile: (path: string) => void }) {
+const PROPOSAL_STATUS: Record<ScheduleProposal['status'], { label: string; color: ChipProps['color'] }> = {
+  pending: { label: 'Waiting for your approval', color: 'warning' },
+  approved: { label: 'Approved', color: 'success' },
+  rejected: { label: 'Rejected', color: 'default' },
+};
+
+/** The agent's proposal for a recurring task: shows exactly what would run and when; only the buttons create it. */
+function ProposalCard({ p, mayDecide, deciding, onDecide }: { p: ScheduleProposal; mayDecide: boolean; deciding: boolean; onDecide: (decision: 'approve' | 'reject') => void }) {
+  const status = PROPOSAL_STATUS[p.status];
+  return (
+    <Box sx={{ my: 1, p: 1.5, border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+        <EventRepeatOutlined fontSize="small" color="action" />
+        <Typography variant="subtitle2" sx={{ flex: 1, minWidth: 0 }}>
+          {p.schedule.title}
+        </Typography>
+        <Chip size="small" label={status.label} color={status.color} variant={p.status === 'rejected' ? 'outlined' : 'filled'} />
+      </Stack>
+      <Typography variant="body2">
+        <strong>When:</strong> {describeCalendar(p.schedule.calendar)} (Europe/Berlin)
+      </Typography>
+      <Typography variant="body2">
+        <strong>Type:</strong> {p.schedule.type} · <strong>approval:</strong> {p.schedule.approval}
+      </Typography>
+      <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+        <strong>Instructions for every run:</strong>
+        <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, bgcolor: 'action.hover', whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>{p.schedule.instructions}</Box>
+      </Typography>
+      {p.status === 'pending' && (
+        <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
+          <Button size="small" variant="contained" disabled={!mayDecide || deciding} onClick={() => onDecide('approve')}>
+            Approve &amp; schedule
+          </Button>
+          <Button size="small" disabled={!mayDecide || deciding} onClick={() => onDecide('reject')}>
+            Reject
+          </Button>
+          {deciding && <CircularProgress size={18} />}
+          {!mayDecide && (
+            <Typography variant="caption" color="text.secondary">
+              Only {p.requestedBy.name || p.requestedBy.upn} can decide.
+            </Typography>
+          )}
+        </Stack>
+      )}
+      {p.status === 'approved' && (
+        <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
+          Approved by {p.decidedBy?.name || p.decidedBy?.upn} — scheduled as{' '}
+          <Link component={RouterLink} to="/schedules">
+            {p.scheduleId}
+          </Link>
+          . It runs under their name.
+        </Typography>
+      )}
+      {p.status === 'rejected' && (
+        <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
+          Rejected by {p.decidedBy?.name || p.decidedBy?.upn}. Nothing was scheduled.
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+interface ProposalActions {
+  canDecide: (p: ScheduleProposal) => boolean;
+  deciding?: string;
+  onDecide: (messageId: string, decision: 'approve' | 'reject') => void;
+}
+
+function Bubble({ entry, agentName, onOpenFile, proposals }: { entry: Entry; agentName: string; onOpenFile: (path: string) => void; proposals: ProposalActions }) {
   if (entry.side === 'system') {
     return (
       <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, my: 0.5 }}>
@@ -173,7 +243,7 @@ function Bubble({ entry, agentName, onOpenFile }: { entry: Entry; agentName: str
             </Typography>
           )}
         </Stack>
-        {(entry.text || (!human && entry.files?.length)) && (
+        {(entry.text || (!human && (entry.files?.length || entry.proposal))) && (
           <Box
             sx={{
               px: 1.75,
@@ -195,6 +265,14 @@ function Bubble({ entry, agentName, onOpenFile }: { entry: Entry; agentName: str
               </Typography>
             ) : (
               entry.text && <Markdown>{entry.text}</Markdown>
+            )}
+            {!human && entry.proposal && (
+              <ProposalCard
+                p={entry.proposal.p}
+                mayDecide={proposals.canDecide(entry.proposal.p)}
+                deciding={proposals.deciding === entry.proposal.id}
+                onDecide={(d) => proposals.onDecide(entry.proposal!.id, d)}
+              />
             )}
             {!human && !!entry.files?.length && (
               <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5, my: 1, alignItems: 'center' }}>
@@ -262,6 +340,10 @@ export function TaskConversation({
   onSend,
   sending,
   error,
+  canDecideProposal,
+  onDecideProposal,
+  decidingProposal,
+  proposalError,
   onOpenFile,
 }: {
   state: TaskState;
@@ -272,6 +354,11 @@ export function TaskConversation({
   onSend: (text: string) => Promise<unknown>;
   sending: boolean;
   error: unknown;
+  /** The agent may propose a recurring task; it is only created when the right person approves it here. */
+  canDecideProposal: (p: ScheduleProposal) => boolean;
+  onDecideProposal: (messageId: string, decision: 'approve' | 'reject') => Promise<unknown>;
+  decidingProposal?: string;
+  proposalError: unknown;
   onOpenFile: (path: string) => void;
 }) {
   const [text, setText] = useState('');
@@ -359,7 +446,7 @@ export function TaskConversation({
       <CardContent sx={{ pt: 0 }}>
         <Stack ref={list} spacing={2} sx={{ maxHeight: '70vh', overflowY: 'auto', pr: 1, py: 1 }}>
           {entries.map((e, i) => (
-            <Bubble key={i} entry={e} agentName={agentName} onOpenFile={onOpenFile} />
+            <Bubble key={i} entry={e} agentName={agentName} onOpenFile={onOpenFile} proposals={{ canDecide: canDecideProposal, deciding: decidingProposal, onDecide: (id, d) => void onDecideProposal(id, d).catch(() => undefined) }} />
           ))}
         </Stack>
         {attached.length > 0 && (
@@ -456,6 +543,7 @@ export function TaskConversation({
           </Alert>
         )}
         <ErrorAlert error={error} />
+        <ErrorAlert error={proposalError} />
       </CardContent>
     </Card>
   );

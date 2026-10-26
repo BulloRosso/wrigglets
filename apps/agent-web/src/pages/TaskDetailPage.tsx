@@ -86,6 +86,13 @@ export function TaskDetailPage() {
     mutationFn: (text: string) => api.sendChat(id, text),
     onSuccess: (msgs) => qc.setQueryData(['chat', id], [...(chat.data ?? []), ...msgs]),
   });
+  const decideProposal = useMutation({
+    mutationFn: ({ messageId, decision }: { messageId: string; decision: 'approve' | 'reject' }) => api.decideScheduleProposal(id, messageId, decision),
+    onSuccess: (m) => {
+      qc.setQueryData(['chat', id], (chat.data ?? []).map((x) => (x.id === m.id ? m : x)));
+      void qc.invalidateQueries({ queryKey: ['schedules'] });
+    },
+  });
   // same request as a new task, e.g. after a failure or with a better model
   const runAgain = useMutation({
     mutationFn: (st: TaskState) => api.createTask({ title: st.title, instructions: st.instructions, type: st.type as 'analysis' | 'report' | 'change', approval: st.approval }),
@@ -224,6 +231,10 @@ export function TaskDetailPage() {
               onSend={(text) => ask.mutateAsync(text)}
               sending={ask.isPending}
               error={ask.error}
+              canDecideProposal={(p) => !!user && (user.upn === p.requestedBy.upn || hasRole(me.data, 'admin'))}
+              onDecideProposal={(messageId, decision) => decideProposal.mutateAsync({ messageId, decision })}
+              decidingProposal={decideProposal.isPending ? decideProposal.variables?.messageId : undefined}
+              proposalError={decideProposal.error}
               onOpenFile={setPreviewPath}
             />
             <Card>

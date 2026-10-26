@@ -38,3 +38,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0031](0031-internet-access-via-mcp.md) | Internet access for agents through an MCP upstream behind the gateway | Accepted |
 | [0033](0033-exfiltration-guard.md) | Exfiltration guard: an evaluation agent in the harness's pre-tool hook | Accepted |
 | [0032](0032-entra-obo-for-mcp.md) | Optional Microsoft Entra On-Behalf-Of for MCP calls | Accepted |
+| [0034](0034-agent-proposed-schedules.md) | Agents propose scheduled tasks, people approve them in the chat | Accepted |

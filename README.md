@@ -32,6 +32,8 @@ Desktop** environment, extended to a small platform:
 - **Agent portraits** in four moods, generated from a guiding image with an OpenAI image model
 - TypeScript/Node.js throughout, React + Material UI with one shared theme, prepared for Azure (private ACR, APIM, Key Vault)
 
+<img src="wrigglets-overview.png" alt="Wrigglets overview" width="100%">
+
 ## Architecture
 
 **a) Technical components:** the containers of the local stack, their ports and connections.

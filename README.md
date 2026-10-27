@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/images/wrigglets-banner.png" alt="Wrigglets! Five cartoon caterpillar agents playing on a playground" width="720"></p>
 
-# Coworking Agents
+# Wrigglets
 
 AI colleagues that teams talk to through a web UI. Each agent works on one shared, Git-versioned workspace;
 **Temporal** frames all work so that it is always reconstructable who requested what, who approved it, what was done
@@ -44,6 +44,60 @@ Desktop** environment, extended to a small platform:
 
 More detail: [docs/architecture.md](docs/architecture.md); safety, gateway and A2A in
 [diagram 10](docs/diagrams/10-killswitch-gateway.svg).
+
+## An agentic operating system in small
+
+Wrigglets treats agents like workloads on an operating system: each gets an identity, a budget, a sandbox, a
+syscall boundary and an audit log, and none of them can opt out.
+
+**Positioning against OpenAI.** OpenAI's closest equivalent of an enterprise agent control plane is **OpenAI
+Frontier** (announced 5 February 2026, sales-led access): agent lifecycle, dedicated agent identities with enterprise
+IAM, explicit permissions, observability and audit logs, evaluation, governance and shared business context, for
+agents built in-house or by third parties [[1]](#sources-agentic-os)[[2]](#sources-agentic-os). Beneath it sit the
+**Agents API** (managed execution with durable sessions and subagents; public beta since 10 September 2026,
+[[3]](#sources-agentic-os)) and the **Agents SDK** (application-controlled orchestration, tools and handoffs). Frontier
+is a governance and operations layer for *agents*; OpenAI's public descriptions do not establish that it is an
+infrastructure control plane for independently deployed, containerized agents (provisioning and scheduling, third-party
+frameworks, replayable histories, cross-agent discovery, programmatic lifecycle management). That is the gap this
+project fills, and the table shows where the two meet. Frontier capabilities below are *advertised platform
+capabilities*, not necessarily public APIs.
+
+| OS concern | Wrigglets | OpenAI Frontier and Agents API |
+|---|---|---|
+| **Process table and lifecycle** | The **control plane** provisions agent containers on demand and tracks state, tasks, schedules and alerts; the admin console configures, starts and stops them via API. | Agent lifecycle (build, deploy, operate, improve) as a managed offering; the Agents API runs agents on OpenAI's harness. No documented provisioning of arbitrary, independently deployed containers. |
+| **Scheduler and journal** | **Temporal** frames every task as a durable workflow: who requested, who approved, what ran, what is scheduled. Replayable execution history. | Durable *sessions* (saved configuration, turns and items, resumable) and parallel agent execution [[3]](#sources-agentic-os). A replayable workflow history comparable to Temporal is not described. |
+| **Syscall boundary** | The **MCP gateway** is the only MCP endpoint agents see: per-agent allow-lists, no direct access to upstream data sources, kill switch. | Explicit permissions and controlled access to tools and data; integrations with CRM, databases and warehouses [[1]](#sources-agentic-os). Whether agents are blocked from reaching sources directly is not stated. |
+| **Cross-agent communication** | **A2A delegation** inside each agent's discovery set, brokered by the gateway. | Coordinated workflows and subagents inside the Agents API [[3]](#sources-agentic-os); cross-agent discovery across independently deployed agents is not described. |
+| **Intrusion detection** | The **exfiltration guard** checks every tool call against the last 5 model round-trips for indirect, multi-turn injection and data extraction. A block cancels the task and halts the agent. | Guardrails and "enterprise security and compliance controls" [[1]](#sources-agentic-os); a cross-turn monitor of tool calls is not described. |
+| **Resource quotas** | **Money, not tokens**: LiteLLM virtual key and a spend limit per agent. No shared token pool, no direct model access. | Token-based API billing; a per-agent monetary cap is not described. |
+| **Filesystem and snapshots** | Each agent works in an **isolated, Git-versioned workspace**; every change is a commit and a rejected deviation is reverted with ordinary Git ([ADR-0015](docs/adr/0015-deviation-rejection-reverts.md)). | Agents API execution runs with no environment, an OpenAI-hosted sandbox or a self-hosted sandbox [[3]](#sources-agentic-os); workspace versioning with rollback is not described. |
+| **Kernel / harness** | **opencode**, a vendor- and model-neutral harness, protected by the gateway and the guard. | The managed Codex harness [[3]](#sources-agentic-os); Frontier is said to manage third-party agents too [[2]](#sources-agentic-os). |
+| **User identity** | **Entra On-Behalf-Of** at the gateway: agent and user identity on every upstream call, fail closed. | Dedicated agent identities integrated with enterprise IAM [[1]](#sources-agentic-os). Per-user delegation to upstream tools is not described. |
+| **Audit** | Workflow history, task conversations, gateway decisions, alerts and mails for compliance audits. | Monitoring, logs and auditable agent actions; continuous evaluation [[1]](#sources-agentic-os)[[2]](#sources-agentic-os). |
+| **Business context** | Shared Git workspace and task history per agent. | Shared organizational knowledge and persistent context across agents (Frontier's emphasis). |
+
+**What this changes in practice**
+
+- **Containment instead of trust.** Safety does not rely on the model behaving. The agent can only reach what the
+  gateway exposes, only spend what its budget allows, and only write inside a workspace that can be rolled back. Layers
+  stack: allow-list, guard, kill switch, budget.
+- **Infrastructure and governance in one place.** Provisioning, durable workflows, A2A, identity, cost and audit are
+  properties of the platform, not code each agent author must remember to write.
+- **Open and self-hosted.** It runs on your Docker or Azure estate, with a model-neutral harness behind a gateway, so
+  the model vendor can change without changing the control.
+
+**What it is not.** Frontier is a vendor-operated enterprise product with business-context integration, evaluation and
+OpenAI's scale behind it; this project is a small platform you operate yourself, and its guard is probabilistic.
+Frontier and the Agents API are complements rather than rivals: an agent built on either could, in principle, sit behind
+this gateway and be governed by its quotas and guard, and the Agents SDK remains the lighter choice for a single agent in
+one application.
+
+<a id="sources-agentic-os"></a>
+<sub>Retrieved 2026-10-27. Frontier is described mostly by secondary sources and the product is sales-led; verify against
+OpenAI's own materials before relying on details.
+[1] [OpenAI launches platform to manage AI agents (Axios, 5 Feb 2026)](https://axios.com/2026/02/05/openai-platform-ai-agents) ·
+[2] [OpenAI Frontier: enterprise agents, features and pricing (The Rundown)](https://www.therundown.ai/tools/openai-frontier) and [OpenAI Frontier platform guide (ALM Corp)](https://almcorp.com/blog/openai-frontier-enterprise-ai-agent-platform-guide/) ·
+[3] [OpenAI launches managed Agents API in public beta (Data Phoenix)](https://dataphoenix.info/news/openai-agents-api-public-beta) and [The Agents API: the Codex harness behind one API call](https://kdpisda.in/openai-agents-api-public-beta-codex-harness/).</sub>
 
 ## Microsoft Entra On-Behalf-Of (optional)
 

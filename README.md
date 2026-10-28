@@ -79,6 +79,15 @@ Each building block is described by what it gives you first, then by where it li
   private addresses.
   *In the project:* web search and page reading as gateway tools ([`apps/mcp-web`](apps/mcp-web),
   [ADR-0031](docs/adr/0031-internet-access-via-mcp.md)).
+- **Shared knowledge that people govern** (company wiki, `mcp-wiki` container)
+  Agents read a company wiki and propose changes; nothing is published until a person approves it in the admin console, with
+  the diff, the reason and the evidence in front of them. Each agent also keeps its own wiki for its tactics.
+  *In the project:* an MCP upstream with read, search and propose tools, a review queue in the admin console and a verified
+  author on every proposal ([`apps/mcp-wiki`](apps/mcp-wiki), [ADR-0035](docs/adr/0035-company-wiki.md)).
+- **Dependent work in the right order** (ordered delegation)
+  An agent declares that a task for a colleague depends on earlier ones; the gateway starts it only when they are completed,
+  passes their results along and cancels it if one fails.
+  *In the project:* `after` on `a2a__send_task` ([ADR-0036](docs/adr/0036-ordered-delegation.md)).
 - **Credentials kept out of agents** (secret store, `keyvault` container)
   Passwords and keys for your systems are not in code, images or agents, and can be rotated and audited in one place.
   *In the project:* Azure Key Vault emulator (Lowkey Vault), with the same client code working against Azure

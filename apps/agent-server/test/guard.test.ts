@@ -53,6 +53,16 @@ describe('guard context', () => {
     expect(u).toContain('attacker@evil.example');
   });
 
+  it('shows the approved plan as fenced data, only when there is one', () => {
+    const cfg: Pick<GuardConfig, 'systemPrompt' | 'contextCalls'> = { systemPrompt: 'CUSTOM POLICY '.repeat(10), contextCalls: 5 };
+    const pending = { callID: 'c8', tool: 'gateway_a2a__send_task', args: { agentId: 'sofa-cora' } };
+    const withPlan = buildGuardPrompt(cfg, conversation(), pending, 'N1', '1. Delegate the re-plan to Cora.').messages[1]!.content;
+    expect(withPlan).toContain('<<<APPROVED PLAN N1>>>');
+    expect(withPlan).toContain('Delegate the re-plan to Cora.');
+    expect(withPlan.indexOf('<<<APPROVED PLAN N1>>>')).toBeLessThan(withPlan.indexOf('<<<CONVERSATION N1>>>'));
+    expect(buildGuardPrompt(cfg, conversation(), pending, 'N1').messages[1]!.content).not.toContain('APPROVED PLAN');
+  });
+
   it('parses the verdict from plain JSON, code fences and prose; rejects garbage', () => {
     expect(parseVerdict('{"decision":"block","category":"data_exfiltration","confidence":91,"reason":"mail to unknown address"}')).toMatchObject({ decision: 'block', category: 'data_exfiltration', confidence: 91 });
     expect(parseVerdict('```json\n{"decision":"allow","category":"none","confidence":99,"reason":""}\n```').decision).toBe('allow');

@@ -79,6 +79,12 @@ const schema = z.object({
   /** Web access upstream (search, fetch); token seeded into Key Vault as `mcp-web-authorization` (ADR-0031). */
   WEB_UPSTREAM_URL: z.string().url().optional(),
   MCP_WEB_TOKEN: z.string().optional(),
+  /** Central company wiki (ADR-0035): MCP upstream for agents; token seeded into Key Vault as `mcp-wiki-authorization`. */
+  WIKI_UPSTREAM_URL: z.string().url().optional().or(z.literal('')),
+  MCP_WIKI_TOKEN: z.string().optional(),
+  /** REST base URL and token of the company wiki for the admin console (people review proposals there). */
+  WIKI_URL: z.string().url().optional().or(z.literal('')),
+  WIKI_ADMIN_TOKEN: z.string().optional(),
   /** Red-team example (docs/red-teaming.md): mock MCP upstream without authentication. Unset = not registered. */
   REDTEAM_UPSTREAM_URL: z.string().url().optional().or(z.literal('')),
 

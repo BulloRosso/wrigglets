@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
+import path from 'node:path';
 import type { Client } from '@temporalio/client';
-import type { HealthReport } from '@cw/shared';
+import { workspacePaths, type HealthReport } from '@cw/shared';
 import { AppAuditLog } from './api/appAudit.js';
 import { createApp } from './api/app.js';
 import { createAuth } from './api/auth.js';
@@ -37,7 +39,16 @@ async function main() {
   // Exfiltration guard (ADR-0033): the evaluation agent behind the harness plugin's `tool.execute.before` hook
   let temporalClient: Client | undefined;
   const appAudit = new AppAuditLog(config.artifactsDir);
-  const guard = new GuardService({ config, harness, stepOf: (s) => events.stepOf(s), temporal: () => temporalClient, audit: appAudit });
+  const gatewayClient = new GatewayClient(config.MCP_GATEWAY_BASE_URL, config.AGENT_ID, config.MCP_GATEWAY_TOKEN);
+  const guard = new GuardService({
+    config,
+    harness,
+    stepOf: (s) => events.stepOf(s),
+    planOf: (taskId) => readFile(path.join(config.workspaceDir, workspacePaths.plan(taskId)), 'utf8').catch(() => undefined),
+    readOnlyTools: () => gatewayClient.readOnlyTools(),
+    temporal: () => temporalClient,
+    audit: appAudit,
+  });
   supervisor.setGuard(guard.connection(config.port));
   if (config.HARNESS_ENABLED) {
     await supervisor.start();

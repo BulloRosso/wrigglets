@@ -1,0 +1,313 @@
+{
+  "scenario": "storm",
+  "n": 5,
+  "title": "A thunderstorm damages most of the upholstery fabric in the warehouse",
+  "request": {
+    "by": "Stefan Lang",
+    "to": "Tom",
+    "title": "Storm damage in the fabric hall",
+    "instructions": "The thunderstorm last night damaged the roof of the fabric hall. A surveyor has inspected the affected lots (see the quarantine notes in the ERP). Handle the damaged stock: write off what the surveyor declares unusable, release what is usable, and file the incident report for the insurance. Production must not run out of fabric: ask Lara to buy replacement fabric and Cora to re-prioritise the orders."
+  },
+  "timedOut": false,
+  "attempts": 1,
+  "wiki": {
+    "Cora": [
+      {
+        "path": "wiki/lessons/autumn-bundle-late-even-with-capacity.md",
+        "text": "# Planning autumn bundles can still end late\n\nRule: A healthy-looking factory queue and material projection do not guarantee that a large unplanned autumn bundle will finish on time; verify the post-change late-order KPI and material-shortage projection before treating the plan as sufficient.\n\nApplies when: Several confirmed but unplanned sales orders are added together during a campaign spike and no extra capacity lever is booked.\n\nEvidence: task `task-a2a-868119cc-9a29-4881-a984-46c0d33a5118`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-12\"}`. Reconfirmed in task `task-a2a-7f936446-e11a-49a9-b9a4-49c7504d3147`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-11\"}`. Reconfirmed again in task `task-a2a-0a7827d1-1a0c-4b1b-a2c9-ebe93ff49b49`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-12\"}`.\n"
+      },
+      {
+        "path": "wiki/lessons/north-replan-spindle-motor.md",
+        "text": "# North replan after spindle motor delivery\n\nRule: When `N-CUT-1` is down for the spindle motor replacement, replan only the North orders that are already late if moving additional work would increase the KPI.\n\nApplies when: A North machine outage is tied to `MT-001` and the required part is already secured with a known arrival date.\n\nEvidence: task `task-a2a-7869e423-a373-4844-a249-0c76c2b9dffa`, KPI before `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5` -> after `lateOrders=2`, `sofasLate=220`, `lateOrdersCustomerNotInformed=2`.\n"
+      },
+      {
+        "path": "wiki/index.md",
+        "text": "- [Log](log.md): append-only session notes for durable company learnings.\n- [Planning autumn bundles can still end late](lessons/autumn-bundle-late-even-with-capacity.md): unplanned bundles can still leave all orders late even when current capacity and stock look healthy.\n- [North replan after spindle motor delivery](lessons/north-replan-spindle-motor.md): what we learned about re-planning North orders after the spindle motor arrives.\n- [Replan Werk Süd after temporary workers were booked](log.md): execution note that the South queue stayed on time and priorities were unchanged.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "## [2026-10-28] task task-a2a-7869e423-a373-4844-a249-0c76c2b9dffa | Replan North orders after spindle motor express order\nReplanned the two late North orders `PRD-4200` and `PRD-4202` to `F-SOUTH`, which reduced live KPI from `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5` to `lateOrders=2`, `sofasLate=220`, `lateOrdersCustomerNotInformed=2`.\nThe North machine outage remained in force until `2026-10-13`, so wider replan bundles were rejected in simulation because they increased lateness.\n\n## [2026-10-28] task task-a2a-868119cc-9a29-4881-a984-46c0d33a5118 | Plan unplanned autumn orders SO-2301..SO-2308\nPlanned eight confirmed but unplanned autumn orders into production without disturbing existing priority-5 work.\nThe resulting ERP state still showed all eight orders late and introduced a `FOAM-HR35` shortage from `2026-11-12`, so this bundle is not sufficient on its own.\n\n## [2026-10-28] task task-a2a-7f936446-e11a-49a9-b9a4-49c7504d3147 | Execute autumn campaign backlog SO-2301..SO-2308\nCreated production orders `PRD-4218`..`PRD-4225` for the eight Herbstzauber sales orders without reprioritising existing work.\nLive ERP now shows all eight orders planned, but 8 late orders remain and `FOAM-HR35` is projected to hold production back from `2026-11-11`.\n\n## [2026-10-28] task task-a2a-0a7827d1-1a0c-4b1b-a2c9-ebe93ff49b49 | Re-plan Herbstzauber backlog\nReplanned the eight Herbstzauber sales orders into production with priority 6, split across both factories and keeping the tier-A orders first in the sequence.\nLive ERP still shows 8 late orders and `FOAM-HR35` holding production back from `2026-11-12`, so the backlog remains late after replanning.\n\n## [2026-10-28] task task-a2a-4dfd174a-597f-4e00-b717-b10325a071c4 | Replan Werk Süd after temporary workers were booked\nVerified the F-SOUTH queue after the staffing change. The seven concerned orders remained on their existing priorities, and the ERP still shows zero late orders for F-SOUTH.\n"
+      }
+    ],
+    "Tom": [
+      {
+        "path": "wiki/lessons/warehouse-damage-disposition.md",
+        "text": "# Warehouse Damage Disposition\n\nRule: When a surveyor has split a damaged lot into unusable and usable quantities, the warehouse must write off the unusable part and release only the usable part.\n\nApplies when: Quarantined stock has an inspection note that gives a concrete usable/unusable split.\n\nEvidence: task task-01M61EDVJV0QJWHEAKH8WR1XCJ, KPI 8 late orders / 760 sofas late / 8 late without notice -> 2 late orders / 120 sofas late / 2 late without notice.\n"
+      },
+      {
+        "path": "wiki/playbooks/storm-damage.md",
+        "text": "# Storm Damage Playbook\n\nRule: Handle storm-damaged stock in the order surveyor note, write off only the unusable quantity, release only the usable quantity, and file the insurance incident report after the warehouse disposition.\n\nApplies when: A weather incident damages warehouse stock and the lots are quarantined for inspection.\n\nEvidence: task task-01M61EDVJV0QJWHEAKH8WR1XCJ, KPI 8 late orders / 760 sofas late / 8 late without notice -> 2 late orders / 120 sofas late / 2 late without notice.\n\nSteps:\n1. Read the quarantine note and confirm the surveyor quantities.\n2. Write off the unusable quantity from each affected lot.\n3. Release the usable quantity from each affected lot.\n4. File the incident report for insurance with the surveyor-backed loss estimate.\n5. Hand off procurement and planning so fabric shortages are covered and production is re-prioritised.\n"
+      },
+      {
+        "path": "wiki/index.md",
+        "text": "- [Storm damage playbook](playbooks/storm-damage.md): sequence for quarantined material after storm damage, including write-off, release, incident report, and follow-up handoffs.\n- [Warehouse handling rule](lessons/warehouse-damage-disposition.md): release only the surveyor-approved usable quantity and write off only the declared unusable quantity.\n- [Run log](log.md): append-only record of learned facts from warehouse incidents.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "## [2026-10-28] task task-01M61EDVJV0QJWHEAKH8WR1XCJ | Storm damage in the fabric hall\nSurveyor-verified storm damage split two quarantined fabric lots into unusable and usable quantities. The warehouse disposition reduced the active shortage picture, and the remaining follow-up is procurement/planning for `FAB-ANTH-02`.\n\n## [2026-10-28] task task-01M61EDVJV0QJWHEAKH8WR1XCJ | Delegated follow-up completed\nLara completed the replacement fabric purchase for `FAB-ANTH-02` and Cora confirmed no reprioritisation was needed because the live KPI is already cleared. The storm-damage response is now fully integrated end to end.\n"
+      }
+    ],
+    "Lara": [
+      {
+        "path": "wiki/entities/s-foamtec.md",
+        "text": "# S-FOAMTEC\n\nSupplier facts for `FOAM-HR35` procurement.\n\n- Supplies `FOAM-HR35`.\n- Lead time: 5 workdays.\n- Unit price: 9.5 EUR.\n- Minimum order quantity: 500.\n- Maximum order quantity: 20000.\n- Express delivery: not offered.\n\nEvidence: task `task-a2a-23a37b3c-8c67-4bf8-a726-29fe19dfeea2`, ERP supplier lookup and successful purchase order `PO-4430`.\n"
+      },
+      {
+        "path": "wiki/index.md",
+        "text": "- [Log](log.md): append-only record of what we learned during tasks.\n- [S-FOAMTEC](entities/s-foamtec.md): durable supplier facts for FOAM-HR35 procurement.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "## [2026-10-28] task task-a2a-d0cc57ea-8b6c-4d28-a0cf-af71e1acfefd | Order express spindle motor for N-CUT-1\nPlaced an express purchase order for `SP-SPINDLE-220` from `S-REITER` to support the N-CUT-1 repair.\nThe live ERP KPI improved from `lateOrders=9`, `sofasLate=860`, `lateOrdersCustomerNotInformed=9`, `costOfMeasuresEur=0` to `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5`, `costOfMeasuresEur=9650`.\n# Log\n\n## [2026-10-28] task task-a2a-23a37b3c-8c67-4bf8-a726-29fe19dfeea2 | Secure material if Cora shows a shortage risk\nConfirmed a live `FOAM-HR35` shortage risk from the autumn-order plan and secured one purchase order from `S-FOAMTEC` for `1410` units. The ERP returned `PO-4430` with ETA `2026-10-12`; the live KPI still shows the original shortage state until execution is reflected in the simulation.\n\n## [2026-10-28] task task-a2a-b943ed32-3bc1-4242-a823-41b01590ff28 | Secure material only if replanning exposes a shortage\nReviewed the live ERP projections for `BEAM-PINE-80`, `FAB-OAT-01`, and `FAB-ANTH-02` and found no shortage within 70 workdays, so no purchase order was placed.\n\n## [2026-10-28] task task-a2a-b4c16eb6-adeb-46c9-8374-9387e770e33c | Buy replacement fabric after storm damage\nPlaced an express purchase order for `FAB-ANTH-02` from `S-TUCHWERK` to replace the storm-damaged fabric hall stock.\nThe live ERP KPI improved from `lateOrders=2`, `sofasLate=120`, `lateOrdersCustomerNotInformed=2`, `costOfMeasuresEur=0` to `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, `costOfMeasuresEur=87720`.\n"
+      }
+    ]
+  },
+  "guardStops": [],
+  "kpi": {
+    "baseline": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {},
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterIncident": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 8,
+      "lateOrdersCustomerNotInformed": 8,
+      "sofasLate": 760,
+      "totalLateDays": 274,
+      "materialShortages": {
+        "FAB-ANTH-02": "production held back from 2026-10-05",
+        "FAB-OAT-01": "production held back from 2026-10-15"
+      },
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterMitigation": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {
+        "FAB-ANTH-02": "production held back from 2026-10-13"
+      },
+      "costOfMeasuresEur": 87720,
+      "writes": 6
+    }
+  },
+  "tasks": [
+    {
+      "agent": "Cora",
+      "agentId": "sofa-cora",
+      "taskId": "task-a2a-fafd5442-0930-40e1-9a0e-6680a961b90a",
+      "title": "Re-prioritise production after storm damage and replacement procurement",
+      "status": "completed",
+      "requestedBy": "Stefan Lang",
+      "trigger": {
+        "kind": "agent",
+        "callerAgentId": "sofa-tom",
+        "callerTaskId": "task-01M61EDVJV0QJWHEAKH8WR1XCJ",
+        "a2aTaskId": "fafd5442-0930-40e1-9a0e-6680a961b90a"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Paula Meier",
+          "comment": "Approved.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "Reviewed the shared wiki and live ERP state, then tested three reprioritisation bundles for the eight scoped orders. Every simulated queue change worsened the KPI, with late orders rising from 0 to 2, 3, or 5 depending on the bundle, so the plan recommends leaving the current priority-5 queue unchanged. The plan file records the exact orders, dates, capacity, material projection, and the no-change recommendation for approval.",
+          "tokens": 22144
+        },
+        {
+          "kind": "run",
+          "summary": "Executed the approved plan and verified the live ERP state before making any changes. `list_production_orders(lateOnly=true)` returned no late orders, and `get_overview` still shows `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`, so no reprioritisation was applied. The scoped orders remain on their existing priorities, and the material shortage alert for `FAB-ANTH-02` still points to the existing hold date. No wiki update was needed because the execution confirmed the simulated no-change outcome without adding a durable company lesson.",
+          "tokens": 3460
+        }
+      ],
+      "summary": "Executed the approved plan and verified the live ERP state before making any changes. `list_production_orders(lateOnly=true)` returned no late orders, and `get_overview` still shows `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`, so no reprioritisation was applied. The scoped orders remain on their existing priorities, and the material shortage alert for `FAB-ANTH-02` still points to the existing hold date. No wiki update was needed because the execution confirmed the simulated no-change outcome without adding a durable company lesson.",
+      "plan": "# Goal\nRe-prioritise the scoped fabric-affected production orders only if that reduces late orders without creating new ones. The current ERP state shows the fabric issue on `FAB-ANTH-02` is still present, but all eight scoped orders are currently on time, so the decision is whether any queue change is justified at all.\n\n# Inputs\n- Live ERP overview: `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, `unplannedOrders=[]`, `costOfMeasuresEur=87,720`.\n- Scoped orders and current dates from ERP: `PRD-4201`, `PRD-4204`, `PRD-4205`, `PRD-4209`, `PRD-4210`, `PRD-4213`, `PRD-4216`, `PRD-4217` are all currently `daysLate=0` with expected delivery dates between `2026-10-10` and `2026-10-25`.\n- Material projection for `FAB-ANTH-02`: `usableNow=1700`, open PO `PO-4430` ETA `2026-10-15`, first shortage `production is held back from 2026-10-13`.\n- Capacity checks: both factories show `40 sofas/day` for the next 10 workdays, with all machines running and no worker absences.\n- Relevant wiki: `index.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `rules/capacity-levers.md`, `lessons/autumn-bundle-late-even-with-capacity.md`, `lessons/north-replan-spindle-motor.md`.\n- What-if results:\n  - Reprioritising all 8 scoped orders to priority 4 would worsen KPI to `lateOrders=5`, `sofasLate=570`, `lateWithoutCustomerNotice=5`.\n  - Reprioritising 7 scoped orders (leaving `PRD-4209` unchanged) still worsens KPI to `lateOrders=3`, `sofasLate=280`, `lateWithoutCustomerNotice=3`.\n  - Reprioritising the 6 orders that are not `PRD-4201`/`PRD-4209` still worsens KPI to `lateOrders=2`, `sofasLate=240`, `lateWithoutCustomerNotice=2`.\n\n# Steps\n1. Keep the existing priority-5 queue unchanged; do not move any of the scoped orders unless a better simulation appears.\n2. Report the simulation evidence to the requester: every tested reprioritisation package increases lateness, so the safe choice is no change.\n3. If execution is approved, carry out no `update_production_order` calls and then verify the ERP late-order list remains empty for the scoped orders.\n4. Update the wiki only if execution produces a durable lesson or protocol change; at plan time, no wiki change is expected.\n\n# Outputs\n- `.agent/plans/task-a2a-fafd5442-0930-40e1-9a0e-6680a961b90a.md`\n- `.agent/summaries/task-a2a-fafd5442-0930-40e1-9a0e-6680a961b90a_plan_1.md`\n\n# Risks and open questions\n- The fabric issue on `FAB-ANTH-02` still exists, so a later queue change or new delay could turn currently on-time orders late.\n- The requester asked for moved orders and new completion dates, but the simulation shows any move would make the KPI worse; approval is needed for a no-change outcome.\n- If the live ERP state changes again before execution, the recommendation may need to be revalidated.\n",
+      "reports": [],
+      "tokens": 25604
+    },
+    {
+      "agent": "Tom",
+      "agentId": "sofa-tom",
+      "taskId": "task-01M61EDVJV0QJWHEAKH8WR1XCJ",
+      "title": "Storm damage in the fabric hall",
+      "status": "completed",
+      "requestedBy": "Stefan Lang",
+      "trigger": {
+        "kind": "user"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Stefan Lang",
+          "comment": "Approved. Only the quantities named by the surveyor.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [
+        {
+          "agentId": "sofa-lara",
+          "taskId": "b4c16eb6-adeb-46c9-8374-9387e770e33c",
+          "state": "completed"
+        },
+        {
+          "agentId": "sofa-cora",
+          "taskId": "q-976ef1b36be1",
+          "state": "completed"
+        }
+      ],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "I reviewed the ERP overview, the quarantined fabric lots, the relevant production and CRM risk lists, and the company wiki protocols before planning. The damaged stock is split cleanly by the surveyor into unusable and usable quantities: 7,200 m / 1,800 m for `L-OAT-231` and 6,800 m / 1,700 m for `L-ANTH-219`. A full warehouse disposition simulation showed a meaningful KPI improvement from 8 late orders and 760 sofas late down to 2 late orders and 120 sofas late, so the plan focuses on that complete write-off/release package. I also captured the need for an incident report and the dependent f…",
+          "tokens": 33590
+        },
+        {
+          "kind": "run",
+          "summary": "I executed the approved warehouse disposition for both quarantined fabric lots: `L-OAT-231` was written off by 7,200 m and released by 1,800 m, and `L-ANTH-219` was written off by 6,800 m and released by 1,700 m. I also filed the storm-damage incident report as `INC-0001` with the surveyor-backed loss estimate. The ERP KPI improved from 8 late orders / 760 sofas late / 8 late without notice to 2 late orders / 120 sofas late / 2 late without notice, with only `FAB-ANTH-02` still holding production back from 2026-10-13. I sent the approved delegation to Lara and queued Cora after Lara, then cre…",
+          "tokens": 14249
+        },
+        {
+          "kind": "run",
+          "summary": "I re-read the local wiki pages named in the plan and confirmed they still match the approved storm-damage procedure. The delegated work is complete: Lara bought 6,800 m of `FAB-ANTH-02` under `PO-4430` with ETA `2026-10-15` and cost `87,720 EUR`, and Cora verified that no reprioritisation was needed because the live KPI was already at zero late orders. The ERP now shows `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, and `costOfMeasuresEur=87,720`, so the task is fully integrated. I also updated `wiki/log.md` to record the completed follow-up.",
+          "tokens": 5820
+        }
+      ],
+      "summary": "I re-read the local wiki pages named in the plan and confirmed they still match the approved storm-damage procedure. The delegated work is complete: Lara bought 6,800 m of `FAB-ANTH-02` under `PO-4430` with ETA `2026-10-15` and cost `87,720 EUR`, and Cora verified that no reprioritisation was needed because the live KPI was already at zero late orders. The ERP now shows `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, and `costOfMeasuresEur=87,720`, so the task is fully integrated. I also updated `wiki/log.md` to record the completed follow-up.",
+      "plan": "# Goal\nHandle the storm-damaged fabric inventory so the surveyor's unusable stock is written off, usable stock is released back into production, the insurer gets a claim report, and procurement/planning are pulled in so fabric shortages do not worsen.\n\n# Inputs\n- Simulation date: 2026-10-05.\n- Quarantined lots in the fabric hall:\n  - `L-OAT-231` / `FAB-OAT-01`: 9,000 m total, with surveyor note saying 7,200 m unusable and 1,800 m usable.\n  - `L-ANTH-219` / `FAB-ANTH-02`: 8,500 m total, with surveyor note saying 6,800 m unusable and 1,700 m usable.\n- Current KPI before any change: 8 late orders, 760 sofas late, 8 late without customer notice, shortages on `FAB-ANTH-02` from 2026-10-05 and `FAB-OAT-01` from 2026-10-15.\n- What-if result for the full warehouse disposition (`write_off_stock` + `release_stock` on both lots): KPI improves from 8 late orders / 760 sofas late / 8 late without notice to 2 late orders / 120 sofas late / 2 late without notice; the remaining shortage is only `FAB-ANTH-02` from 2026-10-13.\n- What-if result for write-off only: no KPI improvement.\n- What-if result for release only: the same KPI improvement as the full warehouse disposition, but it leaves the damaged material unaccounted for, so it is not the right final action.\n- Supplier facts from the company wiki: Tuchwerk Bielefeld AG supplies both fabrics; express lead time is 8 workdays; Tessile Como supplies only `FAB-OAT-01`.\n- Company wiki pages read: `index.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `suppliers/overview.md`.\n\n# Steps\n1. Execute `write_off_stock` for `lotId: L-OAT-231`, `quantity: 7200`, `reason: Surveyor report 2026-10-05 after storm damage: water-damaged, mould risk, unusable.`\n2. Execute `release_stock` for `lotId: L-OAT-231`, `quantity: 1800`, `note: Surveyor report 2026-10-05: dry and usable after storm inspection.`\n3. Execute `write_off_stock` for `lotId: L-ANTH-219`, `quantity: 6800`, `reason: Surveyor report 2026-10-05 after storm damage: water-damaged, mould risk, unusable.`\n4. Execute `release_stock` for `lotId: L-ANTH-219`, `quantity: 1700`, `note: Surveyor report 2026-10-05: dry and usable after storm inspection.`\n5. Execute `file_incident_report` with `type: storm_damage`, `description: Thunderstorm last night damaged the roof of the fabric hall; surveyor inspection on 2026-10-05 split the two quarantined lots into unusable and usable portions.`, `estimatedLossEur: 165200`.\n6. Delegate to Lara (`sofa-lara`) to buy replacement fabric for the remaining anthracite shortage: `FAB-ANTH-02`, quantity `6800`, needed by `2026-10-13`, using `Tuchwerk Bielefeld AG` and express delivery if she can secure it, because production is held back from 2026-10-13 after the warehouse correction.\n7. Delegate to Cora (`sofa-cora`) to re-prioritise the fabric-affected production orders after the warehouse correction and procurement date is known: `PRD-4201`, `PRD-4204`, `PRD-4205`, `PRD-4209`, `PRD-4210`, `PRD-4213`, `PRD-4216`, `PRD-4217`; keep existing priority 5 orders intact unless she can reduce late orders without creating new ones.\n8. Update the wiki after execution with the learned durable rule and the incident playbook that stay true for the company, and append the run to the log. The pages expected to change are the local wiki files under `wiki/` and any company wiki proposal that turns out to be durable.\n\nRejected options:\n- Write-off only: rejected because the simulation showed no KPI improvement.\n- Release-only: rejected because it leaves the damaged stock disposition incomplete even though the KPI improves.\n\n# Outputs\n- `.agent/plans/task-01M61EDVJV0QJWHEAKH8WR1XCJ.md`\n- `.agent/summaries/task-01M61EDVJV0QJWHEAKH8WR1XCJ_plan_1.md`\n\n# Risks and open questions\n- The plan assumes the surveyor note is the final basis for both write-off and release quantities.\n- The procurement request to Lara may still need refinement in execution if the remaining shortage window changes after her sourcing answer.\n- The Cora handoff depends on the actual dates returned after procurement and may need to be sequenced after Lara’s result.\n- The incident report cost estimate is based on the write-off values from the simulation.\n",
+      "reports": [],
+      "tokens": 53659
+    },
+    {
+      "agent": "Lara",
+      "agentId": "sofa-lara",
+      "taskId": "task-a2a-b4c16eb6-adeb-46c9-8374-9387e770e33c",
+      "title": "Buy replacement fabric after storm damage",
+      "status": "completed",
+      "requestedBy": "Stefan Lang",
+      "trigger": {
+        "kind": "agent",
+        "callerAgentId": "sofa-tom",
+        "callerTaskId": "task-01M61EDVJV0QJWHEAKH8WR1XCJ",
+        "a2aTaskId": "b4c16eb6-adeb-46c9-8374-9387e770e33c"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Stefan Lang",
+          "comment": "Approved.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "I reviewed the company wiki pages for supplier facts and colleague handoffs, then checked the ERP overview, inventory, material projection, and supplier data for `FAB-ANTH-02`. The key finding is that the standard Tuchwerk order would still leave late orders, while the express option reduces the KPI to zero late orders and zero late sofas, at a higher cost. I drafted the plan with one express purchase order for 6,800 m from `S-TUCHWERK` and documented the before/after KPI numbers from the simulator. No files outside the plan and summary were changed.",
+          "tokens": 10730
+        },
+        {
+          "kind": "run",
+          "summary": "Executed the approved express purchase order for `FAB-ANTH-02` from `S-TUCHWERK` under `PO-4430`. The order quantity was 6,800 m, the ETA is `2026-10-15`, and the total cost is `87,720 EUR`. The live ERP KPI after execution is `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, with `costOfMeasuresEur=87,720`. I also appended the outcome to `wiki/log.md`; no other wiki page needed a durable update.",
+          "tokens": 8196
+        }
+      ],
+      "summary": "Executed the approved express purchase order for `FAB-ANTH-02` from `S-TUCHWERK` under `PO-4430`. The order quantity was 6,800 m, the ETA is `2026-10-15`, and the total cost is `87,720 EUR`. The live ERP KPI after execution is `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, with `costOfMeasuresEur=87,720`. I also appended the outcome to `wiki/log.md`; no other wiki page needed a durable update.",
+      "plan": "# Goal\nBuy 6,800 m of `FAB-ANTH-02` to replace the storm-damaged fabric in the hall, using the company-preferred supplier `S-TUCHWERK` (Tuchwerk Bielefeld AG). Use express delivery because the normal lead time does not help with the shortage date and the express option is the only one that materially improves the KPI.\n\n# Inputs\n- Simulation date: `2026-10-05`.\n- Surveyor result for lot `L-ANTH-219` / `FAB-ANTH-02`: 6,800 m unusable and 1,700 m usable.\n- ERP inventory confirms `FAB-ANTH-02` usable stock is 1,700 m and the shortage starts `2026-10-13`.\n- Supplier lookup: `S-TUCHWERK` supplies `FAB-ANTH-02`, has lead time 12 workdays, express lead time 8 workdays, minimum order 1,000 m, maximum order 30,000 m, unit price 11.8 EUR, express surcharge 1.1 EUR per unit.\n- What-if before you propose: a standard PO for 6,800 m would arrive `2026-10-21` and leaves KPI at late orders 1 / sofas late 70 / late without notice 1 / cost 80,240 EUR. An express PO for 6,800 m would arrive `2026-10-15` and improves KPI to late orders 0 / sofas late 0 / late without notice 0 / cost 87,720 EUR.\n- Wiki: `suppliers/overview.md` (Tuchwerk is the main supplier for both fabrics and offers express), `protocols/handoffs.md` (procurement request needs SKU, quantity, needed-by date, reason, and current KPI), `protocols/ordered-delegation.md` (dependency order only; no dependent work is needed here), `entities/s-foamtec.md` (read as a comparable supplier fact page; not directly applicable to this SKU).\n\n# Steps\n1. Create one purchase order with `gateway_erp__create_purchase_order` using `supplierId: \"S-TUCHWERK\"`, `sku: \"FAB-ANTH-02\"`, `quantity: 6800`, `express: true`, and a note referencing the storm damage and the split lot `L-ANTH-219`.\n2. Verify the returned PO id, supplier, ETA, and cost; then confirm the KPI after the change with `gateway_erp__get_kpi` and `gateway_erp__get_material_projection` for `FAB-ANTH-02`.\n3. Update the task wiki and write the report with the PO id(s), supplier, delivery date, total cost, and KPI after.\n\n# Outputs\n- `.agent/summaries/task-a2a-b4c16eb6-adeb-46c9-8374-9387e770e33c_plan_1.md`\n- `wiki/log.md`\n- `wiki/index.md`\n- Relevant wiki page(s) under `wiki/` if a durable rule is learned\n\n# Risks and open questions\n- Express delivery still may not fully eliminate the material-shortage note on the projection page, even though it improves the KPI; the approval decision is whether the improved KPI justifies the surcharge.\n- The supplier’s exact PO id and ETA will only be known after execution.\n- No follow-up colleague task is needed unless the approved execution reveals an unexpected constraint.\n",
+      "reports": [],
+      "tokens": 18926
+    }
+  ],
+  "changes": [
+    {
+      "at": "2026-10-28T14:27:21.644Z",
+      "tool": "erp.write_off_stock",
+      "args": {
+        "lotId": "L-OAT-231",
+        "quantity": 7200,
+        "reason": "Surveyor report 2026-10-05 after storm damage: water-damaged, mould risk, unusable."
+      },
+      "result": "7200 FAB-OAT-01"
+    },
+    {
+      "at": "2026-10-28T14:27:21.731Z",
+      "tool": "erp.release_stock",
+      "args": {
+        "lotId": "L-OAT-231",
+        "quantity": 1800,
+        "note": "Surveyor report 2026-10-05: dry and usable after storm inspection."
+      },
+      "result": "1800 FAB-OAT-01"
+    },
+    {
+      "at": "2026-10-28T14:27:25.102Z",
+      "tool": "erp.write_off_stock",
+      "args": {
+        "lotId": "L-ANTH-219",
+        "quantity": 6800,
+        "reason": "Surveyor report 2026-10-05 after storm damage: water-damaged, mould risk, unusable."
+      },
+      "result": "6800 FAB-ANTH-02"
+    },
+    {
+      "at": "2026-10-28T14:27:25.108Z",
+      "tool": "erp.file_incident_report",
+      "args": {
+        "type": "storm_damage",
+        "description": "Thunderstorm last night damaged the roof of the fabric hall; surveyor inspection on 2026-10-05 split the two quarantined lots into unusable and usable portions.",
+        "estimatedLossEur": 165200
+      },
+      "result": "INC-0001"
+    },
+    {
+      "at": "2026-10-28T14:27:25.162Z",
+      "tool": "erp.release_stock",
+      "args": {
+        "lotId": "L-ANTH-219",
+        "quantity": 1700,
+        "note": "Surveyor report 2026-10-05: dry and usable after storm inspection."
+      },
+      "result": "1700 FAB-ANTH-02"
+    },
+    {
+      "at": "2026-10-28T14:28:13.603Z",
+      "tool": "erp.create_purchase_order",
+      "args": {
+        "supplierId": "S-TUCHWERK",
+        "sku": "FAB-ANTH-02",
+        "quantity": 6800,
+        "express": true,
+        "note": "Replace storm-damaged fabric hall stock; surveyor split lot L-ANTH-219 into 6800 m unusable and 1700 m usable."
+      },
+      "result": "PO-4430"
+    }
+  ],
+  "customerNotices": [],
+  "primaryTaskId": "task-01M61EDVJV0QJWHEAKH8WR1XCJ"
+}

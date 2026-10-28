@@ -1,0 +1,21 @@
+# Sofa-company example (docs/agentic-mitigations.md): a mock ERP and CRM as MCP servers (no authentication) that
+# simulate a sofa maker, registered by scripts/sofa-company/setup.mjs as gateway upstreams `erp` and `crm`.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.sofa.yml up -d --no-deps mcp-sofa
+#   node scripts/sofa-company/setup.mjs
+#
+# Remove it again with: docker compose -f docker-compose.yml -f docker-compose.sofa.yml rm -sf mcp-sofa
+# (and delete the upstreams `erp` and `crm` under Safety & tools, and the agents sofa-*).
+
+services:
+  mcp-sofa:
+    image: node:24.22.1-bookworm-slim
+    container_name: cw-mcp-sofa
+    hostname: mcp-sofa
+    restart: unless-stopped
+    command: ["node", "/app/mock-mcp.mjs"]
+    volumes:
+      - ./scripts/sofa-company/mock-mcp.mjs:/app/mock-mcp.mjs:ro
+    ports:
+      - "127.0.0.1:7660:7660" # status page, /kpi and scenario triggers from the host (the runner)
+    networks: [coworking]

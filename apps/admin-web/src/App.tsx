@@ -7,6 +7,7 @@ import HistoryEduOutlined from '@mui/icons-material/HistoryEduOutlined';
 import OpenInNewOutlined from '@mui/icons-material/OpenInNewOutlined';
 import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
 import MailOutlined from '@mui/icons-material/MailOutlined';
+import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
 import { AppShell, ErrorAlert, Loading } from '@cw/ui';
 import { useMe } from './api';
 import { GlobalKillSwitch } from './components/KillSwitch';
@@ -17,6 +18,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { SafetyPage } from './pages/SafetyPage';
 import { MailPage } from './pages/MailPage';
 import { UsersPage } from './pages/UsersPage';
+import { WikiPage } from './pages/WikiPage';
 
 export function App() {
   const me = useMe();
@@ -26,6 +28,7 @@ export function App() {
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
     { label: 'Safety & tools', icon: <ShieldOutlined />, to: '/safety' },
+    { label: 'Company wiki', icon: <MenuBookOutlined />, to: '/wiki' },
     { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail' },
     { label: 'Users & access', icon: <GroupOutlined />, to: '/users' },
     { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit' },
@@ -58,6 +61,7 @@ export function App() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/:id" element={<AgentDetailPage />} />
           <Route path="/safety" element={<SafetyPage />} />
+          <Route path="/wiki" element={<WikiPage />} />
           <Route path="/mail" element={<MailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />

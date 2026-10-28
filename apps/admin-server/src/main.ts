@@ -67,6 +67,9 @@ async function main() {
         ...(config.WEB_UPSTREAM_URL
           ? [{ name: 'web', description: 'Internet access: web search and reading public pages (ADR-0031)', url: config.WEB_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-web-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
+        ...(config.WIKI_UPSTREAM_URL
+          ? [{ name: 'wiki', description: 'Central company wiki, governed by people: agents read, search and propose edits (ADR-0035)', url: config.WIKI_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-wiki-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          : []),
         ...(config.REDTEAM_UPSTREAM_URL
           ? [{ name: 'redteam', description: 'Red-team mock: CRM, tickets with prompt injections and a recording mail tool (no authentication)', url: config.REDTEAM_UPSTREAM_URL, headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
@@ -79,6 +82,9 @@ async function main() {
   }
   if (secrets && config.MCP_WEB_TOKEN && !(await secrets.exists('mcp-web-authorization').catch(() => true))) {
     await secrets.set('mcp-web-authorization', `Bearer ${config.MCP_WEB_TOKEN}`).catch((err) => logger.warn({ err: String(err) }, 'could not seed web secret'));
+  }
+  if (secrets && config.MCP_WIKI_TOKEN && !(await secrets.exists('mcp-wiki-authorization').catch(() => true))) {
+    await secrets.set('mcp-wiki-authorization', `Bearer ${config.MCP_WIKI_TOKEN}`).catch((err) => logger.warn({ err: String(err) }, 'could not seed wiki secret'));
   }
   killSwitch.onChange = () => void gateway.push();
   const safety = new SafetyRuleEngine(config.DATA_DIR, registry, runtime, temporal, gateway, killSwitch);

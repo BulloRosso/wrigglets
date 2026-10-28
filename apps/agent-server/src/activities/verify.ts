@@ -50,8 +50,8 @@ export function createVerify(deps: ActivityDeps) {
         failures.push(`Plan of another task was modified: ${f}`);
       } else if ((f.startsWith('.agent/summaries/') || f.startsWith('.agent/steps/')) && !path.posix.basename(f).startsWith(ownPrefix)) {
         failures.push(`Record of another task was modified: ${f}`);
-      } else if ((input.type === 'analysis' || input.type === 'report') && !f.startsWith('.agent/') && !f.startsWith('reports/')) {
-        failures.push(`${input.type} tasks may only write to reports/ (changed: ${f})`);
+      } else if ((input.type === 'analysis' || input.type === 'report') && !f.startsWith('.agent/') && !f.startsWith('reports/') && !f.startsWith('wiki/')) {
+        failures.push(`${input.type} tasks may only write to reports/ and the agent's own wiki/ (changed: ${f})`);
       }
     }
 

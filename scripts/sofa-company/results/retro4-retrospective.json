@@ -1,0 +1,39 @@
+{
+  "Cora": {
+    "agent": "Cora",
+    "agentId": "sofa-cora",
+    "taskId": "task-01M61FHHKBJ1YYCSX6Y4VKMYRS",
+    "title": "Write up the lesson of the autumn bundle",
+    "status": "completed",
+    "requestedBy": "Paula Meier",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Paula Meier",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "Read the company wiki index and the relevant protocol pages for handoffs, ordered delegation, capacity levers, and customer notices, then checked the local wiki lessons for the autumn bundle and North replan incidents. The plan now targets a company wiki proposal at `protocols/release-checklist.md` with the exact requested evidence and the checklist order: material first, capacity second, KPI afterwards. I also recorded the relevant local wiki pages in the plan so the later proposal can stay consistent with existing lessons. No files were changed beyond the plan and this summary.",
+        "tokens": 9011
+      },
+      {
+        "kind": "run",
+        "summary": "Re-read the company wiki pages named in the plan and the two local lesson pages before executing the approved change. Then I proposed `protocols/release-checklist.md` to the company wiki with the exact evidence requested: task `task-01M61DGAK6MTH21QM2205YRV0J` and KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`. The proposed page is a short checklist that states the release order: material first, capacity second, KPI afterwards. No repository files were changed beyond the required run summary.",
+        "tokens": 6083
+      }
+    ],
+    "summary": "Re-read the company wiki pages named in the plan and the two local lesson pages before executing the approved change. Then I proposed `protocols/release-checklist.md` to the company wiki with the exact evidence requested: task `task-01M61DGAK6MTH21QM2205YRV0J` and KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`. The proposed page is a short checklist that states the release order: material first, capacity second, KPI afterwards. No repository files were changed beyond the required run summary.",
+    "plan": "# Goal\nPropose a short company wiki checklist page at `protocols/release-checklist.md` that captures the lesson from the autumn bundle incident: before releasing work, check material first, then capacity, then the KPI afterwards.\n\n# Inputs\n- Requester wants the lesson written as a short checklist page and says not to repeat what the Company overview already says.\n- Exact evidence to use in the proposal: task `task-01M61DGAK6MTH21QM2205YRV0J`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`.\n- Relevant company wiki pages read: `index.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/capacity-levers.md`, `rules/customer-notices.md`.\n- Local wiki pages read: `wiki/lessons/autumn-bundle-late-even-with-capacity.md` and `wiki/lessons/north-replan-spindle-motor.md`.\n- Wiki: `lessons/autumn-bundle-late-even-with-capacity.md` shows the same incident pattern and reinforces that post-change KPI and material-shortage projection must be checked; `lessons/north-replan-spindle-motor.md` is unrelated but confirms existing lesson formatting.\n\n# Steps\n1. Draft a complete Markdown page for `protocols/release-checklist.md` that states the rule as a checklist, focused only on the release-order sequence: material, capacity, KPI afterwards.\n2. Keep the page short and company-wide, avoiding live state, dates, or any extra incident details beyond the approved evidence.\n3. Include the exact evidence string from the requester and a brief reason that this checklist prevents releasing work before material and capacity are verified.\n4. Propose the page to the company wiki in the execute step, using the exact requested path and evidence.\n\n# Outputs\n- `.agent/plans/task-01M61FHHKBJ1YYCSX6Y4VKMYRS.md`\n- `protocols/release-checklist.md` proposal in the company wiki during execute\n\n# Risks and open questions\n- The company wiki may already contain overlapping guidance; if so, the proposal must complement rather than duplicate it.\n- The requested evidence is specific and must be copied exactly; any mismatch would weaken the proposal.\n- The page should remain a stable company rule, so it must avoid copying live KPI snapshots or operational tactics from the incident report.\n",
+    "reports": [],
+    "tokens": 15094
+  }
+}

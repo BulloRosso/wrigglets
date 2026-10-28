@@ -1,0 +1,187 @@
+{
+  "Max": {
+    "agent": "Max",
+    "agentId": "sofa-max",
+    "taskId": "task-01M61F2Z4F1Y1A3S9ME185KG9C",
+    "title": "Retrospective: what should the whole company know?",
+    "status": "completed",
+    "requestedBy": "Paula Meier",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Paula Meier",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "Reviewed the company wiki index and the relevant governance pages, then checked the local task log for durable lessons. The shared wiki already covers the recurring whole-company rules and protocols from prior incidents, so there is nothing new enough to propose. The plan file records that no company wiki edit is justified for this retrospective. No files other than the plan and summary were changed.",
+        "tokens": 8310
+      },
+      {
+        "kind": "run",
+        "summary": "Re-read the company wiki pages named in the approved plan: index, company overview, handoffs, ordered delegation, customer notices, capacity levers, and suppliers. The pages already cover the stable company-wide rules and protocols that came out of prior incidents, so there was nothing appropriate to propose to the company wiki. No delegation was needed and no wiki edits were made. This run therefore completed as a no-op aside from the required summary.",
+        "tokens": 4277
+      }
+    ],
+    "summary": "Re-read the company wiki pages named in the approved plan: index, company overview, handoffs, ordered delegation, customer notices, capacity levers, and suppliers. The pages already cover the stable company-wide rules and protocols that came out of prior incidents, so there was nothing appropriate to propose to the company wiki. No delegation was needed and no wiki edits were made. This run therefore completed as a no-op aside from the required summary.",
+    "plan": "# Goal\nReview the local incident log and the company wiki, then decide whether there is any durable company-wide rule, protocol, or fact worth proposing to the company wiki. Result: no proposal is justified from the available evidence, so the approved outcome should be to propose nothing.\n\n# Inputs\n- Company wiki reviewed: `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `rules/capacity-levers.md`, `suppliers/overview.md`.\n- Local memory reviewed: `wiki/log.md`.\n- The company wiki already covers the durable material from prior incidents: ordered delegation, customer notice rules, and capacity-lever guidance.\n- The local log records past outcomes, but nothing there adds a new whole-company rule, protocol, or durable fact that is not already represented in the company wiki.\n- Wiki note: no local `wiki/lessons/`, `wiki/playbooks/`, `wiki/entities/`, or `wiki/colleagues/` pages exist yet.\n\n# Steps\n1. Confirm the company wiki pages that govern retrospective proposals and compare them with the local incident log.\n2. Verify whether any incident outcome is a durable whole-company rule, protocol, or fact that is not already present in the company wiki.\n3. Since no qualifying addition is found, do not prepare any company wiki proposal content.\n4. Write the final report to state explicitly that no proposal was made and why.\n\n# Outputs\n- `.agent/plans/task-01M61F2Z4F1Y1A3S9ME185KG9C.md`\n- `.agent/summaries/task-01M61F2Z4F1Y1A3S9ME185KG9C_plan_1.md`\n\n# Risks and open questions\n- Risk: a seemingly local incident detail could be misread as a company-wide rule; the reviewed company wiki already contains the broader durable rules, so no new proposal should be made.\n- Open question: none. Based on the reviewed evidence, there is nothing suitable to propose.\n",
+    "reports": [],
+    "tokens": 12587
+  },
+  "Cora": {
+    "agent": "Cora",
+    "agentId": "sofa-cora",
+    "taskId": "task-01M61F2Z99W31864VPNF10C7W0",
+    "title": "Retrospective: what should the whole company know?",
+    "status": "completed",
+    "requestedBy": "Paula Meier",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Paula Meier",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "Reviewed the local wiki log and lesson pages, then checked the relevant company wiki pages for overlap and scope. Only one durable company-wide learning appears to qualify: a general rule that planners must verify the post-change KPI and material-shortage projection after adding a large unplanned bundle, because queue health alone was not enough in repeated autumn-bundle incidents. The North spindle-motor lesson looks too specific to a temporary outage to justify a company-wide proposal. I wrote the plan with one intended company-wiki proposal and noted the two-proposal ceiling in case a seco…",
+        "tokens": 11306
+      },
+      {
+        "kind": "run",
+        "summary": "I re-read the local wiki pages named in the plan and confirmed the autumn-bundle incident is the only durable company-wide lesson worth proposing. I submitted one company-wiki proposal, `rules/post-change-verification.md`, with the general rule that planners must verify post-change KPI and material-shortage projections after large unplanned bundles. I did not submit the North spindle-motor lesson because it is specific to a temporary outage and does not look like a whole-company rule. The proposal is pending human review and has not changed the company wiki yet.",
+        "tokens": 6427
+      }
+    ],
+    "summary": "I re-read the local wiki pages named in the plan and confirmed the autumn-bundle incident is the only durable company-wide lesson worth proposing. I submitted one company-wiki proposal, `rules/post-change-verification.md`, with the general rule that planners must verify post-change KPI and material-shortage projections after large unplanned bundles. I did not submit the North spindle-motor lesson because it is specific to a temporary outage and does not look like a whole-company rule. The proposal is pending human review and has not changed the company wiki yet.",
+    "plan": "# Goal\nReview the incidents already captured in the local wiki and the company wiki, then decide whether any durable company-wide rule, protocol, or correction should be proposed to the company wiki. Based on the evidence, one proposal looks justified: a general planning rule that a healthy-looking queue and stock position do not guarantee an unplanned bundle will finish on time, so planners must verify the post-change KPI and shortage projection before treating the plan as sufficient.\n\n# Inputs\n- Local wiki review:\n  - `wiki/lessons/autumn-bundle-late-even-with-capacity.md`: repeated evidence that adding eight confirmed but unplanned autumn orders still left `lateOrders=8`, `sofasLate=970`, and introduced a `FOAM-HR35` shortage, even after replanning.\n  - `wiki/lessons/north-replan-spindle-motor.md`: North-specific outage lesson, but it is tied to a temporary machine event and looks too situation-specific for the company wiki.\n  - `wiki/log.md`: the same autumn bundle incident was confirmed multiple times, which makes the rule stable enough to share company-wide.\n- Company wiki review:\n  - `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `rules/capacity-levers.md`, `suppliers/overview.md`.\n  - The company wiki already covers capacity levers, delegation, and customer notices; it does not yet state the specific rule that post-change KPI and shortage projection must be checked after large unplanned bundles.\n\n# Steps\n1. Prepare at most one company-wiki proposal for a new rule page about large unplanned bundles: add a durable planning rule that queue health alone is not enough, and that planners must check the KPI and material-shortage projection after the change.\n2. Keep the North spindle-motor incident out of the proposal set, because it depends on a temporary outage and does not look like a whole-company rule.\n3. If, during execute, a second proposal still looks justified, limit it to a correction or clarification that is equally durable and company-wide; otherwise propose only the one planning rule.\n4. Use the local wiki evidence and the task ids from `wiki/log.md` as the support for the proposal; do not include live ERP state or tactics that belong only in the local wiki.\n\n# Outputs\n- `.agent/plans/task-01M61F2Z99W31864VPNF10C7W0.md`\n- `.agent/summaries/task-01M61F2Z99W31864VPNF10C7W0_plan_1.md`\n\n# Risks and open questions\n- The autumn-bundle rule may overlap with the existing company page on capacity levers, so the proposal must stay clearly framed as a general verification rule rather than a duplicate of the simulation advice.\n- The North outage lesson may still be useful locally but is probably not durable enough for the company wiki; if the execute step finds a better company-wide formulation, it should stay within the two-proposal limit.\n- No ERP or CRM changes are needed in this task; the evidence comes from the local wiki log and lessons, so the main risk is over-proposing rather than under-proposing.\n",
+    "reports": [],
+    "tokens": 17733
+  },
+  "Horst": {
+    "agent": "Horst",
+    "agentId": "sofa-horst",
+    "taskId": "task-01M61F2ZB747Y1CDJK728YA7MK",
+    "title": "Retrospective: what should the whole company know?",
+    "status": "completed",
+    "requestedBy": "Sabine Roth",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Sabine Roth",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "I reviewed the local wiki log and the company wiki pages that govern handoffs, ordered delegation, customer notices, capacity levers, and the company overview. The evidence from prior incidents does not expose a new whole-company rule or durable fact that is not already covered, and it does not justify proposing a correction. I therefore wrote a plan that records a no-proposal outcome rather than inventing a redundant wiki change. No files outside the required plan and summary artifacts were modified.",
+        "tokens": 8361
+      },
+      {
+        "kind": "run",
+        "summary": "I re-read the wiki pages named in the approved plan and confirmed that the durable rules relevant to the prior incidents are already present in the company wiki. No new whole-company rule, protocol, or durable fact was supported by the evidence, so I made no company-wiki proposal. I updated the local task log to record that outcome, as required by the standing instructions. No other files were changed.",
+        "tokens": 5750
+      }
+    ],
+    "summary": "I re-read the wiki pages named in the approved plan and confirmed that the durable rules relevant to the prior incidents are already present in the company wiki. No new whole-company rule, protocol, or durable fact was supported by the evidence, so I made no company-wiki proposal. I updated the local task log to record that outcome, as required by the standing instructions. No other files were changed.",
+    "plan": "# Goal\nDecide whether any incident knowledge from the local wiki/log and the company wiki is durable enough to propose to the company wiki. Limit the outcome to at most two proposals; if nothing new is supported, propose nothing.\n\n# Inputs\n- Local wiki reviewed: `wiki/index.md` and `wiki/log.md`.\n- Company wiki reviewed: `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `rules/capacity-levers.md`.\n- Local log evidence only covers prior handling of North replanning, the Herbstzauber demand surge, and a wiki lint pass.\n- The company wiki already states the durable rules that those incidents would imply: customer notices must use ERP expected dates, delegation chains must be ordered, capacity levers should be chosen by KPI, and the company overview already covers factories, products, priorities, and the 3-day delivery convention.\n\n# Steps\n1. Compare the local log entries against the reviewed company wiki pages and identify whether any new whole-company rule, protocol, or durable fact is missing.\n2. Reject any candidate that would only restate an existing company wiki page, that would encode live state, or that would only describe one agent's tactic.\n3. Since no additional durable company-wide fact is supported, prepare no company-wiki proposal.\n4. Finish with the required report-only output for this task: no wiki edit proposals were made.\n\n# Outputs\n- `.agent/plans/task-01M61F2ZB747Y1CDJK728YA7MK.md`\n- `.agent/summaries/task-01M61F2ZB747Y1CDJK728YA7MK_plan_1.md`\n\n# Risks and open questions\n- The local evidence is sparse and already overlaps with existing company wiki content, so there is a low risk of missing a subtle correction that is not represented in the reviewed pages.\n- No company-wiki proposal is justified from the available evidence; if a later review uncovers an actual contradiction, it would need a separate task.\n",
+    "reports": [],
+    "tokens": 14111
+  },
+  "Tom": {
+    "agent": "Tom",
+    "agentId": "sofa-tom",
+    "taskId": "task-01M61F2ZGGHZ93YJNAXZX8D8K9",
+    "title": "Retrospective: what should the whole company know?",
+    "status": "completed",
+    "requestedBy": "Stefan Lang",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Stefan Lang",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "I reviewed the local warehouse incident pages and the company wiki pages that govern company-wide knowledge, handoffs, ordered delegation, customer notices, and the company overview. The incident evidence supports the existing warehouse-local lesson about damaged-lot disposition, but it does not justify a new whole-company rule or correction. The plan therefore leaves room for up to two proposals only if later evidence proves a durable company-wide change; otherwise, the correct outcome is to propose nothing.",
+        "tokens": 8139
+      },
+      {
+        "kind": "run",
+        "summary": "I re-read the local warehouse incident pages and the relevant company wiki pages before acting. The evidence still points only to the existing warehouse-local disposition rule and not to any durable whole-company rule, protocol, or correction. I therefore made no company wiki proposals, and no wiki content needed to change. The approved plan was executed as a no-op beyond this verification and recordkeeping.",
+        "tokens": 4947
+      }
+    ],
+    "summary": "I re-read the local warehouse incident pages and the relevant company wiki pages before acting. The evidence still points only to the existing warehouse-local disposition rule and not to any durable whole-company rule, protocol, or correction. I therefore made no company wiki proposals, and no wiki content needed to change. The approved plan was executed as a no-op beyond this verification and recordkeeping.",
+    "plan": "# Goal\nReview the warehouse incident history and the company wiki, then decide whether there is any company-wide rule, protocol, durable fact, or correction worth proposing. At most two proposals are allowed; if nothing is company-wide and durable, propose nothing.\n\n# Inputs\n- Local wiki pages reviewed: `wiki/playbooks/storm-damage.md`, `wiki/lessons/warehouse-damage-disposition.md`, `wiki/log.md`, and `wiki/index.md`.\n- Company wiki pages reviewed: `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, and `rules/customer-notices.md`.\n- The reviewed incident is warehouse-specific: storm damage to quarantined fabric lots, with a disposition rule already captured in the local wiki.\n- The company wiki already covers general handoff rules, ordered delegation, customer notices, and company overview facts; nothing reviewed yet appears to need a company-wide correction.\n- Wiki: reviewed `wiki/playbooks/storm-damage.md` for the incident sequence, `wiki/lessons/warehouse-damage-disposition.md` for the split write-off/release rule, `wiki/log.md` for the prior incident follow-up, and company wiki pages `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`; the takeaway is that the evidence supports a warehouse-local lesson, not a new whole-company rule.\n\n# Steps\n1. Compare the incident pages against the company wiki and check whether any fact is truly durable, company-wide, and not already covered.\n2. If a qualifying company-wide rule or correction exists, draft at most two complete wiki page texts for proposal, each with reason and evidence from the incident record.\n3. Otherwise, make no proposal and record that the evidence does not justify a company-wide change.\n\n# Outputs\n- `.agent/plans/task-01M61F2ZGGHZ93YJNAXZX8D8K9.md`\n- `.agent/summaries/task-01M61F2ZGGHZ93YJNAXZX8D8K9_plan_1.md`\n\n# Risks and open questions\n- The incident evidence may be too specific to justify a company-wide wiki change; if so, the correct outcome is to propose nothing.\n- If a reviewer expects a broader protocol for similar incidents, that would need stronger evidence than the local warehouse lesson and log provide.\n",
+    "reports": [],
+    "tokens": 13086
+  },
+  "Lara": {
+    "agent": "Lara",
+    "agentId": "sofa-lara",
+    "taskId": "task-01M61F2ZQ9669A5WB85PW35ASX",
+    "title": "Retrospective: what should the whole company know?",
+    "status": "completed",
+    "requestedBy": "Stefan Lang",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Stefan Lang",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "I reviewed the local wiki, the company wiki, and the incident log for durable, company-wide knowledge worth proposing. The existing company pages already cover the relevant procurement, delegation, notice, and capacity rules, and the local supplier pages already hold the stable supplier facts from past incidents. I found no new rule, protocol, or durable fact that should be proposed to the company wiki. The plan therefore records a no-proposal outcome and points to the pages reviewed.",
+        "tokens": 9786
+      },
+      {
+        "kind": "run",
+        "summary": "I re-read the local wiki pages named in the plan and the corresponding company wiki pages before acting. The supplier entity pages already capture the stable facts from the incidents, and the company wiki already contains the relevant company-wide rules and protocols. I found no additional durable rule, protocol, or factual correction that was both company-wide and independently supportable. No company wiki proposal was made.",
+        "tokens": 6365
+      }
+    ],
+    "summary": "I re-read the local wiki pages named in the plan and the corresponding company wiki pages before acting. The supplier entity pages already capture the stable facts from the incidents, and the company wiki already contains the relevant company-wide rules and protocols. I found no additional durable rule, protocol, or factual correction that was both company-wide and independently supportable. No company wiki proposal was made.",
+    "plan": "# Goal\nReview the local wiki, company wiki, and log for durable facts or rules that should be shared company-wide. At most two company-wiki proposals are allowed, but only if they are supported by stable evidence and are not live state or one-off tactics.\n\n# Inputs\n- Local wiki index and pages reviewed: `wiki/index.md`, `wiki/log.md`, `wiki/entities/s-foamtec.md`, `wiki/entities/s-baltic.md`, `wiki/entities/s-silesia.md`.\n- Company wiki pages reviewed: `index.md`, `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `rules/capacity-levers.md`, `suppliers/overview.md`.\n- The local supplier pages already contain durable facts for `S-FOAMTEC`, `S-BALTIC`, and `S-SILESIA`, with evidence tied to past tasks.\n- The company wiki already covers the general rules and protocols relevant to procurement, delegation, customer notices, and capacity choices.\n\n# Steps\n1. Re-check the local wiki and company wiki for any durable fact, rule, or protocol gap that is not already covered.\n2. Compare the existing pages against the incidents recorded in `wiki/log.md` and the supplier entity pages.\n3. Decide whether any company-wide statement is both new and stable enough to propose; if not, propose nothing.\n4. If no proposal qualifies, prepare a final response that says no company-wiki edit is warranted.\n\n# Outputs\n- `.agent/plans/task-01M61F2ZQ9669A5WB85PW35ASX.md`\n- `.agent/summaries/task-01M61F2ZQ9669A5WB85PW35ASX_plan_1.md`\n\n# Risks and open questions\n- The available evidence is limited to durable supplier facts already recorded in the local wiki; there may be no new company-wide fact to add.\n- The company wiki may already capture the applicable rules, leaving nothing appropriate to propose.\n- No live ERP/CRM state was needed for this retrospective task, so there is no KPI-based change to cite for a proposal.\n",
+    "reports": [],
+    "tokens": 16151
+  }
+}

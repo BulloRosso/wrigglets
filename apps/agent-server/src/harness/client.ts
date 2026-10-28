@@ -16,6 +16,8 @@ export interface HarnessTurnResult {
   cost?: number;
   toolCalls: Array<{ tool: string; status: 'ok' | 'error'; title?: string }>;
   filesTouched: string[];
+  /** Wiki pages (`wiki/…`) the agent opened with the read tool in this step. */
+  wikiReads?: string[];
   /** Tasks delegated via the gateway tool `a2a__send_task` (ADR-0023). */
   delegations: Array<{ agentId: string; taskId: string }>;
   error?: { kind: 'aborted' | 'provider' | 'permission' | 'unknown'; message: string };
@@ -111,6 +113,7 @@ export function summarizeTurn(turn: HarnessMessage[], workspaceDir: string): Har
   let error: HarnessTurnResult['error'];
   const toolCalls: HarnessTurnResult['toolCalls'] = [];
   const files = new Set<string>();
+  const wikiReads = new Set<string>();
   const delegations: HarnessTurnResult['delegations'] = [];
   const rel = (p: string) => {
     const r = path.posix.isAbsolute(p) ? path.posix.relative(workspaceDir, p) : p;
@@ -145,6 +148,11 @@ export function summarizeTurn(turn: HarnessMessage[], workspaceDir: string): Har
             /* tool reported an error text */
           }
         }
+        if (tp.tool === 'read' && st.status === 'completed') {
+          const p = (st.input.filePath ?? st.input.path) as string | undefined;
+          const r = p ? rel(p) : undefined;
+          if (r?.startsWith('wiki/')) wikiReads.add(r);
+        }
         if (FILE_TOOLS.has(tp.tool) && st.status === 'completed') {
           const p = (st.input.filePath ?? st.input.path) as string | undefined;
           const r = p ? rel(p) : undefined;
@@ -158,7 +166,7 @@ export function summarizeTurn(turn: HarnessMessage[], workspaceDir: string): Har
     }
   }
   tokens.total = tokens.input + tokens.output + tokens.reasoning;
-  return { finalText, tokens, cost: cost || undefined, toolCalls, filesTouched: [...files], delegations, error };
+  return { finalText, tokens, cost: cost || undefined, toolCalls, filesTouched: [...files], wikiReads: [...wikiReads], delegations, error };
 }
 
 function classifyError(e: NonNullable<AssistantMessage['error']>): HarnessTurnResult['error'] {

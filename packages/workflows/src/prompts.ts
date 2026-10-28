@@ -57,6 +57,9 @@ export function runPrompt(taskId: string, input: TaskInput, createdAt: string, a
         'written for the requester. Do not only describe what you did or where the result is.',
     );
   }
+  lines.push(
+    'If the plan names delegations to colleagues (a2a__send_task), send ALL of them in this step, now. A task that depends on the result of another goes in the same step with `after` set to the taskId(s) it depends on: the platform starts it only when they have completed and passes their results on. A follow-up that is not sent in this step is not done.',
+  );
   lines.push('Only change files that the plan requires. Never touch `.git`, `AGENTS.md` or `opencode.json`.');
   return lines.join('\n');
 }
@@ -87,6 +90,10 @@ export function integratePrompt(
   for (const r of results) {
     lines.push('', `### ${r.agentId} — task ${r.taskId} (${r.state})`, r.result.slice(0, 8000));
   }
-  lines.push('', 'Integrate these results into your deliverables. If a delegated task did not complete, say so explicitly.');
+  lines.push(
+    '',
+    `Check the approved plan (\`${workspacePaths.plan(taskId)}\`) against the delegations that exist so far. If the plan names a delegation to a colleague that has not been sent, send it now with a2a__send_task (with \`after\` if it depends on a task that is still running), and say so in your summary. Finish only when everything the plan names has been sent and its results are integrated.`,
+  );
+  lines.push('Integrate these results into your deliverables. If a delegated task did not complete, say so explicitly.');
   return lines.join('\n');
 }

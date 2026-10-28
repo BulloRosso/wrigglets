@@ -1,0 +1,147 @@
+{
+  "scenario": "supplier-beams",
+  "n": 1,
+  "title": "A supplier cannot deliver the wood beams for the frames",
+  "request": {
+    "by": "Stefan Lang",
+    "to": "Lara",
+    "title": "Nordholz cannot deliver pine beams",
+    "instructions": "Nordholz just told us that they cannot deliver any pine beams before 2026-11-30 (kiln damage), including the two open purchase orders. Our beam stock will not last. Find out how bad it is, secure alternative supply and make sure frame production keeps running. Ask Cora to re-plan production if the new supply does not close the gap, and Horst to take care of customers whose delivery promise is at risk."
+  },
+  "timedOut": false,
+  "attempts": 1,
+  "wiki": {
+    "Lara": [
+      {
+        "path": "wiki/entities/s-baltic.md",
+        "text": "# S-BALTIC\n\nSupplier facts for `BEAM-PINE-80` procurement.\n\n- Supplies `BEAM-PINE-80`.\n- Lead time: 6 workdays.\n- Express delivery: 4 workdays.\n- Unit price: 4.6 EUR.\n- Express surcharge: 0.3 EUR per unit.\n- Minimum order quantity: 1000.\n- Maximum order quantity: 6000.\n- Rating: A.\n\nEvidence: task `task-01M61ERCRH2T2GCCTCKNAWE1MC`, ERP supplier lookup and successful purchase order `PO-4431`; KPI `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13` -> `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`.\n"
+      },
+      {
+        "path": "wiki/entities/s-foamtec.md",
+        "text": "# S-FOAMTEC\n\nSupplier facts for `FOAM-HR35` procurement.\n\n- Supplies `FOAM-HR35`.\n- Lead time: 5 workdays.\n- Unit price: 9.5 EUR.\n- Minimum order quantity: 500.\n- Maximum order quantity: 20000.\n- Express delivery: not offered.\n\nEvidence: task `task-a2a-23a37b3c-8c67-4bf8-a726-29fe19dfeea2`, ERP supplier lookup and successful purchase order `PO-4430`.\n"
+      },
+      {
+        "path": "wiki/entities/s-silesia.md",
+        "text": "# S-SILESIA\n\nSupplier facts for `BEAM-PINE-80` procurement.\n\n- Supplies `BEAM-PINE-80`.\n- Lead time: 10 workdays.\n- Unit price: 4.35 EUR.\n- Minimum order quantity: 500.\n- Maximum order quantity: 3000.\n- Express delivery: not offered.\n- Rating: B.\n\nEvidence: task `task-01M61ERCRH2T2GCCTCKNAWE1MC`, ERP supplier lookup and successful purchase order `PO-4430`; KPI `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13` -> `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`.\n"
+      },
+      {
+        "path": "wiki/index.md",
+        "text": "- [Log](log.md): append-only record of what we learned during tasks.\n- [S-FOAMTEC](entities/s-foamtec.md): durable supplier facts for FOAM-HR35 procurement.\n- [S-BALTIC](entities/s-baltic.md): durable supplier facts for `BEAM-PINE-80` procurement.\n- [S-SILESIA](entities/s-silesia.md): durable supplier facts for `BEAM-PINE-80` procurement.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "## [2026-10-28] task task-a2a-d0cc57ea-8b6c-4d28-a0cf-af71e1acfefd | Order express spindle motor for N-CUT-1\nPlaced an express purchase order for `SP-SPINDLE-220` from `S-REITER` to support the N-CUT-1 repair.\nThe live ERP KPI improved from `lateOrders=9`, `sofasLate=860`, `lateOrdersCustomerNotInformed=9`, `costOfMeasuresEur=0` to `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5`, `costOfMeasuresEur=9650`.\n# Log\n\n## [2026-10-28] task task-01M61ERCRH2T2GCCTCKNAWE1MC | Nordholz cannot deliver pine beams\nNordholz could not deliver `BEAM-PINE-80` before `2026-11-30`, so I secured replacement supply from `S-BALTIC` and `S-SILESIA`.\nThe live ERP KPI improved from `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13`, `costOfMeasuresEur=0` to `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, `costOfMeasuresEur=42450`.\n\n## [2026-10-28] task task-a2a-23a37b3c-8c67-4bf8-a726-29fe19dfeea2 | Secure material if Cora shows a shortage risk\nConfirmed a live `FOAM-HR35` shortage risk from the autumn-order plan and secured one purchase order from `S-FOAMTEC` for `1410` units. The ERP returned `PO-4430` with ETA `2026-10-12`; the live KPI still shows the original shortage state until execution is reflected in the simulation.\n\n## [2026-10-28] task task-a2a-b943ed32-3bc1-4242-a823-41b01590ff28 | Secure material only if replanning exposes a shortage\nReviewed the live ERP projections for `BEAM-PINE-80`, `FAB-OAT-01`, and `FAB-ANTH-02` and found no shortage within 70 workdays, so no purchase order was placed.\n\n## [2026-10-28] task task-a2a-b4c16eb6-adeb-46c9-8374-9387e770e33c | Buy replacement fabric after storm damage\nPlaced an express purchase order for `FAB-ANTH-02` from `S-TUCHWERK` to replace the storm-damaged fabric hall stock.\nThe live ERP KPI improved from `lateOrders=2`, `sofasLate=120`, `lateOrdersCustomerNotInformed=2`, `costOfMeasuresEur=0` to `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, `costOfMeasuresEur=87720`.\n"
+      }
+    ]
+  },
+  "guardStops": [],
+  "kpi": {
+    "baseline": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {},
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterIncident": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 13,
+      "lateOrdersCustomerNotInformed": 13,
+      "sofasLate": 1260,
+      "totalLateDays": 440,
+      "materialShortages": {
+        "BEAM-PINE-80": "production held back from 2026-10-15"
+      },
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterMitigation": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {},
+      "costOfMeasuresEur": 42450,
+      "writes": 2
+    }
+  },
+  "tasks": [
+    {
+      "agent": "Lara",
+      "agentId": "sofa-lara",
+      "taskId": "task-01M61ERCRH2T2GCCTCKNAWE1MC",
+      "title": "Nordholz cannot deliver pine beams",
+      "status": "completed",
+      "requestedBy": "Stefan Lang",
+      "trigger": {
+        "kind": "user"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Stefan Lang",
+          "comment": "Approved. Keep Nordholz's postponed orders open, we will not cancel them.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "I checked the live ERP and confirmed the Nordholz beam disruption is already causing a `BEAM-PINE-80` shortage from `2026-10-15`, with `13` late orders and `1260` sofas late. I also read the relevant company wiki pages for handoffs, ordered delegation, customer notices, and supplier rules. Simulations showed that replacing the missing beams with one express order from Baltic and one standard order from Silesia clears the shortage and improves the KPI to zero late orders and zero late sofas. The plan now names those two purchase orders and explicitly avoids unnecessary follow-up delegation unl…",
+          "tokens": 24073
+        },
+        {
+          "kind": "run",
+          "summary": "Executed the approved procurement plan for the Nordholz beam disruption. I created purchase order `PO-4431` from `S-BALTIC` for `6000` `BEAM-PINE-80` with express delivery and purchase order `PO-4430` from `S-SILESIA` for `3000` units, matching the plan but in the reverse order returned by the ERP. The post-change ERP overview shows the shortage cleared and the KPI improved from `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13` to `0`, `0`, and `0`, with `costOfMeasuresEur=42450`. I then updated the local wiki with durable supplier facts for `S-BALTIC` and `S-SILESIA` and …",
+          "tokens": 32439
+        }
+      ],
+      "summary": "Executed the approved procurement plan for the Nordholz beam disruption. I created purchase order `PO-4431` from `S-BALTIC` for `6000` `BEAM-PINE-80` with express delivery and purchase order `PO-4430` from `S-SILESIA` for `3000` units, matching the plan but in the reverse order returned by the ERP. The post-change ERP overview shows the shortage cleared and the KPI improved from `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13` to `0`, `0`, and `0`, with `costOfMeasuresEur=42450`. I then updated the local wiki with durable supplier facts for `S-BALTIC` and `S-SILESIA` and …",
+      "plan": "# Goal\nSecure replacement supply for `BEAM-PINE-80` after Nordholz's delivery stop, so frame production keeps running and the current material shortage is removed. The live ERP shows the shortage starts on `2026-10-15`, `13` late orders, and `1260` sofas late.\n\n# Inputs\n- ERP overview (`2026-10-05`): `lateOrders=13`, `sofasLate=1260`, `lateOrdersCustomerNotInformed=13`, `materialShortages.BEAM-PINE-80=production held back from 2026-10-15`.\n- Inventory: `5200` usable `BEAM-PINE-80` on hand.\n- Open Nordholz purchase orders: `PO-4411` for `8000` pcs due `2026-11-30` and `PO-4418` for `7000` pcs due `2026-12-14`, both delayed because Nordholz cannot deliver before `2026-11-30`.\n- BOM facts: `LUND` uses `6` beams, `OSLO` uses `8`, `BERGEN` uses `12`.\n- Supplier options for `BEAM-PINE-80`: `S-BALTIC` lead `6` workdays, min `1000`, max `6000`, express available (`4` workdays, `+0.3`/unit); `S-SILESIA` lead `10` workdays, min `500`, max `3000`, no express; Nordholz is unavailable.\n- What-if result: `create_purchase_order` for `S-BALTIC` `6000` pcs express plus `S-SILESIA` `3000` pcs standard changes KPI from `lateOrders=13`, `sofasLate=1260`, `lateWithoutCustomerNotice=13`, `materialShortages={BEAM-PINE-80}` to `lateOrders=0`, `sofasLate=0`, `lateWithoutCustomerNotice=0`, `materialShortages={}`, at `costOfMeasuresEur=42450`.\n\n# Steps\n1. Create purchase order `create_purchase_order` for `supplierId=S-BALTIC`, `sku=BEAM-PINE-80`, `quantity=6000`, `express=true`, `note=\"Bridge pine beam shortage caused by Nordholz delay until 2026-11-30\"`.\n2. Create purchase order `create_purchase_order` for `supplierId=S-SILESIA`, `sku=BEAM-PINE-80`, `quantity=3000`, `note=\"Bridge pine beam shortage caused by Nordholz delay until 2026-11-30\"`.\n3. Do not delegate to Cora or Horst in this run, because the simulated procurement package removes the beam shortage and clears the late-order KPI; only if execution diverges will follow-up work be needed.\n\n# Outputs\n- New purchase orders in ERP with the supplier, quantity, ETA and cost recorded at:\n  - `PO-` ids returned by the two `create_purchase_order` calls.\n- Updated ERP KPI expected after execution: `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`, `materialShortages={}`, `costOfMeasuresEur=42450`.\n- Report file: `.agent/summaries/task-01M61ERCRH2T2GCCTCKNAWE1MC_plan_1.md`.\n\n# Risks and open questions\n- The plan assumes the live ERP still accepts both suppliers at the simulated lead times and quantities; if either order fails, the shortage may remain and a replanning step may be required.\n- The delayed Nordholz POs stay open in this plan; cancel them only if execution or later planning makes that necessary.\n- Wiki: company wiki `index.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`, `suppliers/overview.md` were read and used for the request format, dependency ordering, customer-notice rule, and supplier constraints.\n",
+      "reports": [],
+      "tokens": 56512
+    }
+  ],
+  "changes": [
+    {
+      "at": "2026-10-28T14:33:51.338Z",
+      "tool": "erp.create_purchase_order",
+      "args": {
+        "supplierId": "S-SILESIA",
+        "sku": "BEAM-PINE-80",
+        "quantity": 3000,
+        "note": "Bridge pine beam shortage caused by Nordholz delay until 2026-11-30"
+      },
+      "result": "PO-4430"
+    },
+    {
+      "at": "2026-10-28T14:33:51.343Z",
+      "tool": "erp.create_purchase_order",
+      "args": {
+        "supplierId": "S-BALTIC",
+        "sku": "BEAM-PINE-80",
+        "quantity": 6000,
+        "express": true,
+        "note": "Bridge pine beam shortage caused by Nordholz delay until 2026-11-30"
+      },
+      "result": "PO-4431"
+    }
+  ],
+  "customerNotices": [],
+  "primaryTaskId": "task-01M61ERCRH2T2GCCTCKNAWE1MC"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "sofa-company-example",
+  "private": true,
+  "type": "module",
+  "description": "Runner of the sofa-company example (docs/agentic-mitigations.md). Not part of the pnpm workspace.",
+  "dependencies": { "playwright-core": "1.56.1" }
+}

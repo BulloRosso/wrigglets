@@ -7,6 +7,7 @@
 #   mcp-gateway    – MCP gateway (tools, kill switch, A2A broker)
 #   mcp-demo       – example upstream MCP server
 #   mcp-web        – internet access (web search, fetch) as upstream MCP server
+#   mcp-wiki       – central company wiki: agents read and propose, people decide (ADR-0035)
 # The AI model is LiteLLM (official image, see docker-compose.yml) → OpenAI.
 #
 # All versions are pinned (spec §13 supply chain).
@@ -33,6 +34,7 @@ COPY apps/oauth-web/package.json apps/oauth-web/
 COPY apps/mcp-gateway/package.json apps/mcp-gateway/
 COPY apps/mcp-demo/package.json apps/mcp-demo/
 COPY apps/mcp-web/package.json apps/mcp-web/
+COPY apps/mcp-wiki/package.json apps/mcp-wiki/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/codec/package.json packages/codec/
@@ -51,7 +53,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/oauth-server deploy --legacy --prod /out/oauth && \
     pnpm --filter @cw/mcp-gateway deploy --legacy --prod /out/mcp-gateway && \
     pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo && \
-    pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web
+    pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web && \
+    pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway
@@ -82,6 +85,17 @@ COPY --from=build /out/mcp-web ./
 ENV NODE_ENV=production PORT=7600
 USER node
 EXPOSE 7600
+CMD ["node", "dist/main.js"]
+
+# ---------------------------------------------------------------- mcp-wiki (central company wiki, ADR-0035)
+FROM ${NODE_IMAGE} AS mcp-wiki
+WORKDIR /app
+COPY --from=build /out/mcp-wiki ./
+ENV NODE_ENV=production PORT=7700 DATA_DIR=/data
+RUN mkdir -p /data && chown node:node /data
+USER node
+VOLUME ["/data"]
+EXPOSE 7700
 CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- oauth

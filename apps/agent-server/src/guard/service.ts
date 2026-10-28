@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Client } from '@temporalio/client';
-import { agentWorkflowId, DEFAULT_GUARD_CONFIG, guardConfig, type GuardConfig, type GuardVerdict, type Principal, type SecurityWarning } from '@cw/shared';
+import { agentWorkflowId, DEFAULT_GUARD_CONFIG, guardConfig, toolAllowed, type GuardConfig, type GuardVerdict, type Principal, type SecurityWarning } from '@cw/shared';
 import { cancelUpdate, securityWarningSignal } from '@cw/workflows/messages';
 import { ulid } from 'ulid';
 import type { AppAuditLog } from '../api/appAudit.js';
@@ -35,7 +35,11 @@ export interface GuardDeps {
   config: Pick<Config, 'AGENT_ID' | 'CONTROL_PLANE_URL' | 'CONTROL_PLANE_TOKEN' | 'AI_GATEWAY_BASE_URL' | 'AI_GATEWAY_API_KEY' | 'AI_GATEWAY_MODEL' | 'AI_GATEWAY_SMALL_MODEL'>;
   harness: Pick<HarnessClient, 'messages' | 'abort'>;
   /** Which task a harness session is working for right now. */
-  stepOf: (sessionId: string) => { taskId: string; stepId: string } | undefined;
+  stepOf: (sessionId: string) => { taskId: string; stepId: string; kind?: string } | undefined;
+  /** The plan a person approved for this task, if any (read from the workspace). */
+  planOf?: (taskId: string) => Promise<string | undefined>;
+  /** Names (as the harness sees them) of the tools their MCP server declares read-only. */
+  readOnlyTools?: () => Promise<Set<string>>;
   temporal: () => Client | undefined;
   audit: Pick<AppAuditLog, 'write'>;
   fetch?: typeof fetch;
@@ -103,7 +107,9 @@ export class GuardService {
     this.seen.set(req.sessionID, (this.seen.get(req.sessionID) ?? 0) + 1);
     if (this.seen.size > 500) this.seen.delete(this.seen.keys().next().value!);
     const cfg = await this.getConfig();
-    if (!cfg.enabled || cfg.skipTools.includes(req.tool)) return { decision: 'allow' };
+    // skipTools entries are tool names; `*` matches any characters (e.g. `gateway_erp__get_*`)
+    if (!cfg.enabled || toolAllowed(cfg.skipTools, req.tool)) return { decision: 'allow' };
+    if (cfg.skipReadOnly && (await this.deps.readOnlyTools?.().catch(() => undefined))?.has(req.tool)) return { decision: 'allow' };
     const already = this.halted.get(req.sessionID);
     if (already) return { decision: 'block', message: blockMessage(already.reason) };
 
@@ -111,7 +117,10 @@ export class GuardService {
     const model = cfg.model || this.deps.config.AI_GATEWAY_SMALL_MODEL || this.deps.config.AI_GATEWAY_MODEL;
     try {
       const history = await this.deps.harness.messages(req.sessionID).catch(() => []);
-      verdict = await this.ask(model, buildGuardPrompt(cfg, history, { callID: req.callID, tool: req.tool, args: req.args }).messages);
+      const step = this.deps.stepOf(req.sessionID);
+      // the approved plan is context for steps that carry it out; while planning it is still being written
+      const plan = step && step.kind !== 'plan' ? await this.deps.planOf?.(step.taskId).catch(() => undefined) : undefined;
+      verdict = await this.ask(model, buildGuardPrompt(cfg, history, { callID: req.callID, tool: req.tool, args: req.args }, undefined, plan).messages);
     } catch (err) {
       logger.warn({ tool: req.tool, err: String(err) }, 'guard evaluation failed');
       await this.deps.audit

@@ -105,10 +105,12 @@ export function createRunAgentStep(deps: ActivityDeps) {
     let turn;
     const guardedBefore = deps.guard?.evaluationsOf(sessionId) ?? 0;
     // `interactive`: a signed-in user is behind the task (not a schedule or A2A delegation) — decides Entra OBO vs. agent-only
-    await deps.gateway.setStepContext({ taskId: input.taskId, requestedBy: input.requestedBy, interactive: input.meta.trigger === 'user' });
+    await deps.gateway.setStepContext({ taskId: input.taskId, requestedBy: input.requestedBy, interactive: input.meta.trigger === 'user', phase: input.kind });
     try {
       heartbeat();
-      turn = await harness.prompt({ sessionId, text: `${preamble}${input.prompt}${footer}`, signal: ctx.cancellationSignal });
+      const wiki = await wikiBrief(config.workspaceDir, input.kind);
+      turn = await harness.prompt({ sessionId, text: `${wiki}${preamble}${input.prompt}${footer}`, signal: ctx.cancellationSignal });
+      if (wiki) log.info({ stepKind: input.kind, wikiReads: turn.wikiReads?.length ?? 0, pages: turn.wikiReads }, 'wiki use');
     } catch (err) {
       stoppedByGuard();
       if (ctx.cancellationSignal.aborted) throw new CancelledFailure('Step cancelled');
@@ -206,6 +208,27 @@ export function createRunAgentStep(deps: ActivityDeps) {
     }
     return { ...result, commit };
   };
+}
+
+const WIKI_INDEX_MAX = 6_000;
+
+/**
+ * The agent's wiki is its memory between tasks (wiki/index.md, kept by the agent). The platform puts the index in front of
+ * every plan and execute step, so that using the memory does not depend on the agent remembering to open it.
+ */
+async function wikiBrief(workspaceDir: string, kind: string): Promise<string> {
+  if (kind === 'fix') return '';
+  const index = await readFile(path.join(workspaceDir, 'wiki', 'index.md'), 'utf8').catch(() => '');
+  const head = '## Your wiki: memory from your earlier tasks';
+  if (!index.trim()) {
+    return [head, 'You have no wiki yet. Create wiki/index.md and wiki/log.md as described in your standing instructions when you finish this task.', '', ''].join('\n');
+  }
+  const clipped = index.length > WIKI_INDEX_MAX ? `${index.slice(0, WIKI_INDEX_MAX)}\n[… index shortened]` : index;
+  const ask =
+    kind === 'plan'
+      ? 'Before you plan, open the pages that fit this task (read tool) and use what they say. Add a line "Wiki: <pages you read and what you took from them>" to the plan, or "Wiki: none fit (index reviewed)". If a page contradicts what the tools show, trust the tools and correct the page in the execute step.'
+      : 'Before you act, re-read the wiki pages named in the plan. After the result is known, update the wiki as your standing instructions describe.';
+  return [head, 'Index (wiki/index.md):', '', clipped, '', ask, '', ''].join('\n');
 }
 
 function contextPreamble(input: RunAgentStepInput): string {

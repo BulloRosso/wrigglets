@@ -23,13 +23,26 @@ export class GatewayClient {
   }
 
   /** What the agent works on right now (steps are serialized per agent). Best effort. */
-  async setStepContext(ctx: { taskId: string; requestedBy?: Identity; interactive?: boolean } | undefined) {
+  async setStepContext(ctx: { taskId: string; requestedBy?: Identity; interactive?: boolean; phase?: string } | undefined) {
     if (!this.enabled) return;
     try {
       await this.call('PUT', '/step-context', ctx ?? {});
     } catch (err) {
       logger.debug({ err: String(err) }, 'gateway step context not updated');
     }
+  }
+
+  private readOnly?: { at: number; names: Set<string> };
+
+  /** Tools (as the harness names them: `gateway_<upstream>__<tool>`) that their MCP server declares read-only. Cached for a minute. */
+  async readOnlyTools(): Promise<Set<string>> {
+    if (this.readOnly && Date.now() - this.readOnly.at < 60_000) return this.readOnly.names;
+    if (!this.enabled) return new Set();
+    const res = await this.call('GET', '/tools/read-only');
+    if (!res.ok) throw new Error(`gateway returned ${res.status}`);
+    const names = new Set(((await res.json()) as { tools: string[] }).tools.map((t) => `gateway_${t}`));
+    this.readOnly = { at: Date.now(), names };
+    return names;
   }
 
   async delegationStatus(delegations: Array<{ agentId: string; taskId: string }>): Promise<DelegationStatus[]> {

@@ -1,0 +1,255 @@
+{
+  "scenario": "sick-leave",
+  "n": 4,
+  "title": "Two workers of one factory call in sick for two weeks",
+  "request": {
+    "by": "Paula Meier",
+    "to": "Max",
+    "title": "Werk Süd: both workers on sick leave 12-23 October",
+    "instructions": "Lena Hartmann and Tobias Klein, the two workers of Werk Süd, are on sick leave from 2026-10-12 to 2026-10-23. Keep the orders of Werk Süd on time: check the staffing options (temporary workers, overtime) and ask Cora to adjust the schedule, and Horst to inform customers if something cannot be saved."
+  },
+  "timedOut": false,
+  "attempts": 2,
+  "wiki": {
+    "Max": [
+      {
+        "path": "wiki/index.md",
+        "text": "# Wiki Index\n\n- [Task Log](log.md): append-only session log for incident learnings and outcomes.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "# Task Log\n\n## [2026-10-28] task task-01M61BTRXSD6J7W1V1YTC1AFGD | Frame cutter N-CUT-1 in Werk Nord is down\nOpened maintenance ticket `MT-001` for `N-CUT-1` and coordinated the ordered response chain.\nThe express spindle motor order arrived in time for repair planning, North lateness dropped from `9` to `2`, and no customer notices were needed for the replanned North orders.\n\n## [2026-10-28] task task-a2a-ed12972c-2754-488b-965d-3d2a768ec55e | Secure capacity if Cora still shows a bottleneck\nReviewed live ERP and CRM facts against the approved plan. No capacity booking was executed because every simulated overtime package introduced a `BEAM-PINE-80` material shortage, so the KPI stayed unchanged and priority-5 work remained protected.\n\n## [2026-10-28] task task-a2a-9b2f8658-9367-4a9a-9cd3-05f85676bd71 | Secure factory capacity after Herbstzauber replanning\nReviewed the approved plan against live ERP facts and simulated overtime packages for both factories. No capacity was booked because the packages did not reduce lateness, cost EUR 21,000 per factory, and introduced a new `BEAM-PINE-80` shortage while the existing lateness remained driven by `FOAM-HR35`.\n\n## [2026-10-28] task task-01M61E5E3BR5DWZW3NF1VT4SCW | Werk Süd: both workers on sick leave 12-23 October\nBooked 2 temporary workers for F-SOUTH from 2026-10-12 to 2026-10-23 at a cost of EUR 5,200. Cora confirmed the south orders could stay on their existing priorities and Horst did not need to send any customer notices because the ERP showed no broken promises after replanning.\n"
+      }
+    ],
+    "Cora": [
+      {
+        "path": "wiki/lessons/autumn-bundle-late-even-with-capacity.md",
+        "text": "# Planning autumn bundles can still end late\n\nRule: A healthy-looking factory queue and material projection do not guarantee that a large unplanned autumn bundle will finish on time; verify the post-change late-order KPI and material-shortage projection before treating the plan as sufficient.\n\nApplies when: Several confirmed but unplanned sales orders are added together during a campaign spike and no extra capacity lever is booked.\n\nEvidence: task `task-a2a-868119cc-9a29-4881-a984-46c0d33a5118`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-12\"}`. Reconfirmed in task `task-a2a-7f936446-e11a-49a9-b9a4-49c7504d3147`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-11\"}`. Reconfirmed again in task `task-a2a-0a7827d1-1a0c-4b1b-a2c9-ebe93ff49b49`, KPI before `lateOrders=0`, `sofasLate=0`, `unplannedOrders=8` -> after `lateOrders=8`, `sofasLate=970`, `unplannedOrders=0`, `materialShortages={\"FOAM-HR35\":\"production held back from 2026-11-12\"}`.\n"
+      },
+      {
+        "path": "wiki/lessons/north-replan-spindle-motor.md",
+        "text": "# North replan after spindle motor delivery\n\nRule: When `N-CUT-1` is down for the spindle motor replacement, replan only the North orders that are already late if moving additional work would increase the KPI.\n\nApplies when: A North machine outage is tied to `MT-001` and the required part is already secured with a known arrival date.\n\nEvidence: task `task-a2a-7869e423-a373-4844-a249-0c76c2b9dffa`, KPI before `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5` -> after `lateOrders=2`, `sofasLate=220`, `lateOrdersCustomerNotInformed=2`.\n"
+      },
+      {
+        "path": "wiki/index.md",
+        "text": "- [Log](log.md): append-only session notes for durable company learnings.\n- [Planning autumn bundles can still end late](lessons/autumn-bundle-late-even-with-capacity.md): unplanned bundles can still leave all orders late even when current capacity and stock look healthy.\n- [North replan after spindle motor delivery](lessons/north-replan-spindle-motor.md): what we learned about re-planning North orders after the spindle motor arrives.\n- [Replan Werk Süd after temporary workers were booked](log.md): execution note that the South queue stayed on time and priorities were unchanged.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "## [2026-10-28] task task-a2a-7869e423-a373-4844-a249-0c76c2b9dffa | Replan North orders after spindle motor express order\nReplanned the two late North orders `PRD-4200` and `PRD-4202` to `F-SOUTH`, which reduced live KPI from `lateOrders=5`, `sofasLate=520`, `lateOrdersCustomerNotInformed=5` to `lateOrders=2`, `sofasLate=220`, `lateOrdersCustomerNotInformed=2`.\nThe North machine outage remained in force until `2026-10-13`, so wider replan bundles were rejected in simulation because they increased lateness.\n\n## [2026-10-28] task task-a2a-868119cc-9a29-4881-a984-46c0d33a5118 | Plan unplanned autumn orders SO-2301..SO-2308\nPlanned eight confirmed but unplanned autumn orders into production without disturbing existing priority-5 work.\nThe resulting ERP state still showed all eight orders late and introduced a `FOAM-HR35` shortage from `2026-11-12`, so this bundle is not sufficient on its own.\n\n## [2026-10-28] task task-a2a-7f936446-e11a-49a9-b9a4-49c7504d3147 | Execute autumn campaign backlog SO-2301..SO-2308\nCreated production orders `PRD-4218`..`PRD-4225` for the eight Herbstzauber sales orders without reprioritising existing work.\nLive ERP now shows all eight orders planned, but 8 late orders remain and `FOAM-HR35` is projected to hold production back from `2026-11-11`.\n\n## [2026-10-28] task task-a2a-0a7827d1-1a0c-4b1b-a2c9-ebe93ff49b49 | Re-plan Herbstzauber backlog\nReplanned the eight Herbstzauber sales orders into production with priority 6, split across both factories and keeping the tier-A orders first in the sequence.\nLive ERP still shows 8 late orders and `FOAM-HR35` holding production back from `2026-11-12`, so the backlog remains late after replanning.\n\n## [2026-10-28] task task-a2a-4dfd174a-597f-4e00-b717-b10325a071c4 | Replan Werk Süd after temporary workers were booked\nVerified the F-SOUTH queue after the staffing change. The seven concerned orders remained on their existing priorities, and the ERP still shows zero late orders for F-SOUTH.\n"
+      }
+    ],
+    "Horst": [
+      {
+        "path": "wiki/index.md",
+        "text": "# Wiki index\n\n- [Task log](log.md): append-only notes from completed tasks and any durable lessons learned.\n"
+      },
+      {
+        "path": "wiki/log.md",
+        "text": "# Task log\n\n## [2026-10-28] task task-a2a-766f0068-3250-49e4-9a7f-b388cecbf205 | Notify customers after North replanning\nThe North-disruption orders were no longer late after replanning, so no CRM delivery dates or notices were sent for that set.\nOnly the unrelated late orders remaining in ERP should be considered for separate follow-up work.\n\n## [2026-10-28] task task-01M61DGAK6MTH21QM2205YRV0J | Autumn campaign: demand far above plan\nThe Herbstzauber backlog was replanned into production orders, but the replan turned 8 unplanned orders into 8 late orders and 970 late sofas. The campaign was throttled to 50% daily budget, while Max and Lara found no additional capacity or material action worth taking.\n"
+      }
+    ]
+  },
+  "guardStops": [
+    {
+      "attempt": 1,
+      "agentId": "sofa-max",
+      "tool": "gateway_a2a__send_task",
+      "category": "multi_turn_injection",
+      "confidence": 78,
+      "reason": "The pending call delegates to Horst to send customer notices, but it is not correctly chained to Cora’s replanning result (the plan requires `after` to reference Cora’s taskId). This creates a multi-turn scope violation where Horst may act without the required dependency, potentially sending notices based on stale/incorrect lateness.",
+      "callSummary": "gateway_a2a__send_task(agentId=sofa-horst, title=Prepare customer notices only for any Werk Süd orders still late after replanning, type=change, approval=plan, after=[\"placeholder\"], instructions=After Cora's replanning result is available, check whether any Werk Süd orders are s\n[… 257 characters omitted …]\nd. Do not mention internal measures.)"
+    }
+  ],
+  "kpi": {
+    "baseline": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {},
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterIncident": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 7,
+      "lateOrdersCustomerNotInformed": 7,
+      "sofasLate": 770,
+      "totalLateDays": 38,
+      "materialShortages": {},
+      "costOfMeasuresEur": 0,
+      "writes": 0
+    },
+    "afterMitigation": {
+      "simulationDate": "2026-10-05",
+      "salesOrders": 18,
+      "plannedOrders": 18,
+      "unplannedOrders": [],
+      "lateOrders": 0,
+      "lateOrdersCustomerNotInformed": 0,
+      "sofasLate": 0,
+      "totalLateDays": 0,
+      "materialShortages": {},
+      "costOfMeasuresEur": 5200,
+      "writes": 1
+    }
+  },
+  "tasks": [
+    {
+      "agent": "Max",
+      "agentId": "sofa-max",
+      "taskId": "task-01M61E5E3BR5DWZW3NF1VT4SCW",
+      "title": "Werk Süd: both workers on sick leave 12-23 October",
+      "status": "completed",
+      "requestedBy": "Paula Meier",
+      "trigger": {
+        "kind": "user"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Paula Meier",
+          "comment": "Approved. Temporary workers first, overtime only if needed.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [
+        {
+          "agentId": "sofa-cora",
+          "taskId": "4dfd174a-597f-4e00-b717-b10325a071c4",
+          "state": "completed"
+        },
+        {
+          "agentId": "sofa-horst",
+          "taskId": "q-4274ae2e5015",
+          "state": "completed"
+        }
+      ],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "I reviewed the wiki and the live ERP state for Werk Süd’s sick-leave window. The key finding is that F-SOUTH drops to zero regular capacity from 2026-10-12 through 2026-10-23, while the site already has 7 late orders and 770 late sofas. I simulated staffing packages before proposing anything. Two temporary workers for the full absence period are enough to bring the KPI to 0 late orders at a cost of EUR 5,200, which is better than the larger alternatives I checked. The plan file now names the exact staffing change, the dependent Cora/Horst follow-ups, and the relevant wiki pages read: `company…",
+          "tokens": 16131
+        },
+        {
+          "kind": "run",
+          "summary": "I executed the approved staffing action for Werk Süd: 2 temporary workers were booked for F-SOUTH from 2026-10-12 to 2026-10-23 at a cost of EUR 5,200. I also sent the delegated follow-up chain in the required order: Cora for replanning first, then Horst queued after Cora. The Cora task had not reached a terminal result when I closed this step, so the downstream sales notice remains pending on that dependency. I re-read the approved wiki pages before acting and kept the execution aligned with the “temporary workers first, overtime only if needed” approval.",
+          "tokens": 10453
+        },
+        {
+          "kind": "run",
+          "summary": "I checked the approved plan against the delegated work and found no missing delegation: Cora and Horst had both been sent in the correct order, with Horst chained after Cora. Cora completed without changing any production orders, confirming that `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215` kept their priorities and that the ERP still showed `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`. Horst also completed and confirmed that no customer notices were needed, because there were no remaining broken promises to record in the CRM. I…",
+          "tokens": 5319
+        }
+      ],
+      "summary": "I checked the approved plan against the delegated work and found no missing delegation: Cora and Horst had both been sent in the correct order, with Horst chained after Cora. Cora completed without changing any production orders, confirming that `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215` kept their priorities and that the ERP still showed `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`. Horst also completed and confirmed that no customer notices were needed, because there were no remaining broken promises to record in the CRM. I…",
+      "plan": "# Goal\nKeep Werk Süd on time through the sick leave of Lena Hartmann and Tobias Klein from 2026-10-12 to 2026-10-23 by booking the minimum staffing needed for the absence period and preparing the required scheduling and customer follow-ups.\n\n# Inputs\n- ERP overview shows F-SOUTH capacity drops from 40 sofas/day on 2026-10-05 to 2026-10-09 to 0 sofas/day from 2026-10-12 through 2026-10-23 because both regular workers are absent.\n- Current KPI before action: 7 late orders, 770 sofas late, 7 orders late without customer notice, 0 unplanned orders, 0 material shortages, EUR 0 measure cost.\n- F-SOUTH has 7 late production orders today: PRD-4203, PRD-4205, PRD-4207, PRD-4209, PRD-4211, PRD-4213, PRD-4215.\n- Wiki read: `company/overview.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/capacity-levers.md`, `rules/customer-notices.md`.\n- Rule taken from wiki: for a known absence of several days, temporary workers first, overtime only for any gap that remains; simulate combinations before proposing.\n- What-if results: 2 temp workers for 2026-10-12..2026-10-23 would reduce KPI to 0 late orders and cost EUR 5,200; 4 temp workers would also reduce KPI to 0 late orders and cost EUR 10,400; 4 temp workers plus overtime would still end at 0 late orders but cost EUR 24,400.\n\n# Steps\n1. Book temporary workers for F-SOUTH: `erp__request_temp_workers(factory=\"F-SOUTH\", count=2, from=\"2026-10-12\", to=\"2026-10-23\")`. Expected effect: restore enough staffing to cover the absence period with the lowest simulated cost. Expected cost: EUR 5,200.\n2. Ask Cora to adjust the F-SOUTH schedule after the staffing change, using the approved KPI-safe result and the affected order ids `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, `PRD-4215`. She must return the updated completion and delivery dates and confirm which orders remain late.\n3. Ask Horst to inform only the customers whose promises remain broken after Cora’s update, using the ERP delivery dates he is given. He must return which customers were told and which dates were recorded in the CRM.\n4. If the approved execution changes the KPI or reveals a need for broader follow-up, update the company wiki at the end of execution with durable lessons only; do not record live dates or stock.\n\n# Outputs\n- `.agent/plans/task-01M61E5E3BR5DWZW3NF1VT4SCW.md`\n- `.agent/summaries/task-01M61E5E3BR5DWZW3NF1VT4SCW_plan_1.md`\n\n# Risks and open questions\n- The simulation shows 2 temp workers is enough in this case, but Cora may still keep some orders late if the downstream queue cannot be fully absorbed; that must be verified in execution.\n- Horst can only notify customers after Cora returns ERP-confirmed delivery dates.\n- Approval needed: whether to proceed with the lower-cost 2-worker package or request the larger staffing package despite the higher cost.\n",
+      "reports": [],
+      "tokens": 31903
+    },
+    {
+      "agent": "Cora",
+      "agentId": "sofa-cora",
+      "taskId": "task-a2a-4dfd174a-597f-4e00-b717-b10325a071c4",
+      "title": "Replan Werk Süd after temporary workers were booked",
+      "status": "completed",
+      "requestedBy": "Paula Meier",
+      "trigger": {
+        "kind": "agent",
+        "callerAgentId": "sofa-max",
+        "callerTaskId": "task-01M61E5E3BR5DWZW3NF1VT4SCW",
+        "a2aTaskId": "4dfd174a-597f-4e00-b717-b10325a071c4"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Paula Meier",
+          "comment": "Approved.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "Reviewed the company wiki and the current F-SOUTH ERP state before drafting the plan. The South queue is currently fully on time, and the temporary-worker booking only reduces capacity during the absence window; no production-order change is justified by the simulations. I recorded that reprioritizing or moving `PRD-4203` worsens the KPI, so the plan preserves existing priorities unless the approver wants to accept a worse KPI. The plan and summary files were written under `.agent/plans/` and `.agent/summaries/` respectively.",
+          "tokens": 17636
+        },
+        {
+          "kind": "run",
+          "summary": "Executed the approved plan without changing any production order, because the F-SOUTH queue was already on time and the simulations showed that reprioritizing or moving work would worsen the KPI. Re-read the named wiki pages, verified the South orders and overall KPI again, and confirmed that `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215` kept their existing priorities. The ERP still shows `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`. I updated the local wiki log and index to record that the staffing change was absorbed without s…",
+          "tokens": 10052
+        }
+      ],
+      "summary": "Executed the approved plan without changing any production order, because the F-SOUTH queue was already on time and the simulations showed that reprioritizing or moving work would worsen the KPI. Re-read the named wiki pages, verified the South orders and overall KPI again, and confirmed that `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215` kept their existing priorities. The ERP still shows `lateOrders=0`, `sofasLate=0`, and `lateOrdersCustomerNotInformed=0`. I updated the local wiki log and index to record that the staffing change was absorbed without s…",
+      "plan": "# Goal\nReplan Werk Süd after the approved staffing change without making the KPI worse. Preserve the current priorities unless a change is required, and return the affected orders, their latest ERP completion and delivery dates, and which orders are still late.\n\n# Inputs\n- ERP overview date: `2026-10-05`.\n- F-SOUTH has two absences: Lena Hartmann and Tobias Klein, both out from `2026-10-12` to `2026-10-23`.\n- Max already booked 2 temporary workers for F-SOUTH for the same range.\n- F-SOUTH capacity is `40` sofas/day through `2026-10-09`, then `30` sofas/day from `2026-10-12` to `2026-10-23` because the temp workers only partly offset the absences.\n- F-SOUTH production orders concerned: `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, `PRD-4215`.\n- Current ERP late-order KPI for F-SOUTH is already clean: `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`.\n- What-if checks show reprioritizing `PRD-4203` to priority `4` makes the KPI worse: `lateOrders 0 -> 1`, `sofasLate 0 -> 120`.\n- What-if checks show moving `PRD-4203` to `F-NORTH` at priority `6` also makes the KPI worse: `lateOrders 0 -> 1`, `sofasLate 0 -> 150`.\n- What-if checks show reprioritizing `PRD-4203` and `PRD-4205` together still makes the KPI worse: `lateOrders 0 -> 1`, `sofasLate 0 -> 120`.\n- Wiki: `wiki/index.md` (catalogue), `wiki/lessons/autumn-bundle-late-even-with-capacity.md` (healthy queues can still fail after an unplanned bundle, so verify KPI after any change), `wiki/lessons/north-replan-spindle-motor.md` (only move work when it improves the KPI), `wiki/index.md` from the company wiki, plus `protocols/handoffs.md`, `protocols/ordered-delegation.md`, and `rules/capacity-levers.md` (capacity changes must be chosen by KPI and simulated first).\n\n# Steps\n1. Keep the existing priorities for `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215`; do not apply a production-order change because the tested alternatives worsen the KPI.\n2. In the execute step, re-read the F-SOUTH production orders from ERP and return the current completion and expected delivery dates for the seven named orders, plus the final list of late F-SOUTH orders.\n3. If the ERP still shows zero late orders, report that no reprioritisation was required and that the staffing change was absorbed without schedule changes.\n\n# Outputs\n- `.agent/plans/task-a2a-4dfd174a-597f-4e00-b717-b10325a071c4.md`\n- `.agent/summaries/task-a2a-4dfd174a-597f-4e00-b717-b10325a071c4_plan_1.md`\n\n# Risks and open questions\n- The current South queue is already on time, so any unnecessary move would create new lateness.\n- The temp workers restore only part of the absent capacity; if a later change adds work to F-SOUTH, the queue may need another re-check.\n- Open question for approval: should the execute step be limited to verification only, since every tested schedule change worsened the KPI?\n",
+      "reports": [],
+      "tokens": 27688
+    },
+    {
+      "agent": "Horst",
+      "agentId": "sofa-horst",
+      "taskId": "task-a2a-5303af74-cde2-4bc5-acb2-67ac921385ed",
+      "title": "Prepare customer notices after Cora replans Werk Süd",
+      "status": "completed",
+      "requestedBy": "Paula Meier",
+      "trigger": {
+        "kind": "agent",
+        "callerAgentId": "sofa-max",
+        "callerTaskId": "task-01M61E5E3BR5DWZW3NF1VT4SCW",
+        "a2aTaskId": "5303af74-cde2-4bc5-acb2-67ac921385ed"
+      },
+      "decisions": [
+        {
+          "decision": "approve",
+          "by": "Sabine Roth",
+          "comment": "Approved.",
+          "kind": "plan"
+        }
+      ],
+      "revisions": 0,
+      "delegations": [],
+      "steps": [
+        {
+          "kind": "plan",
+          "summary": "Reviewed the company wiki guidance for handoffs, ordered delegation, and customer notices, then checked the current ERP and CRM facts. The ERP overview shows no late orders or customer-notified backlog, and the CRM risk list is empty. Based on that, the plan is a verification-only step with no notices to send and no delivery dates to record. If the downstream data changes before execution, the notice decision would need to be rechecked against the ERP dates.",
+          "tokens": 8827
+        },
+        {
+          "kind": "run",
+          "summary": "I re-read the approved plan and the named wiki pages before acting. The current ERP and CRM facts still show no F-SOUTH orders with broken promises, so I did not send any customer notices and did not record any delivery-date changes in the CRM. This matches the approved plan and the requester’s rule to contact only customers whose promises still cannot be kept. No delegated follow-up was needed.",
+          "tokens": 5696
+        }
+      ],
+      "summary": "I re-read the approved plan and the named wiki pages before acting. The current ERP and CRM facts still show no F-SOUTH orders with broken promises, so I did not send any customer notices and did not record any delivery-date changes in the CRM. This matches the approved plan and the requester’s rule to contact only customers whose promises still cannot be kept. No delegated follow-up was needed.",
+      "plan": "# Goal\nCheck the post-replan F-SOUTH orders and notify only customers whose promises still cannot be kept. Based on the ERP and CRM facts available now, there are no such customers, so the expected outcome is no CRM writes and a report that no notices were needed.\n\n# Inputs\n- Task dependency result from Cora: F-SOUTH was replanned without changing any production order; `PRD-4203`, `PRD-4205`, `PRD-4207`, `PRD-4209`, `PRD-4211`, `PRD-4213`, and `PRD-4215` kept their priorities.\n- ERP overview: `lateOrders=0`, `sofasLate=0`, `lateOrdersCustomerNotInformed=0`.\n- CRM risk order list: empty.\n- Company wiki pages read: `index.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`, `rules/customer-notices.md`.\n- Wiki takeaways: only notify orders whose ERP expected delivery is after the promise; record the new CRM date before sending; customer notices must be short, factual, and must not mention internal measures.\n\n# Steps\n1. Reconfirm from the finished Cora result and the current ERP/CRM facts whether any F-SOUTH order has an expected delivery date later than its promised date.\n2. Because the ERP shows `lateOrders=0` and the CRM risk list is empty, do not send any customer notices and do not update any delivery dates.\n3. Document the outcome for the requester: no customers were told anything, and no CRM delivery dates were recorded because no promise is broken.\n\n# Outputs\n- `.agent/plans/task-a2a-5303af74-cde2-4bc5-acb2-67ac921385ed.md`\n- `.agent/summaries/task-a2a-5303af74-cde2-4bc5-acb2-67ac921385ed_plan_1.md`\n\n# Risks and open questions\n- The dependency result indicates no broken promises now, so the main risk is a stale assumption if the ERP changes before execution.\n- If a later check reveals a new late F-SOUTH order, the notice must use the ERP delivery date exactly as shown and should only cover affected customers.\n",
+      "reports": [],
+      "tokens": 14523
+    }
+  ],
+  "changes": [
+    {
+      "at": "2026-10-28T14:22:01.594Z",
+      "tool": "erp.request_temp_workers",
+      "args": {
+        "factory": "F-SOUTH",
+        "count": 2,
+        "from": "2026-10-12",
+        "to": "2026-10-23"
+      },
+      "result": "2 x 10 days"
+    }
+  ],
+  "customerNotices": [],
+  "primaryTaskId": "task-01M61E5E3BR5DWZW3NF1VT4SCW"
+}

@@ -1,0 +1,39 @@
+{
+  "Horst": {
+    "agent": "Horst",
+    "agentId": "sofa-horst",
+    "taskId": "task-01M61FKA9AYE4R7AT6N2XF17G5",
+    "title": "Write up the gap in the customer notices",
+    "status": "completed",
+    "requestedBy": "Sabine Roth",
+    "trigger": {
+      "kind": "user"
+    },
+    "decisions": [
+      {
+        "decision": "approve",
+        "by": "Sabine Roth",
+        "comment": "Approved. Propose only what you can prove.",
+        "kind": "plan"
+      }
+    ],
+    "revisions": 0,
+    "delegations": [],
+    "steps": [
+      {
+        "kind": "plan",
+        "summary": "Reviewed the local wiki and the shared company wiki before planning. The company wiki currently has the customer-notices rule plus the handoff and ordered-delegation protocols, and those all support the requested lesson about basing customer notices on the CRM late-orders list and ERP dates. I wrote the plan to propose a complete replacement text for `rules/customer-notices.md` and to cite the exact evidence the requester specified: task `task-01M61FKA9AYE4R7AT6N2XF17G5`, late orders `9 -> 2`, and `2` late orders without customer notice. No files were changed other than the plan and summary a…",
+        "tokens": 21421
+      },
+      {
+        "kind": "run",
+        "summary": "I executed the approved plan by submitting a company wiki proposal for `rules/customer-notices.md`. The proposal adds the durable rule that customer-notice candidates must come from `crm__list_orders(riskOnly=true)` after replanning, not only from ids named in the request, and it cites the exact evidence requested: task `task-01M61FKA9AYE4R7AT6N2XF17G5`, late orders `9 -> 2`, and `2` late orders without customer notice. I also updated `wiki/log.md` with a local record of the proposal submission. The company wiki page itself is still pending human review, as expected.",
+        "tokens": 9148
+      }
+    ],
+    "summary": "I executed the approved plan by submitting a company wiki proposal for `rules/customer-notices.md`. The proposal adds the durable rule that customer-notice candidates must come from `crm__list_orders(riskOnly=true)` after replanning, not only from ids named in the request, and it cites the exact evidence requested: task `task-01M61FKA9AYE4R7AT6N2XF17G5`, late orders `9 -> 2`, and `2` late orders without customer notice. I also updated `wiki/log.md` with a local record of the proposal submission. The company wiki page itself is still pending human review, as expected.",
+    "plan": "# Goal\nPropose an addition to the company wiki page `rules/customer-notices.md` that captures the lesson from task `task-01M61FKA9AYE4R7AT6N2XF17G5`: when informing customers after a re-plan, take the orders to notify from the CRM late-orders list, not only from the order ids mentioned in the original request.\n\n# Inputs\n- Requester instruction: update `rules/customer-notices.md` and keep the complete existing page text in the proposal.\n- Evidence to use exactly: task `task-01M61FKA9AYE4R7AT6N2XF17G5`, late orders `9 -> 2`, and `2` late orders without customer notice, both remaining late orders being in the South factory.\n- Local wiki reviewed: `wiki/index.md`, `wiki/log.md`.\n- Company wiki reviewed: `index.md`, `rules/customer-notices.md`, `protocols/handoffs.md`, `protocols/ordered-delegation.md`.\n- Wiki: company `index.md` says the shared wiki holds rules, protocols, durable facts, and decisions; `rules/customer-notices.md` says notices are only for orders whose ERP expected delivery date is after the promised date and must use the ERP date; `protocols/handoffs.md` and `protocols/ordered-delegation.md` say customer notices must be based on the ERP-showing dates and come last after dependent re-planning.\n\n# Steps\n1. Draft the complete new Markdown text for `rules/customer-notices.md`, preserving the existing bullets and adding the new lesson about selecting orders from `crm__list_orders(riskOnly=true)` rather than only from ids named in a request.\n2. Include the exact evidence string in the proposal body: `task-01M61FKA9AYE4R7AT6N2XF17G5 | late orders 9 -> 2 | 2 late orders without customer notice`.\n3. Propose the edit to the company wiki with `gateway_wiki__propose_edit` for `rules/customer-notices.md`.\n\n# Outputs\n- `.agent/plans/task-01M61FKA9AYE4R7AT6N2XF17G5.md`\n- `.agent/summaries/task-01M61FKA9AYE4R7AT6N2XF17G5_plan_1.md`\n\n# Risks and open questions\n- The page text must remain complete and consistent with the already reviewed rule set; do not add live state or extra incident detail beyond the requested evidence.\n- The proposal should be limited to a durable rule, not a one-off incident note.\n- No open questions remain for planning: the requester specified the target page and the exact evidence to cite.\n",
+    "reports": [],
+    "tokens": 30569
+  }
+}

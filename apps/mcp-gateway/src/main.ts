@@ -7,6 +7,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, typ
 import { SecretStore } from '@cw/secrets';
 import { A2A_TOOL, toolAllowed, type GatewayAgentConfig, type Identity } from '@cw/shared';
 import { A2aBroker } from './a2a.js';
+import { hideCallerParams, withCaller } from './caller.js';
 import { Audit } from './audit.js';
 import { loadConfig } from './config.js';
 import { OboClient } from './oboClient.js';
@@ -25,7 +26,7 @@ const obo = new OboClient(env.GATEWAY_TOKEN);
 
 /** What the agent is currently working on (registered by runAgentStep; steps are serialized per agent). */
 /** `interactive`: a signed-in user is behind the task (not a schedule or A2A delegation) — only then Entra OBO applies. */
-const stepContext = new Map<string, { taskId: string; requestedBy: Identity; interactive: boolean }>();
+const stepContext = new Map<string, { taskId: string; requestedBy: Identity; interactive: boolean; /** plan | run | fix: while planning only tools that are not declared as changing data may run */ phase?: string }>();
 
 const A2A_TOOLS: Tool[] = [
   {
@@ -42,6 +43,12 @@ const A2A_TOOLS: Tool[] = [
       properties: {
         agentId: { type: 'string', description: 'Id of the colleague (from a2a__list_agents)' },
         title: { type: 'string', description: 'Short title of the delegated task' },
+        after: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Task ids (the taskId that earlier a2a__send_task calls returned) that must have COMPLETED before this task starts. The platform holds this task back, starts it only then and gives it the results of those tasks. Use it for every task that depends on the result of a colleague, for example customer notices that need the new delivery dates. Declare the whole chain in this step. If a predecessor fails, this task is cancelled and never started.',
+        },
         instructions: { type: 'string', description: 'What the colleague should do and deliver' },
         type: { type: 'string', enum: ['analysis', 'report', 'change'], default: 'report' },
         approval: { type: 'string', enum: ['plan', 'none', 'deviation'], default: 'plan', description: 'Approval policy at the colleague' },
@@ -71,7 +78,7 @@ function mcpServer(agent: GatewayAgentConfig): Server {
       const r = await obo.token(agent, { mode: 'agent-only', scope: u.oboScope });
       return r.ok ? r.accessToken : undefined;
     };
-    const upstreamTools = (await upstreams.listTools(config.upstreams, discover)).filter((t) => toolAllowed(agent.allowedTools, t.name));
+    const upstreamTools = (await upstreams.listTools(config.upstreams, discover)).filter((t) => toolAllowed(agent.allowedTools, t.name)).map(hideCallerParams);
     // A2A tools are always listed (the harness reads the tool list once); calls are checked live.
     return { tools: [...upstreamTools, ...A2A_TOOLS] };
   });
@@ -101,6 +108,17 @@ function mcpServer(agent: GatewayAgentConfig): Server {
     }
 
     try {
+      // Planning is read-only (enforced, not just requested): nothing may change before a person approved the plan.
+      // A tool is refused in the plan step when its MCP server declares it as changing data (readOnlyHint: false);
+      // delegating to a colleague is an action as well.
+      if (stepContext.get(agent.agentId)?.phase === 'plan') {
+        const changes = tool === A2A_TOOL.send || (tool !== A2A_TOOL.list && tool !== A2A_TOOL.get && (await upstreams.annotationsOf(config!.upstreams, tool))?.readOnlyHint === false);
+        if (changes) {
+          const reason = `${tool} changes data or delegates work, so it can only run in the execute step, after a person has approved the plan. While planning, use read tools only.`;
+          await record('denied', { reason: 'plan step is read-only' });
+          return text(reason, true);
+        }
+      }
       if (tool === A2A_TOOL.list) {
         const peers = visiblePeers(config!, agent);
         const cards = await Promise.all(
@@ -120,7 +138,7 @@ function mcpServer(agent: GatewayAgentConfig): Server {
         const peerId = String(args.agentId ?? '');
         const peer = config!.agents.find((a) => a.agentId === peerId);
         if (tool === A2A_TOOL.send) {
-          const d = decideDelegation(config!, agent, peerId, broker.edges());
+          const d = decideDelegation(config!, agent, peerId, await broker.liveEdges());
           if (!d.allowed || !peer) {
             await record('denied', { reason: d.allowed ? 'unknown agent' : d.reason, peer: peerId });
             return text(d.allowed ? `Unknown agent ${peerId}` : d.reason, true);
@@ -131,10 +149,18 @@ function mcpServer(agent: GatewayAgentConfig): Server {
               instructions: z.string().min(1).max(20_000),
               type: z.enum(['analysis', 'report', 'change']).default('report'),
               approval: z.enum(['plan', 'none', 'deviation']).default('plan'),
+              after: z.array(z.string().min(1).max(100)).max(5).default([]),
             })
             .parse(args);
           const ctx = stepContext.get(agent.agentId);
-          const r = await broker.send(agent, peer, input, { callerTaskId: ctx?.taskId, requestedBy: ctx?.requestedBy });
+          const { after, ...task } = input;
+          let r;
+          try {
+            r = after.length ? await broker.sendAfter(agent, peer, task, { callerTaskId: ctx?.taskId, requestedBy: ctx?.requestedBy }, after) : await broker.send(agent, peer, task, { callerTaskId: ctx?.taskId, requestedBy: ctx?.requestedBy });
+          } catch (err) {
+            await record('denied', { reason: String(err).slice(0, 200), peer: peerId });
+            return text(err instanceof Error ? err.message : String(err), true);
+          }
           await record('ok', { peer: peerId, remoteTaskId: r.taskId });
           return text(JSON.stringify({ agentId: peerId, taskId: r.taskId, state: r.state }));
         }
@@ -169,7 +195,10 @@ function mcpServer(agent: GatewayAgentConfig): Server {
         accessToken = t.accessToken;
         authAudit = { authMode: auth.mode, userOid: oid };
       }
-      const result = await upstreams.call(config!.upstreams, tool, args, limits.callTimeoutMs, accessToken);
+      const def = (await upstreams.listTools(config!.upstreams)).find((t) => t.name === tool);
+      const ctx = stepContext.get(agent.agentId);
+      const callArgs = withCaller(def, args, { agentId: agent.agentId, taskId: ctx?.taskId, requestedBy: ctx?.requestedBy?.upn });
+      const result = await upstreams.call(config!.upstreams, tool, callArgs, limits.callTimeoutMs, accessToken);
       await record(result.isError ? 'error' : 'ok', { resultBytes: Buffer.byteLength(JSON.stringify(result.content ?? '')), ...authAudit });
       return result;
     } catch (err) {
@@ -219,9 +248,17 @@ const agentAuth = (req: Request, res: Response): GatewayAgentConfig | undefined 
 app.put('/agents/:agentId/step-context', (req, res) => {
   const agent = agentAuth(req, res);
   if (!agent) return;
-  if (req.body?.taskId) stepContext.set(agent.agentId, { taskId: String(req.body.taskId), requestedBy: req.body.requestedBy as Identity, interactive: req.body.interactive === true });
+  if (req.body?.taskId) stepContext.set(agent.agentId, { taskId: String(req.body.taskId), requestedBy: req.body.requestedBy as Identity, interactive: req.body.interactive === true, phase: typeof req.body.phase === 'string' ? req.body.phase : undefined });
   else stepContext.delete(agent.agentId);
   res.status(204).end();
+});
+
+/** Tools their MCP server declares read-only (`readOnlyHint: true`), by gateway name; the agent's guard may skip them (opt-in). */
+app.get('/agents/:agentId/tools/read-only', async (req, res) => {
+  const agent = agentAuth(req, res);
+  if (!agent || !sync.config) return;
+  const tools = await upstreams.listTools(sync.config.upstreams);
+  res.json({ tools: [...tools.filter((t) => t.annotations?.readOnlyHint === true && toolAllowed(agent.allowedTools, t.name)).map((t) => t.name), A2A_TOOL.list, A2A_TOOL.get] });
 });
 
 /** Status of delegated tasks (used by the caller's TaskWorkflow while it waits). */
@@ -264,5 +301,6 @@ internal.get('/tools', async (_req, res) => {
 app.use('/internal', internal);
 
 await broker.load();
+broker.setConfigSource(() => sync.config);
 sync.start();
 app.listen(env.PORT, () => log.info({ port: env.PORT, keyVault: env.KEYVAULT_URL }, 'mcp gateway listening'));

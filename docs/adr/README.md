@@ -39,3 +39,5 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0033](0033-exfiltration-guard.md) | Exfiltration guard: an evaluation agent in the harness's pre-tool hook | Accepted |
 | [0032](0032-entra-obo-for-mcp.md) | Optional Microsoft Entra On-Behalf-Of for MCP calls | Accepted |
 | [0034](0034-agent-proposed-schedules.md) | Agents propose scheduled tasks, people approve them in the chat | Accepted |
+| [0035](0035-company-wiki.md) | A central company wiki that people govern | Accepted |
+| [0036](0036-ordered-delegation.md) | Ordered delegation: the platform keeps the order of dependent work | Accepted |

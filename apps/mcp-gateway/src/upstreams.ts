@@ -105,6 +105,11 @@ export class UpstreamPool {
     return tools;
   }
 
+  /** Annotations the upstream declared for a (prefixed) tool, from the cached tool list. */
+  async annotationsOf(upstreams: UpstreamServer[], name: string): Promise<Tool['annotations']> {
+    return (await this.listTools(upstreams)).find((t) => t.name === name)?.annotations;
+  }
+
   invalidate() {
     this.toolCache = undefined;
   }

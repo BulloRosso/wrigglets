@@ -86,6 +86,44 @@ export interface MailRecord {
   error?: string;
 }
 
+/** Central company wiki (ADR-0035). */
+export interface WikiPageInfo {
+  path: string;
+  title: string;
+  updatedAt: string;
+  updatedBy: string;
+  chars: number;
+  pending: number;
+}
+export interface WikiPage {
+  path: string;
+  content: string;
+  updatedAt: string;
+  updatedBy: string;
+  note?: string;
+  hash: string;
+  history: Array<{ index: number; at: string; by: string; note?: string; chars: number }>;
+}
+export interface WikiProposal {
+  id: string;
+  path: string;
+  content: string;
+  /** Current text of the page (null: new page). */
+  current: string | null;
+  reason: string;
+  evidence: string;
+  agent: string;
+  task?: string;
+  requestedBy?: string;
+  createdAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decidedBy?: string;
+  decidedAt?: string;
+  comment?: string;
+  baseChanged?: boolean;
+  edited?: boolean;
+}
+
 export type AgentTask = TaskListItem & { agentId: string };
 
 const id = encodeURIComponent;
@@ -150,6 +188,14 @@ export const api = {
   agentSpend: (agentId: string) => apiFetch<AgentSpend>(`/api/agents/${id(agentId)}/spend`),
   mails: (agentId?: string) => apiFetch<{ delivery: 'api' | 'file'; mails: MailRecord[] }>(`/api/mail${agentId ? `?agentId=${id(agentId)}` : ''}`),
   mailHtmlUrl: (mailId: string) => `/api/mail/${id(mailId)}/html`,
+  wikiPages: () => apiFetch<WikiPageInfo[]>('/api/wiki/pages'),
+  wikiPage: (path: string) => apiFetch<WikiPage>(`/api/wiki/page?path=${id(path)}`),
+  wikiVersion: (path: string, index: number) => apiFetch<{ at: string; by: string; note?: string; content: string }>(`/api/wiki/version?path=${id(path)}&index=${index}`),
+  saveWikiPage: (path: string, content: string, note?: string) => apiFetch<{ path: string }>('/api/wiki/page', { method: 'PUT', json: { path, content, note } }),
+  deleteWikiPage: (path: string) => apiFetch<void>(`/api/wiki/page?path=${id(path)}`, { method: 'DELETE' }),
+  wikiProposals: (status?: string) => apiFetch<WikiProposal[]>(`/api/wiki/proposals${status ? `?status=${status}` : ''}`),
+  decideWikiProposal: (proposalId: string, decision: 'approve' | 'reject', comment?: string, content?: string) =>
+    apiFetch<WikiProposal>(`/api/wiki/proposals/${id(proposalId)}/decide`, { method: 'POST', json: { decision, comment, content } }),
   audit: (target?: string) => apiFetch<AdminAuditEntry[]>(`/api/audit${target ? `?target=${id(target)}` : ''}`),
 };
 

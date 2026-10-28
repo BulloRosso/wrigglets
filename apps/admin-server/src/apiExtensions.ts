@@ -301,6 +301,48 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
     res.json(await d.ai.agentSpend(entry.spec, entry.secrets.aiKey, d.spendLimit(entry.spec)));
   });
 
+  /* ------------------------------------------------------------ central company wiki (ADR-0035): people govern it */
+  const wiki = async (method: string, path: string, body?: unknown) => {
+    if (!d.config.WIKI_URL || !d.config.WIKI_ADMIN_TOKEN) throw new HttpError(404, 'The company wiki is not configured (WIKI_URL, WIKI_ADMIN_TOKEN)');
+    let res: globalThis.Response;
+    try {
+      res = await fetch(`${d.config.WIKI_URL}/admin${path}`, {
+        method,
+        headers: { authorization: `Bearer ${d.config.WIKI_ADMIN_TOKEN}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new HttpError(502, 'The company wiki is not reachable');
+    }
+    if (res.status === 204) return undefined;
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) throw new HttpError(res.status === 401 ? 502 : res.status, json.error ?? 'company wiki request failed');
+    return json;
+  };
+  const q = (v: unknown) => encodeURIComponent(String(v ?? ''));
+  r.get('/wiki/pages', async (_req, res) => res.json(await wiki('GET', '/pages')));
+  r.get('/wiki/page', async (req, res) => res.json(await wiki('GET', `/page?path=${q(req.query.path)}`)));
+  r.get('/wiki/version', async (req, res) => res.json(await wiki('GET', `/version?path=${q(req.query.path)}&index=${q(req.query.index)}`)));
+  r.put('/wiki/page', express.json({ limit: '256kb' }), async (req, res) => {
+    const body = z.object({ path: z.string(), content: z.string(), note: z.string().max(300).optional() }).parse(req.body);
+    const out = await wiki('PUT', '/page', { ...body, by: by(req) });
+    await d.audit.write({ by: by(req), action: 'wiki.page', target: body.path, details: { chars: body.content.length } });
+    res.json(out);
+  });
+  r.delete('/wiki/page', async (req, res) => {
+    await wiki('DELETE', `/page?path=${q(req.query.path)}&by=${q(by(req))}`);
+    await d.audit.write({ by: by(req), action: 'wiki.page.delete', target: String(req.query.path) });
+    res.status(204).end();
+  });
+  r.get('/wiki/proposals', async (req, res) => res.json(await wiki('GET', `/proposals${req.query.status ? `?status=${q(req.query.status)}` : ''}`)));
+  r.post('/wiki/proposals/:id/decide', express.json({ limit: '256kb' }), async (req, res) => {
+    const body = z.object({ decision: z.enum(['approve', 'reject']), comment: z.string().max(1000).optional(), content: z.string().optional() }).parse(req.body);
+    const out = (await wiki('POST', `/proposals/${q(req.params.id)}/decide`, { ...body, by: by(req) })) as { path?: string; agent?: string };
+    await d.audit.write({ by: by(req), action: `wiki.proposal.${body.decision}`, target: String(out?.path ?? req.params.id), details: { proposal: req.params.id, agent: out?.agent, comment: body.comment } });
+    res.json(out);
+  });
+
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
     const all = await d.mail.list(500);

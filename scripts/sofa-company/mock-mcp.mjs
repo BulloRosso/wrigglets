@@ -796,7 +796,8 @@ const send = (res, status, data) => {
 W = freshWorld();
 
 /** A read-only status page ("what the ERP/CRM screen shows"), used for before/after screenshots. */
-function dashboardHtml() {
+/** `blur`: customer names are blurred (for screenshots that are published: they show customers' names). */
+function dashboardHtml(blur = false) {
   const k = kpi();
   const e = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const sim = simulate();
@@ -818,17 +819,18 @@ function dashboardHtml() {
   const orders = rows
     .map((r) => {
       const state = !r.po ? badge('not planned', 'r') : r.v.late === null ? badge('beyond horizon', 'r') : r.v.late > 0 ? badge(`${r.v.late} d late`, 'r') : badge('on time', 'g');
-      return `<tr><td>${r.so.id}</td><td>${e(r.c.name)}</td><td>${r.so.product} × ${r.so.qty}</td><td>${r.so.promisedDelivery}</td><td>${r.v?.expected ?? '—'}</td><td>${state}</td><td>${r.so.communicatedDelivery ? badge(`informed: ${r.so.communicatedDelivery}`, 'a') : ''}</td></tr>`;
+      return `<tr><td>${r.so.id}</td><td class="cust">${e(r.c.name)}</td><td>${r.so.product} × ${r.so.qty}</td><td>${r.so.promisedDelivery}</td><td>${r.v?.expected ?? '—'}</td><td>${state}</td><td>${r.so.communicatedDelivery ? badge(`informed: ${r.so.communicatedDelivery}`, 'a') : ''}</td></tr>`;
     })
     .join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Sofa company – ERP/CRM status</title><style>
+.blur .cust{filter:blur(6px);user-select:none}
 body{font:14px/1.4 Roboto,'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#1d2733;margin:0;padding:20px}
 h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 8px}.sub{color:#5b6777;margin-bottom:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px}.card{background:#fff;border:1px solid #dfe3ea;border-radius:10px;padding:14px}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid #dfe3ea;border-radius:10px;padding:10px 12px}.kpi b{display:block;font-size:22px}.kpi span{color:#5b6777;font-size:12px}
 table{border-collapse:collapse;width:100%}td,th{padding:3px 6px;border-bottom:1px solid #eef0f4;text-align:left;font-size:13px}th{color:#5b6777;font-weight:500}td.num{text-align:right}
 td.n{text-align:center;width:28px;font-size:11px;border:1px solid #fff;padding:4px 0}.b{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600}.g{background:#e3f4e4;color:#1b5e20}.r{background:#fde4e4;color:#b71c1c}.a{background:#fff1d6;color:#8a5a00}
-</style></head><body>
+</style></head><body class="${blur ? 'blur' : ''}">
 <h1>Sofa company – ERP/CRM status</h1><div class="sub">Simulation date ${TODAY} · mock systems for the Wrigglets example · ${W.events.length ? `disruptions: ${W.events.join(', ')}` : 'no disruption'} · ${W.log.length} change(s) by agents</div>
 <div class="kpis">
 <div class="kpi"><b>${k.lateOrders}</b><span>orders expected late</span></div>
@@ -850,7 +852,7 @@ createServer(async (req, res) => {
   if (path === '/health') return send(res, 200, { status: 'ok' });
   if (path === '/' || path === '/dashboard') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    return res.end(dashboardHtml());
+    return res.end(dashboardHtml((req.url ?? '').includes('blur=customers')));
   }
   if (path === '/kpi') return send(res, 200, kpi());
   if (path === '/log') return send(res, 200, W.log);

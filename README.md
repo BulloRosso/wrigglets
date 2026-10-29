@@ -295,7 +295,7 @@ OpenAI's own materials before relying on details.
 | `apps/agent-server`, `apps/agent-web` | the agent (API/BFF, worker, harness supervisor; UI) |
 | `apps/admin-server`, `apps/admin-web` | control plane and admin console (runs in the temporal container) |
 | `apps/oauth-server`, `apps/oauth-web` | OpenID Connect server and sign-in pages |
-| `apps/mcp-gateway`, `apps/mcp-demo`, `apps/mcp-web` | MCP gateway (tools, kill switch, A2A broker), example upstream and internet access (search, fetch) |
+| `apps/mcp-gateway`, `apps/mcp-demo`, `apps/mcp-web`, `apps/mcp-wiki` | MCP gateway (tools, kill switch, A2A broker), example upstream, internet access (search, fetch) and the company wiki people govern |
 | `packages/secrets` | Key Vault access (`@azure/keyvault-secrets`), works against the emulator and Azure |
 | `packages/*` | shared DTOs, workflows, codec, harness config, OIDC RP, MUI theme/components |
 | `infra/docker` | multi-target Dockerfile and agent entrypoint |

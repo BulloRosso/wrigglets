@@ -132,6 +132,8 @@ a mitigation either works in the simulation or it does not.
 
 ![ERP/CRM status page, baseline](docs/images/mitigations/s0-erp-baseline.png)
 
+Customer names are blurred in the screenshots of this status page (`/dashboard?blur=customers`).
+
 Rules the agents work with: a regular worker makes 20 sofas a day, a temporary worker 15 (available three workdays after
 booking), a factory tops out at 48 a day, overtime adds 25 % (EUR 1,400 per factory and day); a machine that is down stops the
 whole factory; a repair starts only when the spare part has arrived and takes two workdays; suppliers have lead times, prices,

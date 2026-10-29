@@ -202,7 +202,7 @@ async function runScenario(sc, shots, attempt = 1, guardStops = []) {
   const afterIncident = await kpi();
   log(`   incident injected: ${afterIncident.lateOrders} late orders, ${afterIncident.unplannedOrders.length} unplanned, shortages ${JSON.stringify(afterIncident.materialShortages)}`);
   await sleep(500);
-  await shot(adminMail, `${MOCK_HOST}/dashboard`, 'erp-after-incident', { fullPage: true });
+  await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-incident', { fullPage: true });
 
   const known = new Set((await allTasks()).map((t) => t.taskId));
   const requester = await as(sc.requester, sc.agent);
@@ -295,7 +295,7 @@ async function runScenario(sc, shots, attempt = 1, guardStops = []) {
   log(`   result: late orders ${afterIncident.lateOrders} → ${after.lateOrders}, unplanned ${afterIncident.unplannedOrders.length} → ${after.unplannedOrders.length}, cost € ${after.costOfMeasuresEur}`);
 
   // evidence of the outcome, from the people's point of view
-  await shot(adminMail, `${MOCK_HOST}/dashboard`, 'erp-after-mitigation', { fullPage: true });
+  await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-mitigation', { fullPage: true });
   for (const d of described) {
     const owner = HUMANS[AGENTS[d.agentId].owner];
     await shot(owner.email, `${baseUrl[d.agentId]}/tasks/${d.taskId}`, `done-${d.agent.toLowerCase()}`, { height: 1100, wait: 2000 });
@@ -391,7 +391,7 @@ try {
   for (const t of await allTasks()) if (!TERMINAL.has(t.status)) await (await as(AGENTS[t.agentId].owner, t.agentId).catch(() => undefined))?.raw(`${baseUrl[t.agentId]}/api/tasks/${t.taskId}/cancel`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => undefined);
   if (shots && !only) {
     await post('/reset');
-    await shots.snap(env.BOOTSTRAP_ADMIN_EMAIL, `${MOCK_HOST}/dashboard`, 's0-erp-baseline', { fullPage: true });
+    await shots.snap(env.BOOTSTRAP_ADMIN_EMAIL, `${MOCK_HOST}/dashboard?blur=customers`, 's0-erp-baseline', { fullPage: true });
   }
   const order = args.order ? String(args.order).split(',').map(Number) : SCENARIOS.map((x) => x.n);
   for (const n of order) {

@@ -70,5 +70,5 @@ export class Shots {
   }
 }
 
-export const dashboardUrl = `${MOCK}/dashboard`;
+export const dashboardUrl = `${MOCK}/dashboard?blur=customers`;
 export { HOST };

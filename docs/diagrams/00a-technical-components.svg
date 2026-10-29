@@ -32,7 +32,7 @@
   </defs>
   <rect width="1200" height="1180" rx="16" fill="#ffffff"/>
   <text x="32" y="44" class="t">Wrigglets — technical components</text>
-  <text x="32" y="66" class="st">Containers of the local stack (docker-compose.yml), their ports and how they talk to each other. Numbers refer to the table below. Responsibilities: 00b.</text>
+  <text x="32" y="66" class="st">Containers of the local stack (docker-compose.yml), ports and connections (numbers: see list below), incl. private and company wiki. Responsibilities: 00b.</text>
 
   <!-- People -->
   <rect class="usr" x="32" y="86" width="560" height="54" rx="10"/>
@@ -52,7 +52,7 @@
   <text x="48" y="270" class="d">• Node process: web UI + API (OIDC)</text>
   <text x="48" y="290" class="d">• Temporal worker (workflows, activities)</text>
   <text x="48" y="310" class="d">• Agent Harness (opencode) + guard plugin</text>
-  <text x="48" y="330" class="d">• Git workspace + artifacts (volume)</text>
+  <text x="48" y="330" class="d">• Git workspace, artifacts, private wiki/ (volume)</text>
   <text x="48" y="350" class="d">• A2A server · exfiltration guard service</text>
   <text x="48" y="370" class="d">• file preview (md, PDF, images, Excel …)</text>
 
@@ -102,22 +102,27 @@
   <text x="846" y="596" class="d">• PostgreSQL: keys and spend logs</text>
 
   <!-- Row C -->
-  <rect class="sup" x="32" y="684" width="164" height="84" rx="10"/>
-  <text x="46" y="708" class="h">mcp-demo</text>
-  <text x="46" y="725" class="img">internal :7500</text>
-  <text x="46" y="746" class="d">company systems</text>
-  <text x="46" y="760" class="d">(suppliers, FX)</text>
-  <rect class="sup" x="208" y="684" width="164" height="84" rx="10"/>
-  <text x="222" y="708" class="h">mcp-web</text>
-  <text x="222" y="725" class="img">internal :7600</text>
-  <text x="222" y="746" class="d">internet access</text>
-  <text x="222" y="760" class="d">(search, fetch)</text>
+  <rect class="sup" x="32" y="684" width="108" height="84" rx="10"/>
+  <text x="42" y="708" class="h">mcp-demo</text>
+  <text x="42" y="725" class="img">internal :7500</text>
+  <text x="42" y="746" class="d">company data</text>
+  <text x="42" y="760" class="d">(suppliers, FX)</text>
+  <rect class="sup" x="148" y="684" width="108" height="84" rx="10"/>
+  <text x="158" y="708" class="h">mcp-web</text>
+  <text x="158" y="725" class="img">internal :7600</text>
+  <text x="158" y="746" class="d">internet access</text>
+  <text x="158" y="760" class="d">(search, fetch)</text>
+  <rect class="ag" x="264" y="684" width="108" height="84" rx="10"/>
+  <text x="274" y="708" class="h">mcp-wiki</text>
+  <text x="274" y="725" class="img">internal :7700</text>
+  <text x="274" y="746" class="d">company wiki</text>
+  <text x="274" y="760" class="d">(people approve)</text>
 
   <rect class="sup" x="430" y="684" width="540" height="84" rx="10"/>
   <text x="446" y="708" class="h">Docker volumes</text>
   <text x="446" y="729" class="d">agent-&lt;id&gt;-home: Git workspace, artifacts · control-plane-data:</text>
   <text x="446" y="745" class="d">Temporal DB, registry, mail_out · oauth-data · mcp-gateway-data ·</text>
-  <text x="446" y="761" class="d">keyvault-certs · litellm-db-data</text>
+  <text x="446" y="761" class="d">keyvault-certs · litellm-db-data · mcp-wiki-data</text>
 
   <!-- External -->
   <text x="430" y="828" class="bl">External services (outbound HTTPS)</text>
@@ -141,11 +146,13 @@
   <path class="ln" d="M290,468 L290,402" marker-end="url(#a)"/>
   <path class="ln2" d="M220,400 L220,434 L1000,434 L1000,468" marker-end="url(#g)"/>
   <path class="ln" d="M372,555 L428,555" marker-end="url(#a)"/>
-  <path class="ln" d="M100,640 L100,682" marker-end="url(#a)"/>
-  <path class="ln" d="M290,640 L290,682" marker-end="url(#a)"/>
-  <path class="ln" d="M1000,640 L1000,838" marker-end="url(#a)"/>
+  <path class="ln" d="M86,640 L86,682" marker-end="url(#a)"/>
+  <path class="ln" d="M202,640 L202,682" marker-end="url(#a)"/>
+  <path class="ln" d="M318,640 L318,682" marker-end="url(#a)"/>
+  <path class="ln" d="M800,400 L800,662 L350,662 L350,682" marker-end="url(#a)"/>
+  <path class="ln" d="M1124,640 L1124,838" marker-end="url(#a)"/>
   <path class="ln" d="M440,400 L360,468" marker-end="url(#a)"/>
-  <path class="ln" d="M780,400 L860,468" marker-end="url(#a)"/>
+  <path class="ln" d="M850,400 L850,468" marker-end="url(#a)"/>
 
   <!-- badges -->
   <g>
@@ -158,11 +165,13 @@
     <circle class="bd" cx="290" cy="440" r="10"/><text class="bn" x="290" y="444">7</text>
     <circle class="bd" cx="620" cy="434" r="10"/><text class="bn" x="620" y="438">8</text>
     <circle class="bd" cx="400" cy="555" r="10"/><text class="bn" x="400" y="559">9</text>
-    <circle class="bd" cx="100" cy="661" r="10"/><text class="bn" x="100" y="665">10</text>
-    <circle class="bd" cx="290" cy="661" r="10"/><text class="bn" x="290" y="665">10</text>
-    <circle class="bd" cx="1000" cy="740" r="10"/><text class="bn" x="1000" y="744">11</text>
+    <circle class="bd" cx="86" cy="661" r="10"/><text class="bn" x="86" y="665">10</text>
+    <circle class="bd" cx="202" cy="661" r="10"/><text class="bn" x="202" y="665">10</text>
+    <circle class="bd" cx="318" cy="661" r="10"/><text class="bn" x="318" y="665">10</text>
+    <circle class="bd" cx="800" cy="540" r="10"/><text class="bn" x="800" y="544">15</text>
+    <circle class="bd" cx="1124" cy="740" r="10"/><text class="bn" x="1124" y="744">11</text>
     <circle class="bd" cx="404" cy="440" r="10"/><text class="bn" x="404" y="444">13</text>
-    <circle class="bd" cx="820" cy="434" r="10"/><text class="bn" x="820" y="438">14</text>
+    <circle class="bd" cx="850" cy="440" r="10"/><text class="bn" x="850" y="444">14</text>
   </g>
 
   <!-- legend -->
@@ -178,14 +187,16 @@
     <text x="32" y="1106"><tspan font-weight="700">7</tspan>  Gateway → agent: A2A calls for delegated tasks</text>
     <text x="32" y="1126"><tspan font-weight="700">8</tspan>  Agent → LiteLLM: model calls with the agent's virtual key (green)</text>
     <text x="32" y="1146"><tspan font-weight="700">9</tspan>  Gateway → Key Vault: upstream credentials by reference</text>
-    <text x="620" y="970"><tspan font-weight="700">10</tspan>  Gateway → upstream MCP servers (company systems, internet)</text>
+    <text x="620" y="970"><tspan font-weight="700">10</tspan>  Gateway → upstream MCP servers (company systems, internet, wiki)</text>
     <text x="620" y="990"><tspan font-weight="700">11</tspan>  LiteLLM → OpenAI API: the real model, current prices</text>
     <text x="620" y="1010"><tspan font-weight="700">12</tspan>  Control plane → Mail API / OpenAI Images (outbound only)</text>
     <text x="620" y="1030"><tspan font-weight="700">13</tspan>  Control plane → gateway: pushes tool lists, allow-lists, kill</text>
     <text x="646" y="1046">switch; reads the tool-call audit</text>
     <text x="620" y="1066"><tspan font-weight="700">14</tspan>  Control plane → LiteLLM: creates keys, reads spend per agent</text>
-    <text x="620" y="1096" class="d">Also: all UIs and the admin console sign users in through</text>
-    <text x="620" y="1112" class="d">oauth (browser redirects). Everything runs on Docker Desktop;</text>
-    <text x="620" y="1128" class="d">Azure equivalents (Container Apps, APIM, Key Vault) in docs/azure.md.</text>
+    <text x="620" y="1086"><tspan font-weight="700">15</tspan>  Control plane → company wiki: REST with admin token (review</text>
+    <text x="646" y="1102">queue: approve, edit, reject; publish) — agents only propose</text>
+    <text x="620" y="1132" class="d">Also: all UIs and the admin console sign users in through</text>
+    <text x="620" y="1148" class="d">oauth (browser redirects). Everything runs on Docker Desktop;</text>
+    <text x="620" y="1164" class="d">Azure equivalents (Container Apps, APIM, Key Vault) in docs/azure.md.</text>
   </g>
 </svg>

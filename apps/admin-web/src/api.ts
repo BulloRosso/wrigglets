@@ -28,6 +28,10 @@ import type {
   KillSwitchEntry,
   KillSwitchState,
   SafetyRule,
+  ObservationInput,
+  SignalsAgentConfig,
+  SignalsConnectors,
+  SignalsHubStatus,
   SecurityAlert,
   ToolCallAuditEntry,
   UpstreamServer,
@@ -196,6 +200,16 @@ export const api = {
   wikiProposals: (status?: string) => apiFetch<WikiProposal[]>(`/api/wiki/proposals${status ? `?status=${status}` : ''}`),
   decideWikiProposal: (proposalId: string, decision: 'approve' | 'reject', comment?: string, content?: string) =>
     apiFetch<WikiProposal>(`/api/wiki/proposals/${id(proposalId)}/decide`, { method: 'POST', json: { decision, comment, content } }),
+  /* Signals (optional module, ADR-0037) */
+  signalsAvailable: () => apiFetch<{ available: boolean }>('/api/signals'),
+  signalsOverview: () =>
+    apiFetch<{ agents: string[]; connectors: Omit<SignalsConnectors, 'http'> & { http: Array<{ id: string; agentId: string; enabled: boolean }> }; status: SignalsHubStatus | { error: string } }>('/api/signals/overview'),
+  saveSignalsConnectors: (body: Pick<SignalsConnectors, 'imap' | 'mqtt'>) => apiFetch<SignalsConnectors>('/api/signals/connectors', { method: 'PUT', json: body }),
+  createSignalsHttpSource: (sourceId: string, agentId: string) => apiFetch<{ id: string; token: string }>('/api/signals/http-sources', { method: 'POST', json: { id: sourceId, agentId } }),
+  deleteSignalsHttpSource: (sourceId: string) => apiFetch<void>(`/api/signals/http-sources/${id(sourceId)}`, { method: 'DELETE' }),
+  agentSignals: (agentId: string) => apiFetch<{ available: boolean; config: SignalsAgentConfig }>(`/api/agents/${id(agentId)}/signals`),
+  setAgentSignals: (agentId: string, config: SignalsAgentConfig) => apiFetch<SignalsAgentConfig>(`/api/agents/${id(agentId)}/signals`, { method: 'PUT', json: config }),
+  sendObservation: (agentId: string, o: ObservationInput) => apiFetch<{ observationId: string; duplicate: boolean }>(`/api/agents/${id(agentId)}/signals/observations`, { method: 'POST', json: o }),
   audit: (target?: string) => apiFetch<AdminAuditEntry[]>(`/api/audit${target ? `?target=${id(target)}` : ''}`),
 };
 

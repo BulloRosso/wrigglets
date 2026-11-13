@@ -7,6 +7,7 @@ import { GatewayConfigService } from './gateway.js';
 import { KillSwitchService } from './killswitch.js';
 import { SafetyRuleEngine } from './safety.js';
 import { SecurityGuardService } from './security.js';
+import { SignalsControlService } from './signals.js';
 import { createAdminApp } from './api.js';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
@@ -70,6 +71,9 @@ async function main() {
         ...(config.WIKI_UPSTREAM_URL
           ? [{ name: 'wiki', description: 'Central company wiki, governed by people: agents read, search and propose edits (ADR-0035)', url: config.WIKI_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-wiki-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
+        ...(config.SIGNALS_HUB_URL && config.MCP_SIGNALS_TOKEN
+          ? [{ name: 'signals', description: 'Signals: report observations and list or resolve the open expectations of this agent (ADR-0037)', url: `${config.SIGNALS_HUB_URL.replace(/\/$/, '')}/mcp`, headers: { Authorization: { secretRef: 'mcp-signals-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          : []),
         ...(config.REDTEAM_UPSTREAM_URL
           ? [{ name: 'redteam', description: 'Red-team mock: CRM, tickets with prompt injections and a recording mail tool (no authentication)', url: config.REDTEAM_UPSTREAM_URL, headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
           : []),
@@ -83,6 +87,9 @@ async function main() {
   if (secrets && config.MCP_WEB_TOKEN && !(await secrets.exists('mcp-web-authorization').catch(() => true))) {
     await secrets.set('mcp-web-authorization', `Bearer ${config.MCP_WEB_TOKEN}`).catch((err) => logger.warn({ err: String(err) }, 'could not seed web secret'));
   }
+  if (secrets && config.SIGNALS_HUB_URL && config.MCP_SIGNALS_TOKEN && !(await secrets.exists('mcp-signals-authorization').catch(() => true))) {
+    await secrets.set('mcp-signals-authorization', `Bearer ${config.MCP_SIGNALS_TOKEN}`).catch((err) => logger.warn({ err: String(err) }, 'could not seed signals secret'));
+  }
   if (secrets && config.MCP_WIKI_TOKEN && !(await secrets.exists('mcp-wiki-authorization').catch(() => true))) {
     await secrets.set('mcp-wiki-authorization', `Bearer ${config.MCP_WIKI_TOKEN}`).catch((err) => logger.warn({ err: String(err) }, 'could not seed wiki secret'));
   }
@@ -93,6 +100,8 @@ async function main() {
   const guard = new SecurityGuardService(config.DATA_DIR, registry, killSwitch, audit);
   await guard.load();
   agents.extraAiModels = () => (guard.getConfig().model ? [guard.getConfig().model] : []);
+  const signals = new SignalsControlService(config.DATA_DIR, registry, runtime, killSwitch, audit);
+  await signals.load();
   const avatars = new AvatarService({
     dataDir: config.DATA_DIR,
     defaultReference: config.AVATAR_DEFAULT_REFERENCE,
@@ -105,7 +114,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

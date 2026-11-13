@@ -24,7 +24,7 @@ else
 fi
 
 # One call per attribute keeps the script independent of multi-attribute CLI syntax; "already exists" is ignored.
-for def in AgentId:Keyword RequestedBy:Keyword TaskType:Keyword TaskStatus:Keyword TaskTitle:Text Trigger:Keyword ScheduleId:Keyword ApprovedBy:KeywordList; do
+for def in AgentId:Keyword RequestedBy:Keyword TaskType:Keyword TaskStatus:Keyword TaskTitle:Text Trigger:Keyword ScheduleId:Keyword ApprovedBy:KeywordList SignalState:Keyword SignalDue:Datetime SignalSource:Keyword; do
   name="${def%%:*}"; type="${def##*:}"
   if temporal operator search-attribute create $ADDR --namespace "$NAMESPACE" --name "$name" --type "$type" 2>/tmp/sa.err; then
     echo "created $name ($type)"

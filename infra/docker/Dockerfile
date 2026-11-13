@@ -8,6 +8,7 @@
 #   mcp-demo       – example upstream MCP server
 #   mcp-web        – internet access (web search, fetch) as upstream MCP server
 #   mcp-wiki       – central company wiki: agents read and propose, people decide (ADR-0035)
+#   signals-hub    – Signals connectors (HTTP, IMAP, MQTT) + MCP upstream; optional overlay (ADR-0037)
 # The AI model is LiteLLM (official image, see docker-compose.yml) → OpenAI.
 #
 # All versions are pinned (spec §13 supply chain).
@@ -35,8 +36,10 @@ COPY apps/mcp-gateway/package.json apps/mcp-gateway/
 COPY apps/mcp-demo/package.json apps/mcp-demo/
 COPY apps/mcp-web/package.json apps/mcp-web/
 COPY apps/mcp-wiki/package.json apps/mcp-wiki/
+COPY apps/signals-hub/package.json apps/signals-hub/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
+COPY packages/signals/package.json packages/signals/
 COPY packages/codec/package.json packages/codec/
 COPY packages/harness-config/package.json packages/harness-config/
 COPY packages/auth-rp/package.json packages/auth-rp/
@@ -54,7 +57,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/mcp-gateway deploy --legacy --prod /out/mcp-gateway && \
     pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo && \
     pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web && \
-    pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki
+    pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki && \n    pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway
@@ -96,6 +99,19 @@ RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]
 EXPOSE 7700
+CMD ["node", "dist/main.js"]
+
+# ---------------------------------------------------------------- signals-hub (optional Signals module, ADR-0037)
+FROM ${NODE_IMAGE} AS signals-hub
+RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /out/signals-hub ./
+ENV NODE_ENV=production PORT=7800 DATA_DIR=/data
+RUN mkdir -p /data && chown node:node /data
+USER node
+VOLUME ["/data"]
+EXPOSE 7800
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- oauth

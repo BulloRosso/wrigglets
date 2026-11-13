@@ -33,6 +33,9 @@ const laterSecrets = () => ({
   MCP_WEB_TOKEN: secret(24),
   MCP_WIKI_TOKEN: secret(24),
   WIKI_ADMIN_TOKEN: secret(24),
+  // Signals (optional overlay docker-compose.signals.yml, ADR-0037)
+  SIGNALS_HUB_TOKEN: secret(32),
+  MCP_SIGNALS_TOKEN: secret(24),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
   CW_LITELLM_SALT_KEY: `sk-${secret(32)}`,

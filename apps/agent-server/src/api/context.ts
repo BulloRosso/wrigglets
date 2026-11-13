@@ -29,6 +29,8 @@ export interface ApiDeps {
   guard?: Pick<import('../guard/service.js').GuardService, 'evaluate' | 'token'>;
   /** Optional Entra OBO capability (ADR-0032); undefined when not enabled for this agent. */
   obo?: import('../obo/oboService.js').OboService;
+  /** Signals (optional module, ADR-0037); the routes answer 409 while it is switched off for this agent. */
+  signals?: import('../signals/service.js').SignalsService;
 }
 
 export class HttpError extends Error {

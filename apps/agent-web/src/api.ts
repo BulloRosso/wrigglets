@@ -19,7 +19,25 @@ import type {
   Timeline,
   WorkspaceChange,
   WorkspaceEntry,
+  ExpectationEdit,
+  ExpectationListItem,
+  ExpectationState,
+  InterpretResult,
+  ObservationInput,
+  ObservationRecord,
+  SignalAction,
 } from '@cw/shared';
+
+/** Signals of this agent (optional module, ADR-0037). */
+export interface SignalsInfo {
+  enabled: boolean;
+  brief: string;
+  defaultAction: SignalAction;
+  fulfilThreshold: number;
+  graceDays: number;
+  owner?: { upn: string; name: string };
+}
+
 
 export interface Me {
   user: Principal;
@@ -31,6 +49,17 @@ export interface Me {
 }
 
 export const api = {
+  signals: () => apiFetch<SignalsInfo>('/api/signals'),
+  expectations: (status: 'open' | 'closed' | 'all') => apiFetch<ExpectationListItem[]>(`/api/signals/expectations?status=${status}`),
+  expectation: (id: string) => apiFetch<ExpectationState>(`/api/signals/expectations/${encodeURIComponent(id)}`),
+  editExpectation: (id: string, body: ExpectationEdit) => apiFetch<ExpectationState>(`/api/signals/expectations/${encodeURIComponent(id)}/edit`, { method: 'POST', json: body }),
+  resolveExpectation: (id: string, kind: 'dismiss' | 'fulfill', reason: string) =>
+    apiFetch<ExpectationState>(`/api/signals/expectations/${encodeURIComponent(id)}/${kind}`, { method: 'POST', json: { reason } }),
+  observations: () => apiFetch<ObservationRecord[]>('/api/signals/observations'),
+  interpret: (observation: ObservationInput, brief?: string) =>
+    apiFetch<InterpretResult & { model?: string; costUsd?: number; open: number }>('/api/signals/interpret', { method: 'POST', json: { observation, brief } }),
+  commitObservation: (observation: ObservationInput, result: InterpretResult) =>
+    apiFetch<{ observationId: string; duplicate: boolean }>('/api/signals/commit', { method: 'POST', json: { observation, result } }),
   me: () => apiFetch<Me>('/api/me'),
   agentStatus: () => apiFetch<AgentStatusResponse>('/api/agent/status'),
   notifications: () => apiFetch<NotificationDto[]>('/api/notifications'),

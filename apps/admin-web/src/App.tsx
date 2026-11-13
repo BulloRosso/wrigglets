@@ -8,8 +8,10 @@ import OpenInNewOutlined from '@mui/icons-material/OpenInNewOutlined';
 import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
 import MailOutlined from '@mui/icons-material/MailOutlined';
 import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
+import SensorsOutlined from '@mui/icons-material/SensorsOutlined';
+import { useQuery } from '@tanstack/react-query';
 import { AppShell, ErrorAlert, Loading } from '@cw/ui';
-import { useMe } from './api';
+import { api, useMe } from './api';
 import { GlobalKillSwitch } from './components/KillSwitch';
 import { AgentDetailPage } from './pages/AgentDetailPage';
 import { AgentsPage } from './pages/AgentsPage';
@@ -18,17 +20,21 @@ import { DashboardPage } from './pages/DashboardPage';
 import { SafetyPage } from './pages/SafetyPage';
 import { MailPage } from './pages/MailPage';
 import { UsersPage } from './pages/UsersPage';
+import { SignalsPage } from './pages/SignalsPage';
 import { WikiPage } from './pages/WikiPage';
 
 export function App() {
   const me = useMe();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // Signals is optional (ADR-0037): shown only when the control plane has the module configured
+  const signals = useQuery({ queryKey: ['signals-available'], queryFn: api.signalsAvailable, enabled: !!me.data, staleTime: 60_000 });
   const nav = [
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
     { label: 'Safety & tools', icon: <ShieldOutlined />, to: '/safety' },
     { label: 'Company wiki', icon: <MenuBookOutlined />, to: '/wiki' },
+    ...(signals.data?.available ? [{ label: 'Signals', icon: <SensorsOutlined />, to: '/signals' }] : []),
     { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail' },
     { label: 'Users & access', icon: <GroupOutlined />, to: '/users' },
     { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit' },
@@ -62,6 +68,7 @@ export function App() {
           <Route path="/agents/:id" element={<AgentDetailPage />} />
           <Route path="/safety" element={<SafetyPage />} />
           <Route path="/wiki" element={<WikiPage />} />
+          <Route path="/signals" element={<SignalsPage />} />
           <Route path="/mail" element={<MailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />

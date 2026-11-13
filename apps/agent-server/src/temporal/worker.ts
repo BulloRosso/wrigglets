@@ -17,7 +17,7 @@ export async function createWorker(config: Config, connection: NativeConnection,
   const bundlePath = config.WORKFLOW_BUNDLE_PATH ?? path.resolve(here, '../workflow-bundle.js');
   const workflowSource = existsSync(bundlePath)
     ? { workflowBundle: { codePath: bundlePath } }
-    : { workflowsPath: fileURLToPath(import.meta.resolve('@cw/workflows')) };
+    : { workflowsPath: path.resolve(here, '../workflows-entry.js') };
   logger.info({ source: 'workflowBundle' in workflowSource ? bundlePath : 'runtime bundling' }, 'creating worker');
   return Worker.create({
     connection,

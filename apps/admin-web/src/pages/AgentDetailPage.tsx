@@ -52,6 +52,7 @@ import { api, avatarSrc, useMe } from '../api';
 import { CollaborationTab, PortraitTab, SafetyTab } from '../components/AgentTabs';
 import { AiBudgetTab } from '../components/AiBudgetTab';
 import { IdentityTab } from '../components/IdentityTab';
+import { SignalsTab } from '../components/SignalsTab';
 
 function Overview({ a }: { a: AgentSummary }) {
   const h = a.health;
@@ -426,7 +427,7 @@ function AgentAudit({ agentId }: { agentId: string }) {
   );
 }
 
-const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Instructions', 'Settings', 'Audit'] as const;
+const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Signals', 'Instructions', 'Settings', 'Audit'] as const;
 
 export function AgentDetailPage() {
   const { id = '' } = useParams();
@@ -504,6 +505,7 @@ export function AgentDetailPage() {
       {tab === 'Portrait' && <PortraitTab a={a} />}
       {tab === 'Collaboration' && <CollaborationTab a={a} />}
       {tab === 'Safety' && <SafetyTab a={a} />}
+      {tab === 'Signals' && <SignalsTab a={a} />}
       {tab === 'Instructions' && <AgentsMdEditor load={async () => (await api.agentsMd(id)).content} save={(content) => api.saveAgentsMd(id, content)} />}
       {tab === 'Settings' && <Settings a={a} />}
       {tab === 'Audit' && <AgentAudit agentId={id} />}

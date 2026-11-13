@@ -14,6 +14,10 @@ export const SA = {
   Trigger: defineSearchAttributeKey('Trigger', SearchAttributeType.KEYWORD),
   ScheduleId: defineSearchAttributeKey('ScheduleId', SearchAttributeType.KEYWORD),
   ApprovedBy: defineSearchAttributeKey('ApprovedBy', SearchAttributeType.KEYWORD_LIST),
+  /** Signals (ADR-0037): state, due date and source of an expectation workflow. */
+  SignalState: defineSearchAttributeKey('SignalState', SearchAttributeType.KEYWORD),
+  SignalDue: defineSearchAttributeKey('SignalDue', SearchAttributeType.DATETIME),
+  SignalSource: defineSearchAttributeKey('SignalSource', SearchAttributeType.KEYWORD),
 } as const;
 
 /** `name=Type` pairs in the format expected by `temporal server start-dev --search-attribute`. */
@@ -26,6 +30,9 @@ export const SEARCH_ATTRIBUTE_CLI_DEFINITIONS: Array<[string, string]> = [
   ['Trigger', 'Keyword'],
   ['ScheduleId', 'Keyword'],
   ['ApprovedBy', 'KeywordList'],
+  ['SignalState', 'Keyword'],
+  ['SignalDue', 'Datetime'],
+  ['SignalSource', 'Keyword'],
 ];
 
 /** Escapes a value for use inside a single-quoted visibility query literal. */

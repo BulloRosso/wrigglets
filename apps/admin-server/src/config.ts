@@ -87,6 +87,14 @@ const schema = z.object({
   WIKI_ADMIN_TOKEN: z.string().optional(),
   /** Red-team example (docs/red-teaming.md): mock MCP upstream without authentication. Unset = not registered. */
   REDTEAM_UPSTREAM_URL: z.string().url().optional().or(z.literal('')),
+  /*
+   * Signals (optional module, ADR-0037): proactive follow-up of observations and deadlines. Unset = off and hidden.
+   * SIGNALS_HUB_URL: base URL of the signals hub (connectors + MCP upstream at /mcp). SIGNALS_HUB_TOKEN: shared secret
+   * between hub and control plane (both directions). MCP_SIGNALS_TOKEN: seeded into Key Vault as `mcp-signals-authorization`.
+   */
+  SIGNALS_HUB_URL: z.string().url().optional().or(z.literal('')),
+  SIGNALS_HUB_TOKEN: z.string().optional(),
+  MCP_SIGNALS_TOKEN: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

@@ -382,6 +382,8 @@ function triggerLabel(state: TaskState): string {
       return `scheduled · ${state.trigger.scheduleId}`;
     case 'agent':
       return `delegated by agent ${state.trigger.callerAgentId} for ${state.requestedBy.name || state.requestedBy.upn}`;
+    case 'signal':
+      return `started by Signals: expectation ${state.trigger.expectationId} is overdue`;
     default:
       return 'requested by a person';
   }

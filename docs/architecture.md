@@ -734,3 +734,30 @@ signed-in user can use an agent-only token if upstream and agent allow it. Full 
 - **Workspace preview:** the file list refreshes every 10 s. If a file disappeared in the meantime (moved by a task step),
   the preview says so and refreshes the list.
 
+## 26. Signals (optional, [ADR-0037](adr/0037-optional-signals.md))
+
+Optional module: agents interpret incoming observations, track what should follow (expectations with a due date) and raise
+a signal when it is overdue.
+
+- **Where:** `cw-signals-hub` (port 7800) from the overlay `docker-compose.signals.yml`.
+  - Connectors: HTTP sources, IMAP accounts and MQTT brokers.
+  - A durable outbox.
+  - The MCP upstream `signals` (`observe`, `list_expectations`, `resolve_expectation`, with `_agent` and `_task` from the
+    gateway).
+- **Path of an observation:** hub outbox → `POST /internal/signals/observations` (control plane, hub token, kill switch)
+  → `POST /internal/signals/observe` (agent, control-plane token) → `observationWorkflow`.
+- **Workflows** (`packages/signals`, in the agent's bundle `dist/workflows-entry.js`):
+  - `observationWorkflow` (id `sig-obs-<agent>-<hash>`) calls the interpreter (agent's model, tool call
+    `record_interpretation`), fulfils matching expectations and starts `expectationWorkflow` children (id
+    `sig-exp-…-n`, parent close policy *abandon*).
+  - An expectation waits with `condition(…, dueAt)`, raises the signal (notify, or a task with `trigger: signal` and
+    `approval: plan`), then waits for the grace period.
+  - Search attributes: `SignalState`, `SignalDue`, `SignalSource`.
+- **Settings:** per agent in the control plane (`/internal/agents/:id/signals-config`, cached for 20 s by the agent). A 404
+  means the module is off.
+- **APIs:**
+  - Agent: `/api/signals`, `/api/signals/expectations[/:id[/edit|dismiss|fulfill]]`, `/api/signals/observations`,
+    `/api/signals/interpret` (dry run), `/api/signals/commit`.
+  - Control plane: `/api/signals`, `/api/signals/overview`, `/api/signals/connectors`, `/api/signals/http-sources`,
+    `/api/agents/:id/signals[/observations]`.
+- Full description: [signals.md](signals.md).

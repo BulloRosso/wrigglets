@@ -5,11 +5,14 @@ import TimelineOutlined from '@mui/icons-material/TimelineOutlined';
 import EventRepeatOutlined from '@mui/icons-material/EventRepeatOutlined';
 import FolderOutlined from '@mui/icons-material/FolderOutlined';
 import ManageSearchOutlined from '@mui/icons-material/ManageSearchOutlined';
+import SensorsOutlined from '@mui/icons-material/SensorsOutlined';
+import { useQuery } from '@tanstack/react-query';
 import { AgentPortrait, AppShell, ErrorAlert, KillSwitchChip, Loading } from '@cw/ui';
-import { agentMood, avatarUrl, useAgentStatus, useMe } from './api';
+import { agentMood, api, avatarUrl, useAgentStatus, useMe } from './api';
 import { NotificationsButton } from './components/NotificationsButton';
 import { AuditPage } from './pages/AuditPage';
 import { SchedulesPage } from './pages/SchedulesPage';
+import { SignalsPage } from './pages/SignalsPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { TasksPage } from './pages/TasksPage';
 import { TimelinePage } from './pages/TimelinePage';
@@ -21,6 +24,8 @@ export function App() {
   const ks = status.data?.killSwitch;
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // Signals is optional (ADR-0037): the menu entry appears when it is switched on for this agent
+  const signals = useQuery({ queryKey: ['signals'], queryFn: api.signals, enabled: !!me.data, staleTime: 30_000, retry: false });
   useEffect(() => {
     if (me.data) document.title = `${me.data.agent.displayName} · AI Colleague`;
   }, [me.data]);
@@ -29,6 +34,7 @@ export function App() {
     { label: 'Tasks', icon: <TaskAltOutlined />, to: '/tasks' },
     { label: 'Activity timeline', icon: <TimelineOutlined />, to: '/timeline' },
     { label: 'Schedules', icon: <EventRepeatOutlined />, to: '/schedules' },
+    ...(signals.data?.enabled ? [{ label: 'Signals', icon: <SensorsOutlined />, to: '/signals' }] : []),
     { label: 'Workspace', icon: <FolderOutlined />, to: '/workspace' },
     { label: 'Audit', icon: <ManageSearchOutlined />, to: '/audit' },
   ].map((n) => ({ ...n, selected: pathname === n.to || pathname.startsWith(`${n.to}/`), onClick: () => navigate(n.to) }));
@@ -58,6 +64,7 @@ export function App() {
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/schedules" element={<SchedulesPage />} />
+          <Route path="/signals" element={<SignalsPage />} />
           <Route path="/workspace/*" element={<WorkspacePage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="*" element={<Navigate to="/tasks" replace />} />

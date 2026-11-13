@@ -34,7 +34,9 @@ export type TaskTrigger =
   | { kind: 'user' }
   | { kind: 'schedule'; scheduleId: string; owner: Identity }
   /** Delegated by another agent via A2A (ADR-0023); requestedBy = the human behind the calling task. */
-  | { kind: 'agent'; callerAgentId: string; callerTaskId?: string; a2aTaskId: string };
+  | { kind: 'agent'; callerAgentId: string; callerTaskId?: string; a2aTaskId: string }
+  /** Started by the Signals module because an expectation is overdue (ADR-0037); always needs plan approval. */
+  | { kind: 'signal'; expectationId: string; observationId?: string };
 
 /** Who may decide on an approval request. */
 export type ApproverPolicy = 'approver-or-requester' | 'approver-only' | 'requester-only';

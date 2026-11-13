@@ -6,6 +6,7 @@
 | [architecture.md](architecture.md) | developers, architects | complete technical documentation with diagrams, APIs, configuration, verification, spec conformance |
 | [entra-obo.md](entra-obo.md) | architects, admins | optional Microsoft Entra On-Behalf-Of: MCP calls with agent and user identity (Foundry model), set-up, rules, operations |
 | [exfiltration-guard.md](exfiltration-guard.md) | everyone, security | the pre-tool-call evaluation agent against multi-turn prompt injection and data exfiltration: flow, configuration, limits |
+| [signals.md](signals.md) | everyone, admins | optional Signals module: agents interpret incoming mails and messages, track what should follow and raise a signal when it is overdue; set-up, safety, demo |
 | [red-teaming.md](red-teaming.md) | security, developers | a runnable red-team example against a real agent with a mock MCP server (no auth), scenarios and measured results |
 | [azure.md](azure.md) | architects, platform team | Azure resource types, mapping, technical implications, migration checklist |
 | [runbook.md](runbook.md) | operators | restart, stuck lock, failed tasks, restore, secret rotation, upgrades |

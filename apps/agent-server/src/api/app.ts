@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { mountA2a } from '../a2a/server.js';
 import { mountGuard } from '../guard/route.js';
 import { mountObo } from '../obo/route.js';
+import { mountSignalsInternal, signalsRouter } from '../signals/routes.js';
 import { safetyStats } from '../safetyStats.js';
 import type { Auth } from './auth.js';
 import { errorHandler, type ApiDeps } from './context.js';
@@ -44,6 +45,7 @@ export function createApp(deps: ApiDeps, auth: Auth): Express {
     if (!req.body?.by?.upn) return void res.status(400).json({ error: 'by.upn required' });
     agentsMd.put(() => req.body.by)(req, res, next);
   });
+  if (deps.signals) mountSignalsInternal(app, deps.signals, controlPlane);
   mountA2a(app, deps);
   mountGuard(app, deps.guard);
   mountObo(app, deps.obo, deps.config.A2A_GATEWAY_TOKEN);
@@ -63,6 +65,7 @@ export function createApp(deps: ApiDeps, auth: Auth): Express {
   api.use(scheduleRouter(deps));
   api.use(workspaceRouter(deps));
   api.use(miscRouter(deps));
+  if (deps.signals) api.use(signalsRouter(deps.signals, deps.audit));
   api.use((_req, res) => res.status(404).json({ error: 'not found' }));
   app.use('/api', api);
 

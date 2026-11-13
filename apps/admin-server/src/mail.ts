@@ -13,7 +13,7 @@ import { logger } from './logger.js';
  */
 
 export const notifyMailBody = z.object({
-  kind: z.enum(['approval_requested', 'approval_reminder']),
+  kind: z.enum(['approval_requested', 'approval_reminder', 'signal_raised']),
   taskId: z.string().min(1).max(200),
   title: z.string().min(1).max(300),
   text: z.string().max(2000).optional(),
@@ -73,6 +73,29 @@ export function approvalMailHtml(agentName: string, b: NotifyMailBody): { subjec
       <p style="margin:0 0 4px;font-size:14px"><a href="${esc(withParam(b.link, 'review'))}" style="color:#1f5fad">Review the ${b.awaiting === 'deviation' ? 'result' : 'plan'} first</a></p>
       <p style="margin:20px 0 0;color:#5b6777;font-size:12px">Each button opens the decision dialog in ${esc(agentName)}'s web UI after sign-in; nothing is decided by clicking the link alone.
       You receive this e-mail because you have access to ${esc(agentName)}. Only approvers or the requester can decide; the first decision counts.</p>
+    </td></tr>
+  </table>
+</body></html>`;
+  return { subject, html };
+}
+
+/** HTML of a signal (Signals, ADR-0037): an expected thing is overdue; links to the open loop or the follow-up task. */
+export function signalMailHtml(agentName: string, b: NotifyMailBody): { subject: string; html: string } {
+  const subject = `${agentName} noticed an open loop — ${b.title}`;
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(subject)}</title></head>
+<body style="margin:0;padding:24px;background:#f4f6fa;font-family:Roboto,'Segoe UI',Arial,sans-serif;color:#1d2733">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #dfe3ea">
+    <tr><td style="padding:20px 24px;background:#1f5fad;border-radius:12px 12px 0 0;color:#ffffff">
+      <div style="font-size:13px;opacity:.85">AI colleague · Signals</div>
+      <div style="font-size:22px;font-weight:600">${esc(agentName)}</div>
+    </td></tr>
+    <tr><td style="padding:24px">
+      <p style="margin:0 0 12px;font-size:16px">Something that was expected has not happened yet:</p>
+      <p style="margin:0 0 16px;font-size:18px;font-weight:600">${esc(b.title)}</p>
+      ${b.text ? `<p style="margin:0 0 20px;color:#37414f;font-size:14px">${esc(b.text)}</p>` : ''}
+      <a href="${esc(b.link)}" style="display:inline-block;margin:0 8px 8px 0;padding:10px 18px;border-radius:8px;background:#1f5fad;color:#ffffff;font-weight:600;text-decoration:none">Open</a>
+      <p style="margin:20px 0 0;color:#5b6777;font-size:12px">You receive this e-mail because you have access to ${esc(agentName)}. Nothing is done outside the platform without a person's approval.</p>
     </td></tr>
   </table>
 </body></html>`;

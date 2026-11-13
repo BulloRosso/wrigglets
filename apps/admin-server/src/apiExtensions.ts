@@ -24,11 +24,13 @@ import type { Config } from './config.js';
 import type { GatewayConfigService } from './gateway.js';
 import type { KillSwitchService } from './killswitch.js';
 import type { LiteLLMService } from './litellm.js';
-import { approvalMailHtml, notifyMailBody, type MailService } from './mail.js';
+import { approvalMailHtml, notifyMailBody, signalMailHtml, type MailService } from './mail.js';
 import type { OAuthAdmin } from './oauthAdmin.js';
 import type { AdminAudit, AgentRegistry } from './registry.js';
 import type { SafetyRuleEngine } from './safety.js';
 import type { SecurityGuardService } from './security.js';
+import type { SignalsControlService } from './signals.js';
+import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 
 export interface ExtensionDeps {
   config: Config;
@@ -46,6 +48,8 @@ export interface ExtensionDeps {
   agents: Pick<import('./agents.js').AgentService, 'update' | 'rotateAiKey' | 'aiModels' | 'setEntra' | 'syncAiKeys'>;
   smallModel: string;
   oauth: Pick<OAuthAdmin, 'users'>;
+  /** Signals (optional module, ADR-0037). */
+  signals: SignalsControlService;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -343,6 +347,9 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
     res.json(out);
   });
 
+  /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
+  r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
+
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
     const all = await d.mail.list(500);
@@ -363,6 +370,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
 /** Machine-to-machine endpoints (no user session). */
 export function internalRouter(d: ExtensionDeps): Router {
   const r = Router();
+  r.use(signalsInternalRouter({ config: d.config, signals: d.signals, registry: d.registry }));
   r.get('/gateway-config', (req, res) => {
     if (!safeEqual(bearer(req), d.config.GATEWAY_TOKEN)) return res.status(401).json({ error: 'unauthorized' });
     res.json(d.gateway.build());
@@ -404,9 +412,9 @@ export function internalRouter(d: ExtensionDeps): Router {
       .filter((u) => !u.disabled && ((u.agentRoles[agentId]?.length ?? 0) > 0 || (u.agentRoles['*']?.length ?? 0) > 0))
       .map((u) => u.email)
       .sort();
-    const { subject, html } = approvalMailHtml(entry.spec.displayName, body);
+    const { subject, html } = body.kind === 'signal_raised' ? signalMailHtml(entry.spec.displayName, body) : approvalMailHtml(entry.spec.displayName, body);
     const rec = await d.mail.send({ agentId, agentName: entry.spec.displayName, taskId: body.taskId, kind: body.kind, to, subject, html });
-    await d.audit.write({ by: `agent:${agentId}`, action: 'mail.approval', target: agentId, details: { taskId: body.taskId, recipients: to.length, status: rec.status } });
+    await d.audit.write({ by: `agent:${agentId}`, action: body.kind === 'signal_raised' ? 'mail.signal' : 'mail.approval', target: agentId, details: { taskId: body.taskId, recipients: to.length, status: rec.status } });
     res.json({ id: rec.id, recipients: to.length, status: rec.status });
   });
   return r;

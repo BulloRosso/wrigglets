@@ -74,7 +74,9 @@ export function conversationOf(state: TaskState, agentName: string, chat: TaskCh
         ? { label: `Scheduled · ${state.trigger.scheduleId}`, color: 'default' }
         : state.trigger.kind === 'agent'
           ? { label: `Delegated by agent ${state.trigger.callerAgentId}`, color: 'info' }
-          : undefined,
+          : state.trigger.kind === 'signal'
+            ? { label: 'Signals · overdue expectation', color: 'warning' }
+            : undefined,
   });
   for (const s of state.steps) {
     const isPlan = s.kind === 'plan';

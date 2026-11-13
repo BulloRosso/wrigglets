@@ -119,7 +119,8 @@ export function NotificationsButton() {
                   })}
                   onClick={() => {
                     setAnchor(null);
-                    navigate(`/tasks/${encodeURIComponent(n.taskId)}`);
+                    // Signals notices point at an expectation (sig-exp-…), everything else at a task
+                    navigate(n.taskId.startsWith('sig-exp-') ? `/signals?expectation=${encodeURIComponent(n.taskId)}` : `/tasks/${encodeURIComponent(n.taskId)}`);
                   }}
                 >
                   <ListItemAvatar sx={{ minWidth: 48 }}>

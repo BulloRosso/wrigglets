@@ -1,0 +1,77 @@
+# Signals (optional module, ADR-0037, docs/signals.md): proactive reasoning on incoming observations and deadlines.
+# Adds the signals hub (HTTP ingest, IMAP and MQTT connectors, MCP upstream `signals`) and switches the module on in
+# the control plane. For local trials it also starts a test mail server (GreenMail: SMTP 3025, IMAP 3143) and an MQTT
+# broker (Mosquitto: 1883); remove them from this file for real mailboxes and brokers.
+#
+#   node scripts/stack.mjs env        # adds SIGNALS_HUB_TOKEN and MCP_SIGNALS_TOKEN to .env if missing
+#   docker compose -f docker-compose.yml -f docker-compose.signals.yml up -d --build
+#   node scripts/signals-demo/setup.mjs && node scripts/signals-demo/run.mjs
+#
+# Switch it off again: docker compose -f docker-compose.yml -f docker-compose.signals.yml rm -sf signals-hub greenmail mosquitto
+# and start the stack without this file (the admin console then hides Signals; delete the upstream `signals` under
+# Safety & tools). Open expectations stay in Temporal and expire on their own.
+
+services:
+  temporal:
+    environment:
+      SIGNALS_HUB_URL: http://signals-hub:7800
+      SIGNALS_HUB_TOKEN: ${SIGNALS_HUB_TOKEN:?run scripts/stack.mjs env to add SIGNALS_HUB_TOKEN}
+      MCP_SIGNALS_TOKEN: ${MCP_SIGNALS_TOKEN:?run scripts/stack.mjs env to add MCP_SIGNALS_TOKEN}
+
+  signals-hub:
+    build: { context: ., dockerfile: infra/docker/Dockerfile, target: signals-hub }
+    image: coworking/signals-hub:local
+    container_name: cw-signals-hub
+    hostname: signals-hub
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7800:7800" # HTTP ingest from the host (POST /observations)
+    volumes:
+      - signals-hub-data:/data
+      - keyvault-certs:/certs:ro
+    environment:
+      SIGNALS_HUB_TOKEN: ${SIGNALS_HUB_TOKEN:?}
+      MCP_SIGNALS_TOKEN: ${MCP_SIGNALS_TOKEN:?}
+      CONTROL_PLANE_URL: http://temporal:8080
+      KEYVAULT_URL: https://keyvault:8443
+      KEYVAULT_EMULATOR: "true"
+      AZURE_POD_IDENTITY_AUTHORITY_HOST: http://keyvault:8080
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+    depends_on:
+      keyvault: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7800/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [coworking]
+
+  # Local test mail server: users log in with their e-mail address; nothing leaves the machine.
+  greenmail:
+    image: greenmail/standalone:2.1.14
+    container_name: cw-greenmail
+    hostname: greenmail
+    restart: unless-stopped
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users.login=email -Dgreenmail.users=office:office-signals@sofaworks.test
+    ports:
+      - "127.0.0.1:3025:3025" # SMTP from the host (the demo sends mails here)
+      - "127.0.0.1:3143:3143" # IMAP from the host (to look into the mailbox)
+    networks: [coworking]
+
+  # Local MQTT broker (anonymous, local network only)
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    container_name: cw-mosquitto
+    hostname: mosquitto
+    restart: unless-stopped
+    volumes:
+      - ./infra/signals/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "127.0.0.1:1883:1883"
+    networks: [coworking]
+
+volumes:
+  signals-hub-data:

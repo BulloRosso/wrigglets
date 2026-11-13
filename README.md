@@ -79,6 +79,15 @@ Each building block is described by what it gives you first, then by where it li
   private addresses.
   *In the project:* web search and page reading as gateway tools ([`apps/mcp-web`](apps/mcp-web),
   [ADR-0031](docs/adr/0031-internet-access-via-mcp.md)).
+- **Agents that notice open loops** (Signals, optional `signals-hub` container)
+  An agent reads incoming mails, machine messages and posts from other systems, recognises what should follow (the
+  invoice after a hotel stay, the answer a customer promised by Friday) and keeps track of it. When something is
+  overdue it tells you or proposes a follow-up task that you approve first. A good agent completes a task; Signals
+  notices that there is one.
+  *In the project:* an optional overlay with IMAP, MQTT and HTTP connectors and a durable outbox; one Temporal workflow
+  per open expectation in the agent's namespace; settings per agent in the admin console, open loops and a playground
+  in the agent UI ([`apps/signals-hub`](apps/signals-hub), [`packages/signals`](packages/signals),
+  [docs/signals.md](docs/signals.md), [ADR-0037](docs/adr/0037-optional-signals.md)).
 - **Shared knowledge that people govern** (company wiki, `mcp-wiki` container)
   Agents read a company wiki and propose changes; nothing is published until a person approves it in the admin console, with
   the diff, the reason and the evidence in front of them. Each agent also keeps its own wiki for its tactics.
@@ -284,6 +293,7 @@ OpenAI's own materials before relying on details.
 - [Guided tour](guided-tour.md): set up an agent and work with it, step by step with screenshots
 - [Technical documentation](docs/architecture.md) (architecture, diagrams, APIs, configuration, verification)
 - [Exfiltration guard](docs/exfiltration-guard.md): protection against multi-turn prompt injection
+- [Signals](docs/signals.md): optional module, agents notice open loops in incoming mails and messages
 - [Azure target and resource types](docs/azure.md)
 - [Runbook](docs/runbook.md)
 - [Architecture Decision Records](docs/adr/README.md)
@@ -296,13 +306,14 @@ OpenAI's own materials before relying on details.
 | `apps/admin-server`, `apps/admin-web` | control plane and admin console (runs in the temporal container) |
 | `apps/oauth-server`, `apps/oauth-web` | OpenID Connect server and sign-in pages |
 | `apps/mcp-gateway`, `apps/mcp-demo`, `apps/mcp-web`, `apps/mcp-wiki` | MCP gateway (tools, kill switch, A2A broker), example upstream, internet access (search, fetch) and the company wiki people govern |
+| `apps/signals-hub`, `packages/signals` | optional Signals module: connectors (HTTP, IMAP, MQTT) with outbox and MCP tools; observation and expectation workflows |
 | `packages/secrets` | Key Vault access (`@azure/keyvault-secrets`), works against the emulator and Azure |
 | `packages/*` | shared DTOs, workflows, codec, harness config, OIDC RP, MUI theme/components |
 | `infra/docker` | multi-target Dockerfile and agent entrypoint |
 | `infra/keyvault` | local CA and TLS certificate for the Key Vault emulator |
 | `assets` | default guiding image for agent portraits |
 | `infra/temporal` | namespace bootstrap script for self-hosted Temporal (Azure) |
-| `docker-compose.yml`, `scripts/stack.mjs` | local stack |
+| `docker-compose.yml`, `scripts/stack.mjs` | local stack (`docker-compose.signals.yml`: optional Signals overlay) |
 
 ## Tests
 

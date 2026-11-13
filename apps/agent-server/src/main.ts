@@ -16,6 +16,7 @@ import { HarnessEventBus } from './harness/events.js';
 import { HarnessSupervisor } from './harness/supervisor.js';
 import { logger } from './logger.js';
 import { NotificationStore } from './notifications.js';
+import { SignalsService } from './signals/service.js';
 import { initTelemetry } from './telemetry.js';
 import { ensureAgentWorkflow, ensureSystemSchedules } from './temporal/bootstrap.js';
 import { connectClient, connectWorker, createDataConverter } from './temporal/connection.js';
@@ -102,7 +103,8 @@ async function main() {
   const spend = new SpendClient(config);
   const obo = createObo(config);
   if (obo) logger.info({ scope: obo.userScope, agentOnly: config.ENTRA_ALLOW_AGENT_ONLY }, 'Entra OBO enabled');
-  const deps = { config, temporal: client, codec, git, events, notifications, audit: appAudit, health, spend, guard: config.HARNESS_ENABLED ? guard : undefined, obo: obo?.service };
+  const signals = new SignalsService({ config, temporal: () => client, audit: appAudit, spend });
+  const deps = { config, temporal: client, codec, git, events, notifications, audit: appAudit, health, spend, guard: config.HARNESS_ENABLED ? guard : undefined, obo: obo?.service, signals };
   const app = createApp(deps, createAuth(config, obo));
   const server: Server = app.listen(config.port, () => logger.info({ port: config.port, url: config.publicBaseUrl }, 'http server listening'));
   server.keepAliveTimeout = 65_000;
@@ -120,6 +122,7 @@ async function main() {
     gateway: new GatewayClient(config.MCP_GATEWAY_BASE_URL, config.AGENT_ID, config.MCP_GATEWAY_TOKEN),
     spend,
     guard,
+    signals,
   });
 
   let workerDone: Promise<void> | undefined;

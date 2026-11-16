@@ -168,7 +168,7 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
     # ------------------------------------------------------------------ actions
     actions = []
     action_names = set()
-    allowed_action = {"name", "description", "target", "kind", "read_only", "destructive", "mcp_group", "input", "preconditions", "emits", "starts_workflow", "signals_workflow"}
+    allowed_action = {"name", "description", "target", "kind", "read_only", "destructive", "mcp_group", "input", "preconditions", "emits", "starts_workflow", "signals_workflow", "aliases", "deprecated"}
     for i, a in enumerate(actions_doc.get("actions") or []):
         name = a.get("name") if isinstance(a, dict) else None
         path = f"actions.yaml#{name or f'actions[{i}]'}"
@@ -236,6 +236,14 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
         if signals is not None:
             if not isinstance(signals, dict) or set(signals) != {"workflow", "signal"} or not NAME.match(str(signals.get("workflow"))) or not ACTION.match(str(signals.get("signal"))):
                 err(f"{path}.signals_workflow", "{ workflow: PascalCase, signal: snake_case }")
+        aliases = a.get("aliases")
+        if aliases is not None and (not isinstance(aliases, list) or not all(isinstance(x, str) and ACTION.match(x) for x in aliases)):
+            err(f"{path}.aliases", "a list of snake_case former action names")
+            aliases = None
+        deprecated = a.get("deprecated")
+        if deprecated is not None and not isinstance(deprecated, str):
+            err(f"{path}.deprecated", "a deprecation note (text)")
+            deprecated = None
         pre = list(a.get("preconditions") or [])
         for p in pre:
             if not ACTION.match(str(p)):
@@ -253,7 +261,20 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
             "emits": emits,
             "startsWorkflow": starts,
             "signalsWorkflow": signals,
+            "aliases": sorted(aliases) if aliases else None,
+            "deprecated": deprecated,
         }))
+
+    # aliases must not collide with action names or with each other (they become tool names)
+    seen_alias: dict[str, str] = {}
+    action_names = {x["name"] for x in actions}
+    for x in actions:
+        for al in x.get("aliases") or []:
+            if al in action_names:
+                err(f"actions.yaml#{x['name']}.aliases", f"alias '{al}' is the name of an action")
+            elif al in seen_alias:
+                err(f"actions.yaml#{x['name']}.aliases", f"alias '{al}' is already an alias of {seen_alias[al]}")
+            seen_alias[al] = x["name"]
 
     # ------------------------------------------------------------------ bindings
     bindings = []

@@ -502,6 +502,9 @@ importers:
       '@cw/lake':
         specifier: workspace:*
         version: link:../../packages/lake
+      '@cw/ontology-codegen':
+        specifier: workspace:*
+        version: link:../../packages/ontology-codegen
       '@cw/ontology-ir':
         specifier: workspace:*
         version: link:../../packages/ontology-ir

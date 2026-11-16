@@ -72,6 +72,10 @@ export const irAction = z.object({
   startsWorkflow: pascal.optional(),
   /** Signal sent to the running workflow of the action's object (M5). */
   signalsWorkflow: z.object({ workflow: pascal, signal: snake }).optional(),
+  /** Former names still served as deprecated tools (renames without breaking callers, M8). */
+  aliases: z.array(snake).optional(),
+  /** Deprecation note: the action still works, tools say so; removal is a breaking change later. */
+  deprecated: z.string().optional(),
 });
 
 export const irBinding = z.object({

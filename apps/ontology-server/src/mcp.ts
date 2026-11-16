@@ -1,10 +1,12 @@
-import { MCP_TOOLS } from '@cw/ontology-sofa';
+import { mcpTools } from '@cw/ontology-codegen';
+import type { OntologyIr } from '@cw/ontology-ir';
 import { OntologyService } from './service.js';
 
 /*
  * MCP over HTTP (stateless JSON-RPC, the same wire behaviour as the sofa mock the gateway already talks to).
  *   /onto/mcp  every action of the ontology       /erp/mcp, /crm/mcp  the parity groups (same names as the mock)
- * Tool definitions come from the generated MCP_TOOLS. Each tool additionally declares the caller fields the gateway
+ * Tool definitions are computed from the ontology version in force (runtime IR, ADR-0048); deprecated aliases are
+ * served as extra tools that run the renamed action. Each tool additionally declares the caller fields the gateway
  * fills in and hides from the model (_agent, _task, _requestedBy, apps/mcp-gateway caller.ts), so every event records
  * which agent, task and person caused it.
  */
@@ -19,13 +21,16 @@ const CALLER_SCHEMA = {
   _step: { type: 'string', description: 'Set by the gateway: task step (plan | run | fix)' },
 };
 
-export function toolsFor(group: Group) {
-  return MCP_TOOLS.filter((t) => group === 'onto' || t.group === group).map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: { ...t.inputSchema, properties: { ...t.inputSchema.properties, ...CALLER_SCHEMA } },
-    annotations: t.annotations,
-  }));
+export function toolsFor(ir: OntologyIr, group: Group) {
+  const defs = mcpTools(ir);
+  const out = defs.flatMap((t) => {
+    const a = ir.actions.find((x) => x.name === t.name)!;
+    const description = a.deprecated ? `DEPRECATED (${a.deprecated}). ${t.description}` : t.description;
+    const tool = { name: t.name, description, inputSchema: { ...t.inputSchema, properties: { ...t.inputSchema.properties, ...CALLER_SCHEMA } }, annotations: t.annotations, group: t.group };
+    const aliases = (a.aliases ?? []).map((al) => ({ ...tool, name: al, description: `DEPRECATED alias of ${t.name} (renamed in ontology ${ir.version}). ${t.description}` }));
+    return [tool, ...aliases];
+  });
+  return out.filter((t) => group === 'onto' || t.group === group).map(({ group: _g, ...t }) => t);
 }
 
 interface RpcMessage {
@@ -45,10 +50,10 @@ export async function rpc(svc: OntologyService, group: Group, msg: RpcMessage) {
     case 'ping':
       return { jsonrpc: '2.0', id, result: {} };
     case 'tools/list':
-      return { jsonrpc: '2.0', id, result: { tools: toolsFor(group) } };
+      return { jsonrpc: '2.0', id, result: { tools: toolsFor(svc.ir, group) } };
     case 'tools/call': {
       const name = params?.name ?? '';
-      if (!toolsFor(group).some((t) => t.name === name)) return { jsonrpc: '2.0', id, result: text(`Unknown tool ${name}`, true) };
+      if (!toolsFor(svc.ir, group).some((t) => t.name === name)) return { jsonrpc: '2.0', id, result: text(`Unknown tool ${name}`, true) };
       try {
         const { args, caller } = OntologyService.splitCaller(params?.arguments ?? {});
         // approvals and workflow identity never come from an agent's tool call

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Liquid Enterprise ontology server (ADR-0040, ADR-0043): the only write path for business data — action pipeline, MCP (onto/erp/crm) and REST, event log, projection rebuildable from events, lake flush.",
+  "description": "Liquid Enterprise ontology server (ADR-0040, ADR-0043): the only write path for business data \u2014 action pipeline, MCP (onto/erp/crm) and REST, event log, projection rebuildable from events, lake flush.",
   "main": "./dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@cw/lake": "workspace:*",
+    "@cw/ontology-codegen": "workspace:*",
     "@cw/ontology-ir": "workspace:*",
     "@cw/ontology-sofa": "workspace:*",
     "@cw/sofa-domain": "workspace:*",

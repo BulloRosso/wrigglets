@@ -98,10 +98,12 @@ export function objectsToWorld(o: Objects, meta: CompanyMeta): { world: CompanyW
 const same = (a: Row, b: Row) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Objects that differ between two states (added or changed: after = row; removed: after = null). Stable order. */
-export function diffObjects(before: Objects, after: Objects): Change[] {
+export function diffObjects(before: Objects, after: Objects, idOf: (cls: string) => string = identifierAttr): Change[] {
   const out: Change[] = [];
-  for (const cls of SOFA_CLASSES) {
-    const key = identifierAttr(cls);
+  // the domain's classes first (stable order), then classes of newer ontology versions (ADR-0048)
+  const extra = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((c) => !SOFA_CLASSES.includes(c)).sort();
+  for (const cls of [...SOFA_CLASSES, ...extra]) {
+    const key = idOf(cls);
     const b = new Map((before[cls] ?? []).map((r) => [String(r[key]), r]));
     const a = new Map((after[cls] ?? []).map((r) => [String(r[key]), r]));
     for (const [id, row] of a) if (!b.has(id) || !same(b.get(id)!, row)) out.push({ class: cls, id, after: row });
@@ -111,10 +113,10 @@ export function diffObjects(before: Objects, after: Objects): Change[] {
 }
 
 /** Applies changes to a set of objects (used by rebuild and the in-memory store). */
-export function applyChanges(o: Objects, changes: Change[]): Objects {
+export function applyChanges(o: Objects, changes: Change[], idOf: (cls: string) => string = identifierAttr): Objects {
   const next: Objects = Object.fromEntries(Object.entries(o).map(([k, v]) => [k, [...v]]));
   for (const c of changes) {
-    const key = identifierAttr(c.class);
+    const key = idOf(c.class);
     const rows = (next[c.class] ??= []);
     const i = rows.findIndex((r) => String(r[key]) === c.id);
     if (c.after === null) {

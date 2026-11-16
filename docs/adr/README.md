@@ -52,3 +52,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0045](0045-business-workflows-temporal.md) | Holdable business workflows in a separate Temporal namespace | Accepted |
 | [0046](0046-config-repository-proposals.md) | Desired state in a config repository; proposals and reconciler | Accepted |
 | [0047](0047-playbooks-tighten-only.md) | Playbooks, autonomy tiers and the tighten-only rule | Accepted |
+| [0048](0048-ontology-evolution-runtime.md) | Ontology evolution: runtime interpretation, compatibility, live migration | Accepted |

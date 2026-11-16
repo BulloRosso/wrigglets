@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import express, { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
-import { diffIr, type OntologyIr } from '@cw/ontology-ir';
+import { compatibility, diffIr, type OntologyIr } from '@cw/ontology-ir';
 import { HttpError } from '../agents.js';
 import { requireExtension } from '../extensions/api.js';
 import { LIQUID_ID } from '../extensions/liquid.js';
@@ -71,7 +71,7 @@ export function liquidConfigRouter(ext: ExtensionService, d: LiquidConfigDeps, b
     '/liquid/proposals',
     h(async (req, res) => {
       const changes = Array.isArray(req.body?.changes) ? (req.body.changes as Array<{ path?: unknown; content?: unknown }>).map((c) => ({ path: String(c.path ?? ''), content: c.content === null ? null : String(c.content ?? '') })) : [];
-      const p = await d.repo.propose({ title: String(req.body?.title ?? ''), reason: String(req.body?.reason ?? ''), evidence: str(req.body?.evidence), changes, author: { kind: 'person', id: by(req) } });
+      const p = await d.repo.propose({ title: String(req.body?.title ?? ''), reason: String(req.body?.reason ?? ''), evidence: str(req.body?.evidence), migrationNote: str(req.body?.migrationNote), changes, author: { kind: 'person', id: by(req) } });
       await d.audit?.write({ by: by(req), action: 'liquid.proposal.create', target: p.id, details: { paths: p.paths, valid: p.validation.ok } });
       res.status(201).json(p);
     }),
@@ -137,12 +137,16 @@ export function liquidConfigRouter(ext: ExtensionService, d: LiquidConfigDeps, b
       const dr = await d.drafts.get(String(req.params.id));
       const after = await compile(dr.files);
       let diff;
+      let compat;
       if (after.ok && after.ir) {
         const baseFiles = await d.repo.git.files(dr.base, `ontology/${dr.domain}/`);
         const before = await compile({ 'schema.yaml': baseFiles[`ontology/${dr.domain}/schema.yaml`] ?? '', 'actions.yaml': baseFiles[`ontology/${dr.domain}/actions.yaml`] ?? '', 'bindings.yaml': baseFiles[`ontology/${dr.domain}/bindings.yaml`] ?? '' }).catch(() => undefined);
-        if (before?.ir) diff = diffIr(before.ir as OntologyIr, after.ir);
+        if (before?.ir) {
+          diff = diffIr(before.ir as OntologyIr, after.ir);
+          compat = compatibility(before.ir as OntologyIr, after.ir);
+        }
       }
-      res.json({ ok: after.ok, errors: after.errors ?? [], ir: after.ir, diff });
+      res.json({ ok: after.ok, errors: after.errors ?? [], ir: after.ir, diff, compat });
     }),
   );
   r.post(
@@ -155,6 +159,7 @@ export function liquidConfigRouter(ext: ExtensionService, d: LiquidConfigDeps, b
         title: str(req.body?.title, 140) ?? `Ontology ${dr.domain}: ${dr.ops.length} change(s)`,
         reason: str(req.body?.reason) ?? 'Edited in the ontology editor',
         evidence: `Draft ${dr.id}, operations:\n${dr.ops.map((o) => JSON.stringify(o)).join('\n')}`,
+        migrationNote: str(req.body?.migrationNote),
         changes: (['schema.yaml', 'actions.yaml', 'bindings.yaml'] as const).map((n) => ({ path: `ontology/${dr.domain}/${n}`, content: dr.files[n] })),
         author: { kind: 'person', id: by(req) },
       });

@@ -1,6 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import type pg from 'pg';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { irHash, type OntologyIr } from '@cw/ontology-ir';
 import { loadIr, types } from '@cw/ontology-sofa';
 import { PARITY_CALLS, SCENARIO_IDS, SofaCompany, type Args } from '@cw/sofa-domain';
 import { rpc, toolsFor } from './mcp.js';
@@ -167,9 +168,9 @@ describe('projection rebuild, reset, write log', () => {
 
 describe('MCP', () => {
   it('groups: erp + crm + ungrouped (onto only) = onto; caller fields are declared for the gateway', () => {
-    expect(toolsFor('erp').length + toolsFor('crm').length + 1).toBe(toolsFor('onto').length);
-    expect(toolsFor('onto').map((t) => t.name)).toContain('release_purchase_order');
-    expect(Object.keys(toolsFor('erp')[0]!.inputSchema.properties)).toEqual(expect.arrayContaining(['_agent', '_task', '_requestedBy']));
+    expect(toolsFor(loadIr(), 'erp').length + toolsFor(loadIr(), 'crm').length + 1).toBe(toolsFor(loadIr(), 'onto').length);
+    expect(toolsFor(loadIr(), 'onto').map((t) => t.name)).toContain('release_purchase_order');
+    expect(Object.keys(toolsFor(loadIr(), 'erp')[0]!.inputSchema.properties)).toEqual(expect.arrayContaining(['_agent', '_task', '_requestedBy']));
   });
   it('tools/call through JSON-RPC records the caller the gateway injected', async () => {
     const out = (await rpc(svc, 'crm', { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'update_delivery_date', arguments: { orderId: 'SO-2105', newDate: '2026-11-06', reason: 'x', _agent: 'sofa-horst', _task: 't-9', _requestedBy: 'sabine@x' } } })) as { result: { content: Array<{ text: string }>; isError?: boolean } };
@@ -218,5 +219,114 @@ describe('shadow replay (M7)', () => {
     const b = await svc.shadowReplay({ fromSeq: 1, candidate });
     expect(b.reportHash).toBe(a.reportHash);
     expect((await svc.shadowReplay({ fromSeq: 1 })).reportHash).not.toBe(a.reportHash);
+  });
+});
+
+describe('ontology evolution (M8)', () => {
+  const d3 = (): OntologyIr => {
+    const ir = structuredClone(loadIr()) as OntologyIr;
+    ir.version = '0.2.0';
+    ir.classes.push({ name: 'Carrier', identifier: 'id', annotations: { criticality: 'normal', data_class: 'internal', owner: 'head-of-logistics' }, attributes: [{ name: 'id', range: 'string', rangeKind: 'type', required: true, multivalued: false, identifier: true }, { name: 'name', range: 'string', rangeKind: 'type', required: true, multivalued: false, identifier: false }] });
+    ir.classes.find((c) => c.name === 'PurchaseOrder')!.attributes.push({ name: 'carrier', range: 'Carrier', rangeKind: 'class', required: false, multivalued: false, identifier: false });
+    ir.links.push({ from: 'PurchaseOrder', attribute: 'carrier', to: 'Carrier', required: false, multivalued: false });
+    ir.events.push({ name: 'CarrierCreated', objectType: 'Carrier' }, { name: 'PurchaseOrderCarrierAssigned', objectType: 'PurchaseOrder' });
+    ir.actions.push(
+      { name: 'list_carriers', description: 'Carriers', target: 'Carrier', kind: 'query', readOnly: true, destructive: false, input: [{ name: 'name', range: 'string', rangeKind: 'type', required: false, multivalued: false }], preconditions: [], emits: [] },
+      { name: 'create_carrier', description: 'New carrier', target: 'Carrier', kind: 'create', readOnly: false, destructive: false, input: [{ name: 'name', range: 'string', rangeKind: 'type', required: true, multivalued: false }], preconditions: [], emits: ['CarrierCreated'] },
+      { name: 'assign_carrier', description: 'Carrier of a PO', target: 'PurchaseOrder', kind: 'update', readOnly: false, destructive: false, input: [{ name: 'poId', range: 'PurchaseOrder', rangeKind: 'class', required: true, multivalued: false }, { name: 'carrierId', range: 'Carrier', rangeKind: 'class', required: true, multivalued: false }], preconditions: [], emits: ['PurchaseOrderCarrierAssigned'] },
+    );
+    ir.hash = irHash(ir);
+    return ir;
+  };
+
+  it('the D3 change goes live without a restart: new tools, generic actions, projection migrated, no event lost', async () => {
+    await svc.execute('create_purchase_order', { supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 2000 });
+    const before = await events();
+    const next = d3();
+    expect((await svc.check(next)).compatibility.level).toBe('minor');
+    const out = await svc.apply(next, { note: 'D3: carriers' });
+    expect(out).toMatchObject({ applied: true, from: '0.1.0', to: '0.2.0', level: 'minor', migration: 'alter' });
+    expect(await events()).toBe(before + 1);
+    expect(toolsFor(svc.ir, 'onto').map((t) => t.name)).toEqual(expect.arrayContaining(['list_carriers', 'create_carrier', 'assign_carrier']));
+    const c = await svc.execute('create_carrier', { name: 'Nordfracht' }, { agent: 'sofa-lara' });
+    expect(c.isError).toBe(false);
+    const carrierId = JSON.parse(c.text).id as string;
+    expect((await svc.execute('assign_carrier', { poId: 'PO-4430', carrierId }, { agent: 'sofa-lara' })).isError).toBe(false);
+    expect((await svc.execute('assign_carrier', { poId: 'PO-4430', carrierId: 'NOPE' })).text).toMatch(/Unknown Carrier NOPE/);
+    expect(JSON.parse((await svc.execute('list_carriers', {})).text)).toEqual([{ id: carrierId, name: 'Nordfracht' }]);
+    expect(svc.objects().PurchaseOrder!.find((p) => p.id === 'PO-4430')!.carrier).toBe(carrierId);
+    const row = await db.query<{ carrier: string }>("SELECT carrier FROM projection.purchase_order WHERE id = 'PO-4430'");
+    expect(row.rows[0]!.carrier).toBe(carrierId);
+    const ev = await db.query<{ ontology_version: string }>("SELECT ontology_version FROM events WHERE type = 'CarrierCreated'");
+    expect(ev.rows[0]).toMatchObject({ ontology_version: '0.2.0' });
+    expect((await svc.execute('create_purchase_order', { supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 1000 })).isError).toBe(false);
+    expect((await svc.rebuild({ dryRun: true })).identical).toBe(true);
+    const again = new OntologyService(poolOf(db), loadIr());
+    await again.init();
+    expect(again.ir.version).toBe('0.2.0');
+    expect(again.objects().Carrier).toHaveLength(1);
+    expect(again.objects().PurchaseOrder!.find((p) => p.id === 'PO-4430')!.carrier).toBe(carrierId);
+  });
+
+  it('a rename keeps the old name as a deprecated alias that still works and is recorded', async () => {
+    const next = d3();
+    const a = next.actions.find((x) => x.name === 'list_suppliers')!;
+    a.name = 'find_suppliers';
+    a.aliases = ['list_suppliers'];
+    next.hash = irHash(next);
+    await svc.apply(next);
+    const tools = toolsFor(svc.ir, 'onto');
+    expect(tools.find((t) => t.name === 'list_suppliers')!.description).toMatch(/^DEPRECATED alias of find_suppliers/);
+    expect((await svc.execute('list_suppliers', { sku: 'BEAM-PINE-80' })).isError).toBe(false);
+  });
+
+  it('a breaking change needs the go-ahead and rebuilds the projection from the events', async () => {
+    await svc.apply(d3());
+    await svc.execute('create_carrier', { name: 'Nordfracht' });
+    const broken = structuredClone(svc.ir);
+    broken.version = '1.0.0';
+    broken.classes = broken.classes.filter((c) => c.name !== 'Carrier');
+    const po = broken.classes.find((c) => c.name === 'PurchaseOrder')!;
+    po.attributes = po.attributes.filter((x) => x.name !== 'carrier');
+    broken.links = broken.links.filter((l) => l.to !== 'Carrier');
+    broken.actions = broken.actions.filter((x) => !['list_carriers', 'create_carrier', 'assign_carrier'].includes(x.name));
+    broken.events = broken.events.filter((e) => !['CarrierCreated', 'PurchaseOrderCarrierAssigned'].includes(e.name));
+    broken.hash = irHash(broken);
+    const check = await svc.check(broken);
+    expect(check.compatibility.level).toBe('major');
+    expect(check.data.findings.map((f) => f.path)).toContain('Carrier');
+    await expect(svc.apply(broken)).rejects.toThrow(/needs a migration note/);
+    const out = await svc.apply(broken, { allowBreaking: true, note: 'carriers moved to the logistics system' });
+    expect(out).toMatchObject({ level: 'major', migration: 'rebuild', to: '1.0.0' });
+    expect(svc.objects().Carrier).toBeUndefined();
+    const t = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'projection' AND table_name = 'carrier'");
+    expect(t.rows[0]!.n).toBe(0);
+    expect(Number((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM events WHERE type = 'CarrierCreated'")).rows[0]!.n)).toBe(1);
+    expect((await svc.execute('list_suppliers', {})).isError).toBe(false);
+  });
+
+  it('a class that comes back is backfilled from its events (live state = rebuild)', async () => {
+    const first = d3();
+    await svc.apply(first);
+    const old = JSON.parse((await svc.execute('create_carrier', { name: 'Old Carrier' })).text).id as string;
+    const without = structuredClone(svc.ir);
+    without.version = '1.0.0';
+    without.classes = without.classes.filter((c) => c.name !== 'Carrier');
+    const po = without.classes.find((c) => c.name === 'PurchaseOrder')!;
+    po.attributes = po.attributes.filter((x) => x.name !== 'carrier');
+    without.links = without.links.filter((l) => l.to !== 'Carrier');
+    without.actions = without.actions.filter((x) => !['list_carriers', 'create_carrier', 'assign_carrier'].includes(x.name));
+    without.events = without.events.filter((e) => !['CarrierCreated', 'PurchaseOrderCarrierAssigned'].includes(e.name));
+    without.hash = irHash(without);
+    await svc.apply(without, { allowBreaking: true, note: 'gone' });
+    const back = structuredClone(first);
+    back.version = '1.1.0';
+    back.hash = irHash(back);
+    const out = await svc.apply(back);
+    expect(out).toMatchObject({ level: 'minor', migration: 'rebuild' });
+    expect(svc.objects().Carrier!.map((c) => c.id)).toEqual([old]);
+    const next = JSON.parse((await svc.execute('create_carrier', { name: 'New Carrier' })).text).id as string;
+    expect(next).not.toBe(old);
+    expect((await svc.rebuild({ dryRun: true })).identical).toBe(true);
   });
 });

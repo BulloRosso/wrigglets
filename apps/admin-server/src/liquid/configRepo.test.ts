@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import type { OntologyIr } from '@cw/ontology-ir';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -194,5 +197,65 @@ describe('config repository', () => {
     expect((await svc.decide(c.id, 'approve', ADMIN)).status).toBe('approved');
     expect((await allowList())['sofa-max']).toEqual(['erp__get_state']);
     expect(Object.keys(await svc.git.files('main'))).toContain('playbooks/x.yaml');
+  });
+});
+
+describe('ontology changes (M8)', () => {
+  const baseIr = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../packages/ontology-sofa/ir/ontology.ir.json'), 'utf8')) as OntologyIr;
+  const variant = (schema: string): OntologyIr => {
+    const ir = structuredClone(baseIr);
+    if (schema.includes('# carrier')) {
+      ir.version = schema.includes('# v0.2.0') ? '0.2.0' : '0.1.0';
+      ir.classes.push({ name: 'Carrier', identifier: 'id', annotations: { criticality: 'normal', data_class: 'internal', owner: 'head-of-logistics' }, attributes: [{ name: 'id', range: 'string', rangeKind: 'type', required: true, multivalued: false, identifier: true }] });
+    }
+    if (schema.includes('# drop-note')) {
+      ir.version = '1.0.0';
+      const po = ir.classes.find((c) => c.name === 'PurchaseOrder')!;
+      po.attributes = po.attributes.filter((a) => a.name !== 'note');
+    }
+    return ir;
+  };
+  const ontoSeed = { 'ontology/sofa/schema.yaml': 'schema\n', 'ontology/sofa/actions.yaml': 'actions\n', 'ontology/sofa/bindings.yaml': 'bindings\n' };
+  const applied: string[] = [];
+  const mk = async () => {
+    const s2 = new ConfigRepoService(dir, t, { compileOntology: async (f) => ({ ok: true, ir: variant(f['schema.yaml']!) }), checkOntology: async () => ({ data: { ok: true, findings: [] } }) });
+    await s2.load();
+    s2.onOntology = async (d, f) => {
+      applied.push(`${d}:${variant(f['schema.yaml']).version}`);
+      return `ontology ${d} applied`;
+    };
+    await s2.init({ ...seed, ...ontoSeed }, 'ada@example.local');
+    return s2;
+  };
+
+  it('compatibility class, version bump and migration note gate the proposal', async () => {
+    const s2 = await mk();
+    const minorNoBump = await s2.propose({ title: 'Carriers', reason: 'D3 carriers', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# carrier\n' }], author: { kind: 'person', id: 'ben@x' } });
+    expect(minorNoBump.compat?.level).toBe('minor');
+    expect(minorNoBump.validation.ok).toBe(false);
+    expect(minorNoBump.validation.checks.find((c) => c.name.endsWith('version'))?.detail).toMatch(/at least 0.2.0/);
+    const minor = await s2.propose({ title: 'Carriers', reason: 'D3 carriers', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# carrier\n# v0.2.0\n' }], author: { kind: 'person', id: 'ben@x' } });
+    expect(minor.validation.ok).toBe(true);
+    const major = await s2.propose({ title: 'Drop note', reason: 'unused', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# drop-note\n' }], author: { kind: 'person', id: 'ben@x' } });
+    expect(major.compat?.level).toBe('major');
+    expect(major.validation.checks.find((c) => c.name.includes('compatibility'))).toMatchObject({ ok: false });
+    const withNote = await s2.propose({ title: 'Drop note', reason: 'unused', migrationNote: 'notes were never read; history keeps them', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# drop-note\n' }], author: { kind: 'person', id: 'ben@x' } });
+    expect(withNote.validation.ok).toBe(true);
+    const v = await s2.validateChanges([{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# carrier\n# v0.2.0\n' }]);
+    expect(v).toMatchObject({ valid: true, compatibility: { level: 'minor' } });
+    expect(await s2.git.rev('refs/liquid/validate-x')).toBeNull();
+  });
+
+  it('the reconciler applies a changed ontology once, after approval', async () => {
+    applied.length = 0;
+    const s2 = await mk();
+    await s2.reconcile();
+    expect(applied).toEqual(['sofa:0.1.0']); // first reconcile: the running version is confirmed once
+    await s2.reconcile();
+    expect(applied).toHaveLength(1);
+    const p = await s2.propose({ title: 'Carriers', reason: 'D3 carriers', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# carrier\n# v0.2.0\n' }], author: { kind: 'agent', id: 'sofa-modeller' } });
+    await s2.decide(p.id, 'approve', ADMIN);
+    expect(applied).toEqual(['sofa:0.1.0', 'sofa:0.2.0']);
+    expect((await s2.status()).lastReconcile?.changes).toContain('ontology sofa applied');
   });
 });

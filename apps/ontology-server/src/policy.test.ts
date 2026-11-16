@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import type pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { loadIr } from '@cw/ontology-sofa';
-import { SofaCompany } from '@cw/sofa-domain';
+import { worldToObjects, SofaCompany } from '@cw/sofa-domain';
 import { opaPolicy, touchedObjects } from './policy.js';
 import { OntologyService } from './service.js';
 
@@ -25,7 +25,7 @@ async function service(decision: unknown, status = 200) {
 
 describe('touched objects', () => {
   it('resolves class-typed inputs with classification and status', () => {
-    const c = new SofaCompany();
+    const c = worldToObjects(new SofaCompany().W);
     expect(touchedObjects(ir, 'cancel_purchase_order', { poId: 'PO-4411', reason: 'x' }, c)).toEqual([{ class: 'PurchaseOrder', id: 'PO-4411', criticality: 'payment_critical', data_class: 'confidential', owner: 'head-of-logistics', status: 'open' }]);
     expect(touchedObjects(ir, 'send_customer_notice', { customerId: 'C-01', orderIds: ['SO-2101', 'SO-2105'] }, c).map((o) => `${o.class}:${o.id}`)).toEqual(['Customer:C-01', 'SalesOrder:SO-2101', 'SalesOrder:SO-2105']);
     expect(touchedObjects(ir, 'get_kpi', {}, c)).toEqual([]);

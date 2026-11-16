@@ -31,14 +31,16 @@ export function DraftPanel(props: {
   busy: boolean;
   error?: unknown;
   onOps: (ops: Op[]) => void;
-  onSubmit: (title: string, reason: string) => void;
+  onSubmit: (title: string, reason: string, migrationNote?: string) => void;
   onDiscard: () => void;
 }) {
   const { draft, ir, validation, selected, busy, onOps } = props;
   const [cls, setCls] = useState({ name: '', description: '', owner: 'head-of-logistics', criticality: 'normal', data_class: 'internal' });
   const [attr, setAttr] = useState({ name: '', range: 'string', required: false });
   const [ev, setEv] = useState({ enum: ir.enums[0]?.name ?? '', value: '' });
-  const [sub, setSub] = useState({ title: '', reason: '' });
+  const [sub, setSub] = useState({ title: '', reason: '', note: '' });
+  const compat = validation?.compat;
+  const major = compat?.level === 'major';
   const ranges = [...SCALARS, ...ir.enums.map((e) => e.name), ...ir.classes.map((c) => c.name)];
   const sel = selected ? ir.classes.find((c) => c.name === selected) : undefined;
   const submitted = !!draft.proposal;
@@ -55,6 +57,29 @@ export function DraftPanel(props: {
       </Box>
       {submitted && <Alert severity="success">Submitted as proposal {draft.proposal}. It is applied after the owners approve it (Liquid enterprise → Proposals).</Alert>}
       {validation && (validation.ok ? <Alert severity="success">Compiles: {validation.ir?.classes.length} classes, {validation.ir?.actions.length} actions.</Alert> : <Alert severity="error">Does not compile: {validation.errors.map((e) => `${e.path}: ${e.message}`).join(' · ')}</Alert>)}
+      {compat && compat.findings.length > 0 && (
+        <Alert severity={major ? 'warning' : 'info'} icon={false}>
+          <Stack spacing={0.75}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Chip size="small" color={major ? 'error' : compat.level === 'minor' ? 'primary' : 'default'} label={`${compat.level}${major ? ' (breaking)' : ''}`} />
+              <Typography variant="body2">compatibility · version {validation?.ir?.version}</Typography>
+            </Stack>
+            {!compat.versionOk && (
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Typography variant="caption">A {compat.level} change needs version {compat.suggestedVersion}.</Typography>
+                <Button size="small" disabled={busy || submitted} onClick={() => onOps([{ op: 'set_version', version: compat.suggestedVersion }])}>
+                  Set {compat.suggestedVersion}
+                </Button>
+              </Stack>
+            )}
+            {major && (
+              <Typography variant="caption">
+                Breaking: {compat.findings.filter((f) => f.level === 'major').map((f) => `${f.path} (${f.reason})`).join('; ')}. A migration note is required; the projection is rebuilt from the events.
+              </Typography>
+            )}
+          </Stack>
+        </Alert>
+      )}
       {props.error ? <Alert severity="error">{(props.error as Error).message}</Alert> : null}
       {validation?.diff && validation.diff.changes.length > 0 && (
         <Stack spacing={0.5}>
@@ -141,8 +166,9 @@ export function DraftPanel(props: {
             <Typography variant="subtitle2">Submit as proposal</Typography>
             <TextField size="small" label="Title" value={sub.title} onChange={(e) => setSub({ ...sub, title: e.target.value })} />
             <TextField size="small" label="Reason" multiline minRows={2} value={sub.reason} onChange={(e) => setSub({ ...sub, reason: e.target.value })} />
+            {major && <TextField size="small" label="Migration note (required for a breaking change)" multiline minRows={2} value={sub.note} onChange={(e) => setSub({ ...sub, note: e.target.value })} />}
             <Stack direction="row" spacing={1}>
-              <Button variant="contained" disabled={busy || !draft.ops.length || !validation?.ok || sub.title.length < 3 || sub.reason.length < 3} onClick={() => props.onSubmit(sub.title, sub.reason)}>
+              <Button variant="contained" disabled={busy || !draft.ops.length || !validation?.ok || !compat?.versionOk || (major && sub.note.length < 3) || sub.title.length < 3 || sub.reason.length < 3} onClick={() => props.onSubmit(sub.title, sub.reason, sub.note || undefined)}>
                 Submit
               </Button>
               <Button color="error" disabled={busy} onClick={props.onDiscard}>

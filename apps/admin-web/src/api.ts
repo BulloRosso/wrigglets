@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@cw/ui';
 import type { ExtensionStatus } from '@cw/extensions';
-import type { IrDiff, OntologyIr } from '@cw/ontology-ir/browser';
+import type { Compatibility, IrDiff, OntologyIr } from '@cw/ontology-ir/browser';
 import type { Playbook } from '@cw/playbooks';
 import type {
   AdminAuditEntry,
@@ -94,6 +94,8 @@ export interface ConfigProposal {
   validation: { ok: boolean; at: string; checks: ConfigCheck[] };
   owners: Array<{ for: string; owners: string[] }>;
   irDiff?: IrDiff;
+  compat?: Compatibility;
+  migrationNote?: string;
   decidedBy?: string;
   decidedAt?: string;
   comment?: string;
@@ -126,6 +128,7 @@ export interface DraftValidation {
   errors: Array<{ path: string; message: string }>;
   ir?: OntologyIr;
   diff?: IrDiff;
+  compat?: Compatibility;
 }
 
 export interface LiquidHoldState {
@@ -383,7 +386,8 @@ export const api = {
   ontologyDraft: (did: string) => apiFetch<OntologyDraft>(`/api/liquid/ontology/drafts/${id(did)}`),
   applyDraftOps: (did: string, ops: Array<Record<string, unknown>>) => apiFetch<OntologyDraft>(`/api/liquid/ontology/drafts/${id(did)}/ops`, { method: 'POST', json: { ops } }),
   validateDraft: (did: string) => apiFetch<DraftValidation>(`/api/liquid/ontology/drafts/${id(did)}/validate`, { method: 'POST' }),
-  submitDraft: (did: string, title: string, reason: string) => apiFetch<ConfigProposal>(`/api/liquid/ontology/drafts/${id(did)}/submit`, { method: 'POST', json: { title, reason } }),
+  submitDraft: (did: string, title: string, reason: string, migrationNote?: string) => apiFetch<ConfigProposal>(`/api/liquid/ontology/drafts/${id(did)}/submit`, { method: 'POST', json: { title, reason, migrationNote } }),
+  ontologyVersions: () => apiFetch<Array<{ version: string; hash: string; level: string; note: string | null; applied_at: string }>>('/api/liquid/ontology/versions'),
   deleteDraft: (did: string) => apiFetch<void>(`/api/liquid/ontology/drafts/${id(did)}`, { method: 'DELETE' }),
   liquidPolicy: () => apiFetch<LiquidPolicyStatus>('/api/liquid/policy'),
   addLiquidOverlay: (o: Pick<LiquidOverlay, 'effect' | 'reason' | 'match' | 'expires_at'>) => apiFetch<LiquidOverlay>('/api/liquid/policy/overlays', { method: 'POST', json: o }),

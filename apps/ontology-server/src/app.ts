@@ -2,8 +2,9 @@ import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import { z, ZodError } from 'zod';
 import type { EventStore, Lake } from '@cw/lake';
-import { freshWorld, identifierAttr, sofaExtract, worldToObjects } from '@cw/sofa-domain';
-import { opaData } from '@cw/ontology-sofa';
+import { opaData, genSdk } from '@cw/ontology-codegen';
+import { freshWorld, sofaExtract } from '@cw/sofa-domain';
+import { identifierIn } from './runtime.js';
 import { GROUPS, rpc, type Group } from './mcp.js';
 import { OntologyService } from './service.js';
 
@@ -86,14 +87,14 @@ export function createApp(d: AppDeps) {
   const api = express.Router();
   api.use(bearer(d.token), json);
   api.get('/objects/:class', (req, res) => {
-    const rows = worldToObjects(d.svc.company.W)[String(req.params.class)];
+    const rows = d.svc.objects()[String(req.params.class)];
     if (!rows) return void res.status(404).json({ error: `unknown class ${req.params.class}` });
     res.json(rows);
   });
   api.get('/objects/:class/:id', (req, res) => {
     const cls = String(req.params.class);
-    const rows = worldToObjects(d.svc.company.W)[cls];
-    const row = rows?.find((r) => String(r[identifierAttr(cls)]) === String(req.params.id));
+    const rows = d.svc.objects()[cls];
+    const row = rows?.find((r) => String(r[identifierIn(d.svc.ir, cls)]) === String(req.params.id));
     if (!row) return void res.status(404).json({ error: 'not found' });
     res.json(row);
   });
@@ -160,7 +161,18 @@ export function createApp(d: AppDeps) {
     }),
   );
   /** Generated OPA data (data.liquid.ontology) for the policy bundle the control plane builds (ADR-0044). */
-  internal.get('/opa/data', (_req, res) => res.json(opaData()));
+  internal.get('/opa/data', (_req, res) => res.json(opaData(d.svc.ir)));
+  // ontology evolution (ADR-0048): versions, check and live apply of a new IR, the SDK of the version in force
+  internal.get('/ontology/versions', wrap(async (_req, res) => res.json(await d.svc.versions())));
+  internal.post('/ontology/check', wrap(async (req, res) => res.json(await d.svc.check(req.body?.ir))));
+  internal.post(
+    '/ontology/apply',
+    wrap(async (req, res) => {
+      const b = z.object({ ir: z.unknown(), allowBreaking: z.boolean().optional(), note: z.string().max(4000).optional(), by: z.string().max(200).optional() }).parse(req.body ?? {});
+      res.json(await d.svc.apply(b.ir, { allowBreaking: b.allowBreaking, note: b.note, by: b.by }));
+    }),
+  );
+  internal.get('/ontology/sdk.ts', (_req, res) => res.type('text/plain').send(genSdk(d.svc.ir)));
 
   // parity runner (the mock's control surface)
   internal.get('/sim/kpi', (_req, res) => res.json(d.svc.company.kpi()));

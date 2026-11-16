@@ -218,12 +218,19 @@ export function Detail({
       {actions.map((a) => (
         <Box key={a.name}>
           <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-            <Typography
-              variant="body2"
-              sx={{ fontFamily: "monospace", fontWeight: 600 }}
-            >
-              {a.name}
-            </Typography>
+            <Tooltip title={a.deprecated ? `Deprecated: ${a.deprecated}` : ""}>
+              <Typography
+                variant="body2"
+                sx={{ fontFamily: "monospace", fontWeight: 600, textDecoration: a.deprecated ? "line-through" : undefined, color: a.deprecated ? "text.secondary" : undefined }}
+              >
+                {a.name}
+              </Typography>
+            </Tooltip>
+            {a.aliases?.length ? (
+              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace", textDecoration: "line-through" }}>
+                {a.aliases.join(", ")}
+              </Typography>
+            ) : null}
             <Chip
               size="small"
               label={a.kind}
@@ -649,8 +656,8 @@ function DraftEditor({ draftId }: { draftId: string }) {
     onSuccess: refresh,
   });
   const submit = useMutation({
-    mutationFn: (v: { title: string; reason: string }) =>
-      api.submitDraft(draftId, v.title, v.reason),
+    mutationFn: (v: { title: string; reason: string; note?: string }) =>
+      api.submitDraft(draftId, v.title, v.reason, v.note),
     onSuccess: (p) => navigate(`/liquid/proposals/${p.id}`),
   });
   const discard = useMutation({
@@ -694,7 +701,7 @@ function DraftEditor({ draftId }: { draftId: string }) {
               busy={ops.isPending || submit.isPending || validation.isFetching}
               error={ops.error ?? submit.error ?? validation.error}
               onOps={(o) => ops.mutate(o)}
-              onSubmit={(title, reason) => submit.mutate({ title, reason })}
+              onSubmit={(title, reason, note) => submit.mutate({ title, reason, note })}
               onDiscard={() => discard.mutate()}
             />
           )}

@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
-import { canonical, diffIr, type IrDiff, type OntologyIr } from '@cw/ontology-ir';
+import { createHash } from 'node:crypto';
+import { canonical, compatibility, diffIr, type Compatibility, type IrDiff, type OntologyIr } from '@cw/ontology-ir';
 import { GitRepo, type Author } from './git.js';
 import { DEFAULT_OWNERS, MANAGED_PREFIXES, README, ROOT_FILES, STORE_FILES, exportState, findSecrets, ownersFile, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
 
@@ -24,6 +25,8 @@ export interface ConfigTargets {
 export interface Validators {
   compileOntology?(files: Record<string, string>): Promise<{ ok: boolean; ir?: OntologyIr; errors?: Array<{ path: string; message: string }> }>;
   checkRego?(files: Record<string, string>): Promise<{ ok: boolean; errors: Array<{ path: string; message: string }> }>;
+  /** Data check of a candidate ontology against the objects that exist (ontology server, M8). */
+  checkOntology?(ir: OntologyIr): Promise<{ data: { ok: boolean; findings: Array<{ path: string; problem: string; rows: number }> } }>;
 }
 
 export interface Check {
@@ -48,6 +51,10 @@ export interface Proposal {
   validation: { ok: boolean; at: string; checks: Check[] };
   owners: Array<{ for: string; owners: string[] }>;
   irDiff?: IrDiff;
+  /** Compatibility class of an ontology change (M8, E4): patch | minor | major. */
+  compat?: Compatibility;
+  /** Required for a breaking (major) ontology change. */
+  migrationNote?: string;
   decidedBy?: string;
   decidedAt?: string;
   comment?: string;
@@ -59,6 +66,8 @@ interface Meta {
   applied: string | null;
   /** Seed files ever added (a later version adds new defaults once; files removed on purpose stay removed). */
   seeded?: string[];
+  /** Hash of the ontology files last applied to the ontology server (M8). */
+  ontologyHash?: Record<string, string>;
   lastReconcile: { at: string; head: string | null; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> } | null;
   proposals: Proposal[];
 }
@@ -94,6 +103,8 @@ export class ConfigRepoService {
   private timer?: NodeJS.Timeout;
   /** Called after main changed through a proposal or a reconcile applied something (e.g. to rebuild the OPA bundle). */
   onApplied?: () => void;
+  /** Applies the ontology of a domain to the ontology server when its files changed (M8). Returns a change summary. */
+  onOntology?: (domain: string, files: { 'schema.yaml': string; 'actions.yaml': string; 'bindings.yaml': string }, note?: string) => Promise<string | undefined>;
 
   constructor(
     readonly dir: string,
@@ -192,7 +203,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     return this.serial(async () => {
       const head = (await this.git.rev('main'))!;
       // applied and the stores still match main (e.g. not reset by an empty /data/admin) → nothing to do
-      if (!force && head === this.meta.applied && this.meta.lastReconcile?.ok !== false && (await this.driftAt(head)).length === 0) return { ok: true, head, changes: [] as string[], unchanged: true };
+      if (!force && head === this.meta.applied && this.meta.lastReconcile?.ok !== false && (await this.driftAt(head)).length === 0 && (!this.onOntology || this.meta.ontologyHash)) return { ok: true, head, changes: [] as string[], unchanged: true };
       const files = await this.git.files(head);
       const { state, errors } = parseState(files);
       const leaked = findSecrets(files, this.targets.secrets());
@@ -203,6 +214,25 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
         return { ok: false, head, errors };
       }
       const changes = await this.targets.apply(state, by);
+      // ontology versions (M8): a changed domain is compiled and applied to the ontology server while it runs
+      if (this.onOntology) {
+        for (const d of domainsOf(Object.keys(files))) {
+          const of = ontologyFiles(files, d);
+          if (!of) continue;
+          const h = createHash('sha256').update(canonical(of)).digest('hex');
+          if (this.meta.ontologyHash?.[d] === h) continue;
+          try {
+            const note = [...this.meta.proposals].reverse().find((p) => p.status === 'approved' && p.paths.some((x) => x.startsWith(`ontology/${d}/`)))?.migrationNote;
+            const summary = await this.onOntology(d, of, note);
+            if (summary) changes.push(summary);
+            (this.meta.ontologyHash ??= {})[d] = h;
+          } catch (err) {
+            this.meta.lastReconcile = { at: new Date().toISOString(), head, ok: false, changes, errors: [{ path: `ontology/${d}`, message: (err as Error).message }] };
+            await this.persist();
+            return { ok: false, head, errors: this.meta.lastReconcile.errors };
+          }
+        }
+      }
       this.meta.applied = head;
       this.meta.lastReconcile = { at: new Date().toISOString(), head, ok: true, changes, errors: [] };
       await this.persist();
@@ -271,7 +301,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     return { ...p, diff: await this.git.diff(p.base, p.head).catch(() => '') };
   }
 
-  async propose(input: { title: string; reason: string; evidence?: string; changes: Array<{ path: string; content: string | null }>; author: Proposal['author'] }): Promise<Proposal> {
+  async propose(input: { title: string; reason: string; evidence?: string; migrationNote?: string; changes: Array<{ path: string; content: string | null }>; author: Proposal['author'] }): Promise<Proposal> {
     if (!(await this.initialized())) throw new ConfigError(409, 'the config repository is not initialised');
     const title = input.title.trim().slice(0, 140);
     const reason = input.reason.trim().slice(0, 4000);
@@ -292,7 +322,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       const head = await this.git.commit({ ref: branch, parent: base, expect: null, changes, message: `${title}\n\n${reason}\n\n${trailers({ 'Requested-By': input.author.user ?? (input.author.kind === 'person' ? input.author.id : undefined), Agent: input.author.kind === 'agent' ? input.author.id : undefined, Task: input.author.task, 'Change-Id': changeId })}`, author, committer: SYSTEM });
       if (!head) throw new ConfigError(422, 'the proposal changes nothing');
       const paths = await this.git.changedPaths(base, head);
-      const p: Proposal = { id, title, reason, evidence: input.evidence?.slice(0, 8000), author: input.author, createdAt: new Date().toISOString(), base, branch, head, paths, status: 'pending', validation: { ok: false, at: '', checks: [] }, owners: [], changeId };
+      const p: Proposal = { id, title, reason, evidence: input.evidence?.slice(0, 8000), migrationNote: input.migrationNote?.trim().slice(0, 4000) || undefined, author: input.author, createdAt: new Date().toISOString(), base, branch, head, paths, status: 'pending', validation: { ok: false, at: '', checks: [] }, owners: [], changeId };
       await this.validateInto(p, head);
       this.meta.proposals.push(p);
       await this.persist();
@@ -326,6 +356,15 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       const before = prev ? await this.validators.compileOntology(prev).catch(() => undefined) : undefined;
       if (after.ir && before?.ir) {
         p.irDiff = diffIr(before.ir, after.ir);
+        p.compat = compatibility(before.ir, after.ir);
+        const majors = p.compat.findings.filter((f) => f.level === 'major');
+        checks.push({ name: `ontology ${d}: compatibility ${p.compat.level}`, ok: p.compat.level !== 'major' || !!p.migrationNote, detail: p.compat.level === 'major' ? (p.migrationNote ? `breaking, migration note given: ${majors.map((f) => `${f.path} ${f.reason}`).join('; ')}` : `breaking change needs a migration note: ${majors.map((f) => `${f.path} ${f.reason}`).join('; ')}`) : `${p.compat.findings.length} change(s)` });
+        checks.push({ name: `ontology ${d}: version`, ok: p.compat.versionOk, detail: p.compat.versionOk ? after.ir.version : `version ${after.ir.version} must be at least ${p.compat.suggestedVersion} for a ${p.compat.level} change` });
+        if (this.validators.checkOntology) {
+          const r = await this.validators.checkOntology(after.ir).catch((err: Error) => ({ data: { ok: false, findings: [{ path: 'ontology server', problem: err.message, rows: 0 }] } }));
+          const blocking = r.data.findings.filter((f) => !/class removed/.test(f.problem));
+          checks.push({ name: `ontology ${d}: existing data`, ok: blocking.length === 0, detail: r.data.findings.length ? r.data.findings.map((f) => `${f.path}: ${f.problem} (${f.rows})`).join('; ') : 'existing objects fit the new version' });
+        }
         for (const c of Object.keys(p.irDiff.classes)) {
           const owner = (after.ir.classes.find((x) => x.name === c) ?? before.ir.classes.find((x) => x.name === c))?.annotations.owner;
           if (owner) classOwners.push(owner);
@@ -346,6 +385,24 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     const owners = ownersFile.safeParse(YAML.parse(baseFiles['OWNERS.yaml'] ?? DEFAULT_OWNERS));
     p.owners = owners.success ? requiredOwners(owners.data, p.paths, classOwners) : [{ for: 'OWNERS.yaml invalid', owners: ['role:Platform.Admin'] }];
     p.validation = { ok: checks.every((c) => c.ok), at: new Date().toISOString(), checks };
+  }
+
+  /** Validates changes on top of main without creating a proposal (config__validate, the modelling agent). */
+  async validateChanges(changes: Array<{ path: string; content: string | null }>, migrationNote?: string) {
+    if (!(await this.initialized())) throw new ConfigError(409, 'the config repository is not initialised');
+    for (const c of changes) if (!PATH_OK.test(c.path) || c.path.split('/').includes('..') || (!(ROOT_FILES as readonly string[]).includes(c.path) && !MANAGED_PREFIXES.some((x) => c.path.startsWith(x)))) throw new ConfigError(400, `path ${c.path} is outside the config repository layout`);
+    return this.serial(async () => {
+      const main = (await this.git.rev('main'))!;
+      const ref = `refs/liquid/validate-${randomUUID().slice(0, 8)}`;
+      const head = await this.git.commit({ ref, parent: main, expect: null, changes: Object.fromEntries(changes.map((c) => [c.path, c.content])), message: 'validate', author: SYSTEM });
+      try {
+        const probe: Proposal = { id: 'validate', title: 'validate', reason: '-', author: { kind: 'agent', id: 'validate' }, createdAt: '', base: main, branch: ref, head: head ?? main, paths: head ? await this.git.changedPaths(main, head) : [], status: 'pending', validation: { ok: false, at: '', checks: [] }, owners: [], changeId: '-', migrationNote };
+        await this.validateInto(probe, head ?? main);
+        return { valid: probe.validation.ok, checks: probe.validation.checks, compatibility: probe.compat ?? null, diff: probe.irDiff ? { summary: probe.irDiff.summary, changes: probe.irDiff.changes.map((c) => `${c.kind} ${c.element} ${c.path}`) } : null, approvers: probe.owners };
+      } finally {
+        await this.git.deleteRef(ref);
+      }
+    });
   }
 
   async revalidate(id: string) {

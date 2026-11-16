@@ -109,6 +109,8 @@ function Detail({ pid }: { pid: string }) {
             <KeyValueList
               items={[
                 ['Files', <code>{p.paths.join(', ')}</code>],
+                ...(p.compat ? ([['Compatibility', <><Chip size="small" color={p.compat.level === 'major' ? 'error' : p.compat.level === 'minor' ? 'primary' : 'default'} label={p.compat.level} /> {p.compat.findings.length} change(s), suggested version {p.compat.suggestedVersion}</>]] as Array<[string, React.ReactNode]>) : []),
+                ...(p.migrationNote ? ([['Migration note', p.migrationNote]] as Array<[string, React.ReactNode]>) : []),
                 ['Approvers', p.owners.map((o) => `${o.owners.join(' or ')} (${o.for})`).join('; ') || '—'],
                 ['Base', <code>{p.base.slice(0, 12)}</code>],
                 ...(p.decidedBy ? ([['Decided', <>{p.decidedBy} · <RelativeTime iso={p.decidedAt!} />{p.comment ? ` · “${p.comment}”` : ''}</>]] as Array<[string, React.ReactNode]>) : []),

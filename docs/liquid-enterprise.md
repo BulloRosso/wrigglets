@@ -248,6 +248,43 @@ and commit sources, IR and generated files together. Versioning: patch for descr
 additive changes, major for removals or narrowing (enforced from M8). Why this matters, with a worked example from data
 to UI: [link-ml.md](link-ml.md).
 
+## Ontology evolution
+
+Decision record: [ADR-0048](adr/0048-ontology-evolution-runtime.md).
+
+<img src="diagrams/29-liquid-ontology-evolution.svg" alt="Ontology evolution: from proposal to live without a deploy" width="100%">
+
+The ontology server **interprets the ontology at runtime**: tool schemas, input validation, the projection's tables,
+data-quality checks and the OPA data are computed from the version in force. A new ontology version is new data, not
+new code, so it goes live without a build or restart:
+
+1. A change is proposed (modelling agent with `config__validate` / `config__propose_change`, or the editor). Validation
+   reports the **compatibility class** — `patch` (descriptions, annotations), `minor` (additions, renames with an alias),
+   `major` (removals, type changes, new required fields) — checks that the version was raised accordingly, and checks
+   the candidate against the existing objects.
+2. A `major` change needs a **migration note**.
+3. After approval the reconciler compiles `main` and applies the IR to the running ontology server: additive changes
+   alter the projection in place, breaking changes (and classes that come back with history in the event log) rebuild
+   it from the events. The gateway refreshes its tool list immediately; OPA learns the new actions with its next
+   bundle poll; new events carry the new `ontology_version`. `GET /api/liquid/ontology/versions` lists what was
+   applied, `GET /api/liquid/ontology/sdk` returns the TypeScript SDK of the version in force.
+
+**Actions without code.** The domain code implements the ontology it was written for. Actions that a newer version
+adds run generically from the IR — query (filter by inputs), create, update, delete — and the objects of new classes
+are stored like all others (events, projection). New write actions also need a role that may write them
+(`policies/liquid/roles/data.json`); put that into the same proposal.
+
+**Renames** keep the old name working: `aliases: [old_name]` on the action (served as a deprecated tool, recorded in
+the event). `deprecated: <note>` marks an action that still works but should not be used.
+
+**The modelling agent:** `node scripts/liquid/modelling-agent.mjs` creates `sofa-modeller` with the config tools and
+the skill in [assets/liquid/modelling-skill.md](../assets/liquid/modelling-skill.md) (read, draft, validate, propose,
+follow up). It spends model tokens only when given a task.
+
+| D3 proposal under review | Ontology after approval |
+|---|---|
+| ![D3 proposal: compatibility minor, diff graph](images/liquid/liquid-proposal-d3.png) | ![Carrier live in the ontology](images/liquid/liquid-ontology-d3.png) |
+
 ## Ontology editor
 
 Decision record: [ADR-0042](adr/0042-ontology-editor-react-flow.md).
@@ -277,8 +314,10 @@ approve it.
 
 ![Ontology draft: new class Carrier linked from PurchaseOrder](images/liquid/liquid-ontology-draft.png)
 
-Approving an ontology proposal records the new ontology in `main`; the compatibility class (patch/minor/major) and
-applying it to the running ontology server follow in E4 with M8.
+**Compatibility and live apply (E4).** The panel shows the compatibility class of the draft (patch, minor, major) and
+offers the version it needs (*Set 2.1.0*). A breaking change asks for a migration note. After approval the change is
+live within one reconcile (see [Ontology evolution](#ontology-evolution)) and the editor shows the new version.
+Deprecated actions and former names (aliases) are struck through.
 
 ## Policies
 
@@ -843,6 +882,38 @@ Open
 - `agent.task` records a request; starting the agent's task is a person's action (no automatic model spend). Signals
   observations are not yet wired as a trigger source (the trigger kind exists); this follows with the event-log
   refactoring after M8.
+
+### M8 — Ontology change pipeline, editor E4 (2026-11-16)
+
+Done
+- Runtime interpretation in the ontology server: tools, input validation, DDL, DQ checks, OPA data and SDK from the
+  IR in force; versions in `ontology_versions`; live apply (additive migration or rebuild) and data check endpoints;
+  generic handlers and extension state for classes and attributes the domain code does not know; aliases and
+  deprecation (IR, compiler, tools). [ADR-0048](adr/0048-ontology-evolution-runtime.md).
+- `compatibility()` and `inputValidator()` in `@cw/ontology-ir`; proposals carry the compatibility class, require a
+  version bump and, for breaking changes, a migration note; a data check against existing objects.
+- Reconciler applies changed ontologies and refreshes the gateway; `config__validate` for agents; modelling skill and
+  setup script; SDK and version routes; editor E4 (compatibility, version suggestion, migration note, deprecated
+  actions struck through).
+
+Verified
+- `@cw/ontology-ir` 27 tests (14 compatibility cases, version suggestion, runtime validation, aliases); ontology server
+  26 (incl. the D3 change live without restart, alias, breaking change with rebuild, restart keeps the version, a
+  class that comes back is backfilled from its events); config repository 18.
+- **End to end** (`node scripts/liquid/e2e-ontology-evolution.mjs`, `scripts/liquid/results/e2e-ontology-evolution.json`):
+  21/21. Lara validates and proposes the D3 change (Carrier, PurchaseOrder.carrier, three actions, the role to write
+  them): minor, policy tests pass. **After approval it is live in about a second**: version recorded, gateway and agent
+  see the new tools, the SDK contains Carrier, the agent creates a carrier, a purchase order gets its carrier, the
+  projection has the new table and column, events carry the new version, a rebuild equals the live projection. The
+  revert is a breaking change: without a note invalid, with a note live by rebuild, tools gone, history kept.
+- Found on the way: the domain's object diff only knew its own classes; a migrated column changed the projection
+  fingerprint (now key-order independent); re-adding a removed class created an empty table although its events exist
+  (now backfilled by a rebuild); new write actions are refused by the gateway's role check until a role grants them
+  (correct, documented). The ontology version on the stack climbed to 3.0.0 through the test runs (structure equals the
+  built-in 0.1.0).
+
+Open
+- Applying ontology changes needs no image build; changing domain behaviour (complex actions) still does.
 
 ### Later
 

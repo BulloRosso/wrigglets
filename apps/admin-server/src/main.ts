@@ -131,7 +131,11 @@ async function main() {
     if (!res.ok) throw new Error(`ontology compiler ${p}: HTTP ${res.status}`);
     return (await res.json()) as T;
   };
-  const validators: Validators = { compileOntology: (files) => compilerCall('/compile', { files }), checkRego: (files) => compilerCall('/check-rego', { files }) };
+  const validators: Validators = {
+    compileOntology: (files) => compilerCall('/compile', { files }),
+    checkRego: (files) => compilerCall('/check-rego', { files }),
+    checkOntology: (ir) => ontologyCall(liquidCtx, 'POST', '/internal/ontology/check', { ir }),
+  };
   const configRepo = new ConfigRepoService(
     path.join(config.DATA_DIR, 'liquid'),
     storeTargets({
@@ -145,6 +149,15 @@ async function main() {
     async () => JSON.stringify(await ontologyCall(liquidCtx, 'GET', '/internal/opa/data')),
   );
   await configRepo.load();
+  // ontology versions (ADR-0048): a changed ontology in main is compiled and applied to the running ontology server
+  configRepo.onOntology = async (domain, files, note) => {
+    const out = await compilerCall<{ ok: boolean; ir?: unknown; errors?: Array<{ path: string; message: string }> }>('/compile', { files });
+    if (!out.ok || !out.ir) throw new Error(`ontology ${domain} does not compile: ${(out.errors ?? []).map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+    const r = await ontologyCall<{ applied: boolean; from?: string; to?: string; level?: string; migration?: string; reason?: string }>(liquidCtx, 'POST', '/internal/ontology/apply', { ir: out.ir, allowBreaking: true, note, by: 'reconciler' });
+    if (!r.applied) return undefined;
+    await gateway.push(); // agents see the new tools at once (the gateway drops its tool cache)
+    return `ontology ${domain} ${r.from} → ${r.to} (${r.level}, ${r.migration})`;
+  };
   liquidPolicy.policySource = async () => (extensions.isInstalled(LIQUID_ID) ? configRepo.appliedFiles('policies/liquid/') : undefined);
   const playbooksDir = [config.LIQUID_PLAYBOOKS_DIR, path.resolve(here, '../../../playbooks')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_PLAYBOOKS_DIR;
   const seedConfig = async () => ({ ...(await readTree(ontologyDir, 'ontology/')), ...(await readTree(policyDir, 'policies/liquid/')), ...(await readTree(playbooksDir, 'playbooks/')) });

@@ -49,6 +49,17 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   });
   /** The compiled ontology (IR) the ontology server runs on; the editor's graph is built from it. */
   r.get('/liquid/ontology', pass('GET', () => '/internal/ontology'));
+  /** Ontology versions applied to the ontology server (M8) and the SDK generated from the version in force. */
+  r.get('/liquid/ontology/versions', pass('GET', () => '/internal/ontology/versions'));
+  r.get('/liquid/ontology/sdk', async (_req, res, next) => {
+    try {
+      const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/sdk.ts`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
+      if (!out.ok) throw new HttpError(502, `ontology server: HTTP ${out.status}`);
+      res.type('text/plain').send(await out.text());
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // Simulation control of the parity runner (scripts/sofa-company/run.mjs --backend onto): same answers as the mock's
   // /kpi, /log, /notices, /state, /reset, /scenario/:id/start. Reset and scenarios are written as events and audited.

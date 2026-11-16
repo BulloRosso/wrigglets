@@ -68,12 +68,16 @@ export async function shadowReplay(pool: pg.Pool | pg.PoolClient, ir: OntologyIr
   let actualMeta = meta;
   let shadow = companyOf(objects, meta);
   const window = await pool.query<Ev>('SELECT seq, type, action, actor_agent, payload FROM events WHERE seq >= $1 AND seq <= $2 ORDER BY seq', [fromSeq, toSeq]);
-  const report = { fromSeq, toSeq, events: 0, actions: 0, replayed: 0, blocked: 0, needsApproval: 0, diverged: 0, blockedActions: [] as Array<{ seq: number; action: string; agent: string | null; effect: string }>, divergedActions: [] as Array<{ seq: number; action: string; detail: string }> };
+  const report = { fromSeq, toSeq, events: 0, actions: 0, replayed: 0, notReplayed: 0, blocked: 0, needsApproval: 0, diverged: 0, blockedActions: [] as Array<{ seq: number; action: string; agent: string | null; effect: string }>, divergedActions: [] as Array<{ seq: number; action: string; detail: string }> };
   for (const e of window.rows) {
     report.events++;
     const changes = e.payload.changes;
     const def = e.action ? ir.actions.find((a) => a.name === e.action) : undefined;
-    if (def && !def.readOnly && changes && e.type !== 'ActionApprovalRequested') {
+    if (def && !def.readOnly && changes && e.type !== 'ActionApprovalRequested' && !shadow.has(def.name)) {
+      // generic actions of newer ontology versions (objects the domain does not know): applied as recorded
+      report.actions++;
+      report.notReplayed++;
+    } else if (def && !def.readOnly && changes && e.type !== 'ActionApprovalRequested') {
       report.actions++;
       const v = verdict(candidate, ir, def.name, e.actor_agent);
       if (v) {

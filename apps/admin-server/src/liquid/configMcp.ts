@@ -29,6 +29,7 @@ export const CONFIG_TOOLS = [
         title: { type: 'string', description: 'One line, e.g. "sofa-max may list suppliers"' },
         reason: { type: 'string', description: 'Why the change is needed' },
         evidence: { type: 'string', description: 'Optional: what you observed (error messages, task ids, numbers)' },
+        migration_note: { type: 'string', description: 'Required for a breaking ontology change: what happens to existing data and callers' },
         changes: {
           type: 'array',
           minItems: 1,
@@ -39,6 +40,20 @@ export const CONFIG_TOOLS = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  {
+    name: 'validate',
+    description: 'Check a configuration change without proposing it: schemas, secrets, ontology compile, compatibility class (patch / minor / major) against the running ontology, data check against the existing objects, policy tests. Use it before propose_change; give the complete new content of each file.',
+    inputSchema: {
+      type: 'object',
+      required: ['changes'],
+      properties: {
+        changes: { type: 'array', minItems: 1, maxItems: 20, items: { type: 'object', required: ['path', 'content'], properties: { path: { type: 'string' }, content: { type: ['string', 'null'] } }, additionalProperties: false } },
+        migration_note: { type: 'string', description: 'For a breaking ontology change' },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
   },
   {
     name: 'get_proposal',
@@ -68,7 +83,7 @@ async function call(repo: ConfigRepoService, name: string, a: Record<string, unk
     }
     if (name === 'propose_change') {
       const changes = Array.isArray(a.changes) ? (a.changes as Array<{ path?: unknown; content?: unknown }>).map((c) => ({ path: String(c.path ?? ''), content: c.content === null ? null : String(c.content ?? '') })) : [];
-      const p = await repo.propose({ title: String(a.title ?? ''), reason: String(a.reason ?? ''), evidence: str(a.evidence), changes, author: { kind: 'agent', id: agent, user: str(a._requestedBy), task: str(a._task) } });
+      const p = await repo.propose({ title: String(a.title ?? ''), reason: String(a.reason ?? ''), evidence: str(a.evidence), migrationNote: str(a.migration_note), changes, author: { kind: 'agent', id: agent, user: str(a._requestedBy), task: str(a._task) } });
       onProposal?.(p.id, agent);
       const failed = p.validation.checks.filter((c) => !c.ok);
       return text(
@@ -78,9 +93,15 @@ async function call(repo: ConfigRepoService, name: string, a: Record<string, unk
           valid: p.validation.ok,
           problems: failed.map((c) => ({ check: c.name, detail: c.detail, errors: c.errors?.slice(0, 10) })),
           approvers: p.owners,
+          compatibility: p.compat ? { level: p.compat.level, suggestedVersion: p.compat.suggestedVersion, findings: p.compat.findings.slice(0, 20) } : undefined,
           next: p.validation.ok ? 'Waits for approval in the admin console (Liquid enterprise → Proposals). Check with get_proposal.' : 'Not valid: fix the problems and propose again; an invalid proposal cannot be approved.',
         }),
       );
+    }
+    if (name === 'validate') {
+      const changes = Array.isArray(a.changes) ? (a.changes as Array<{ path?: unknown; content?: unknown }>).map((c) => ({ path: String(c.path ?? ''), content: c.content === null ? null : String(c.content ?? '') })) : [];
+      if (!changes.length) return text('changes are required', true);
+      return text(JSON.stringify(await repo.validateChanges(changes, str(a.migration_note))));
     }
     if (name === 'get_proposal') {
       const id = str(a.id);

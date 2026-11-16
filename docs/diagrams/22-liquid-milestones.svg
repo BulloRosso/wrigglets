@@ -100,7 +100,7 @@
   <text x="814" y="443" class="d">Entra option, SDK,</text>
   <text x="814" y="459" class="d">app registry</text>
   <!-- M8 -->
-  <rect x="990" y="260" width="150" height="76" rx="10" class="plan"/>
+  <rect x="990" y="260" width="150" height="76" rx="10" class="done"/>
   <text x="1004" y="283" class="id">M8</text><text x="1038" y="283" class="h">Ontology change</text>
   <text x="1004" y="303" class="d">compatibility, versions,</text>
   <text x="1004" y="319" class="d">migration, modelling agent</text>
@@ -124,7 +124,7 @@
   <text x="814" y="533" class="h">E2 · E3 (done)</text>
   <text x="814" y="551" class="d">with M6: validate, diff graph</text>
   <rect x="990" y="512" width="150" height="50" rx="8" class="ed"/>
-  <text x="1004" y="533" class="h">E4 live apply</text>
+  <text x="1004" y="533" class="h">E4 live apply (done)</text>
   <text x="1004" y="551" class="d">with M8: compatibility</text>
 
   <!-- legend -->

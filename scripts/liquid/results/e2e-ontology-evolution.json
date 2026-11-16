@@ -1,0 +1,139 @@
+{
+  "startedAt": "2026-11-16T22:14:57.978Z",
+  "checks": [
+    {
+      "name": "a breaking change without a migration note is invalid",
+      "ok": true,
+      "detail": [
+        "ontology sofa: compatibility major"
+      ]
+    },
+    {
+      "name": "with a migration note it validates",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "the running ontology",
+      "ok": true,
+      "detail": "sofa@2.0.0, 19 classes, 32 actions"
+    },
+    {
+      "name": "config__validate: compiles, compatibility minor, existing data fits, policy tests pass",
+      "ok": true,
+      "detail": {
+        "checks": [
+          "layout and schemas=true",
+          "no secrets=true",
+          "ontology sofa: compile=true",
+          "ontology sofa: compatibility minor=true",
+          "ontology sofa: version=true",
+          "ontology sofa: existing data=true",
+          "policies: opa check + opa test=true"
+        ],
+        "diff": {
+          "added": 8,
+          "removed": 0,
+          "changed": 2
+        }
+      }
+    },
+    {
+      "name": "the agent proposes the extension; validated, compatibility minor",
+      "ok": true,
+      "detail": {
+        "id": "cp-mwjtnirb-524f",
+        "version": "2.1.0"
+      }
+    },
+    {
+      "name": "the review shows the ontology diff (Carrier added, PurchaseOrder changed)",
+      "ok": true
+    },
+    {
+      "name": "live in 1 s: ontology 2.1.0, class Carrier, actions present",
+      "ok": true
+    },
+    {
+      "name": "the version is recorded (minor, migrated in place)",
+      "ok": true,
+      "detail": [
+        "2.1.0:minor",
+        "2.0.0:major"
+      ]
+    },
+    {
+      "name": "the gateway offers the new tools",
+      "ok": true,
+      "detail": "onto__list_carriers, onto__create_carrier, onto__assign_carrier"
+    },
+    {
+      "name": "the agent sees the new tools it is allowed",
+      "ok": true,
+      "detail": [
+        "onto__list_carriers",
+        "onto__create_carrier"
+      ]
+    },
+    {
+      "name": "the SDK is regenerated from the new version",
+      "ok": true,
+      "detail": "12049 chars"
+    },
+    {
+      "name": "the agent creates a carrier through the new tool",
+      "ok": true,
+      "detail": "{\n  \"id\": \"CA-002\",\n  \"name\": \"Nordfracht Logistik\"\n}"
+    },
+    {
+      "name": "assign_carrier links a purchase order",
+      "ok": true,
+      "detail": "{\n  \"id\": \"PO-4411\",\n  \"supplier\": \"S-NORDHOLZ\",\n  \"sku\": \"BEAM-PINE-80\",\n  \"qty"
+    },
+    {
+      "name": "the projection has the new table and column",
+      "ok": true
+    },
+    {
+      "name": "events carry the new ontology version",
+      "ok": true
+    },
+    {
+      "name": "the projection is still exactly the event log replayed",
+      "ok": true,
+      "detail": {
+        "events": 30
+      }
+    },
+    {
+      "name": "a breaking change without a migration note is invalid",
+      "ok": true,
+      "detail": [
+        "ontology sofa: compatibility major"
+      ]
+    },
+    {
+      "name": "with a migration note it validates",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "the breaking change went live by rebuilding the projection",
+      "ok": true,
+      "detail": {
+        "version": "3.0.0",
+        "note": "Carrier objects stay in the event log; the projection is rebuilt without them."
+      }
+    },
+    {
+      "name": "history is kept: the carrier events are still in the log",
+      "ok": true
+    },
+    {
+      "name": "the tools of the removed actions are gone",
+      "ok": true
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T22:15:34.428Z"
+}

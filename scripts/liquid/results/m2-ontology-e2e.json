@@ -1,0 +1,61 @@
+{
+  "startedAt": "2026-11-16T16:54:43.026Z",
+  "checks": [
+    {
+      "name": "repair picked up the new images and is available",
+      "ok": true,
+      "detail": [
+        "preflight=done",
+        "secrets=done",
+        "volumes=done",
+        "service:ontology-db=done",
+        "service:ontology-server=done",
+        "bootstrap:seed-sofa=done"
+      ]
+    },
+    {
+      "name": "the Ontology page is offered to the nav",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Overview",
+          "path": "/liquid"
+        },
+        {
+          "label": "Ontology",
+          "path": "/liquid/ontology"
+        }
+      ]
+    },
+    {
+      "name": "the ontology server serves the committed IR (same hash)",
+      "ok": true,
+      "detail": "sofa@0.1.0 47c5052c5079"
+    },
+    {
+      "name": "IR has the sofa company: 19 classes, 31 actions",
+      "ok": true,
+      "detail": {
+        "classes": 19,
+        "actions": 31,
+        "links": 21
+      }
+    },
+    {
+      "name": "React Flow renders one node per class",
+      "ok": true,
+      "detail": "19 nodes"
+    },
+    {
+      "name": "React Flow renders one edge per link",
+      "ok": true,
+      "detail": "21 edges"
+    },
+    {
+      "name": "selecting a class shows its details and source table",
+      "ok": true
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T16:54:51.769Z"
+}

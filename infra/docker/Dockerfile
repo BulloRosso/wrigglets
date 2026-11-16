@@ -49,6 +49,9 @@ COPY packages/secrets/package.json packages/secrets/
 COPY packages/extensions/package.json packages/extensions/
 COPY packages/lake/package.json packages/lake/
 COPY packages/sofa-domain/package.json packages/sofa-domain/
+COPY packages/ontology-ir/package.json packages/ontology-ir/
+COPY packages/ontology-codegen/package.json packages/ontology-codegen/
+COPY packages/ontology-sofa/package.json packages/ontology-sofa/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY apps apps
 COPY packages packages

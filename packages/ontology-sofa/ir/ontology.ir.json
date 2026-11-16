@@ -1,0 +1,2768 @@
+{
+  "actions": [
+    {
+      "description": "ERP dashboard as of the simulation date: factories (capacity, machines, staff), alerts from the shop floor and warehouse, and business KPIs (late orders, material shortages). Start here.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_overview",
+      "preconditions": [],
+      "readOnly": true
+    },
+    {
+      "description": "Business KPI of the plan right now: orders expected late, sofas late, unplanned orders, orders late without customer notice, material shortages, cost of measures. This is the measure of success.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_kpi",
+      "preconditions": [],
+      "readOnly": true
+    },
+    {
+      "description": "WHAT-IF, read-only. Applies one change, or a SEQUENCE of changes (parameter \"changes\", applied in order), of the ERP change tools (create_purchase_order, update_production_order, create_production_order, request_overtime, request_temp_workers, write_off_stock, release_stock ...) to a COPY of the company state and returns what each would answer plus the KPI before and after. Nothing is changed. Single options often are not enough: test COMBINATIONS (for example two purchase orders plus overtime) and compare them. Apply the chosen changes only in the execute step.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Name of an ERP change tool (single change)",
+          "multivalued": false,
+          "name": "tool",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "description": "Arguments of that tool (single change)",
+          "multivalued": false,
+          "name": "arguments",
+          "range": "json",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "description": "A sequence of changes to apply together",
+          "multivalued": true,
+          "name": "changes",
+          "range": "json",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "simulate_change",
+      "preconditions": [],
+      "readOnly": true
+    },
+    {
+      "description": "Machines per factory with status, notes and the open maintenance ticket.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_machines",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Machine"
+    },
+    {
+      "description": "Production workers per factory with planned absences.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_workers",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Worker"
+    },
+    {
+      "description": "Daily production capacity (sofas/day) of a factory for the next workdays, with the reason.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Number of workdays, default 15",
+          "multivalued": false,
+          "name": "days",
+          "range": "float",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_capacity",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Factory"
+    },
+    {
+      "description": "Production orders with factory, priority, quantity, due date and the simulated completion date. Filter by factory or show only orders that will miss their delivery promise.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": false
+        },
+        {
+          "description": "Only orders expected to deliver after the promised date",
+          "multivalued": false,
+          "name": "lateOnly",
+          "range": "boolean",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_production_orders",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "ProductionOrder"
+    },
+    {
+      "description": "Warehouse stock by lot (status ok, quarantined or written_off) with the total usable quantity per SKU.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Optional SKU filter, e.g. BEAM-PINE-80",
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_inventory",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "InventoryItem"
+    },
+    {
+      "description": "Projected stock of a SKU over the coming workdays (consumption by the production plan, arrival of open purchase orders) and the first day production is held back by a shortage.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "SKU, e.g. BEAM-PINE-80 or FAB-OAT-01",
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_material_projection",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Material"
+    },
+    {
+      "description": "Purchase orders with supplier, quantity, delivery date and status (open, delayed, cancelled).",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Optional SKU filter",
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_purchase_orders",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "PurchaseOrder"
+    },
+    {
+      "description": "Suppliers with the SKUs they supply, lead time, price, order size limits, express option and current status/notice.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Optional SKU filter",
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_suppliers",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Supplier"
+    },
+    {
+      "description": "Bill of materials of a sofa model (beams, fabric metres, foam blocks per sofa).",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "LUND, OSLO or BERGEN",
+          "multivalued": false,
+          "name": "product",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "get_bom",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Bom"
+    },
+    {
+      "description": "Maintenance tickets with status and planned repair date.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "erp",
+      "name": "list_maintenance_tickets",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "MaintenanceTicket"
+    },
+    {
+      "description": "WRITE. Place a purchase order with a supplier. Returns the delivery date. Fails if the supplier cannot deliver or the quantity is outside its limits.",
+      "destructive": false,
+      "emits": [
+        "PurchaseOrderCreated"
+      ],
+      "input": [
+        {
+          "description": "Supplier id, e.g. S-BALTIC",
+          "multivalued": false,
+          "name": "supplierId",
+          "range": "Supplier",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "SKU",
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Quantity",
+          "multivalued": false,
+          "name": "quantity",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Express delivery if the supplier offers it (surcharge per unit)",
+          "multivalued": false,
+          "name": "express",
+          "range": "boolean",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "description": "Reason / reference",
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "create_purchase_order",
+      "preconditions": [
+        "supplier_can_deliver",
+        "supplier_supplies_sku",
+        "quantity_within_supplier_limits",
+        "express_offered_if_requested"
+      ],
+      "readOnly": false,
+      "target": "PurchaseOrder"
+    },
+    {
+      "description": "WRITE. Cancel an open or delayed purchase order.",
+      "destructive": true,
+      "emits": [
+        "PurchaseOrderCancelled"
+      ],
+      "input": [
+        {
+          "description": "Purchase order id",
+          "multivalued": false,
+          "name": "poId",
+          "range": "PurchaseOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Reason",
+          "multivalued": false,
+          "name": "reason",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "erp",
+      "name": "cancel_purchase_order",
+      "preconditions": [
+        "purchase_order_open_or_delayed"
+      ],
+      "readOnly": false,
+      "target": "PurchaseOrder"
+    },
+    {
+      "description": "WRITE. Open a maintenance ticket for a machine and book the external technician. The repair starts when the required spare part has been delivered (a purchase order for it must exist) and takes 2 workdays.",
+      "destructive": false,
+      "emits": [
+        "MaintenanceTicketOpened"
+      ],
+      "input": [
+        {
+          "description": "Machine id, e.g. N-CUT-1",
+          "multivalued": false,
+          "name": "machineId",
+          "range": "Machine",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Fault description",
+          "multivalued": false,
+          "name": "description",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "SKU of the spare part, if known",
+          "multivalued": false,
+          "name": "requiredPart",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": false
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "create_maintenance_ticket",
+      "preconditions": [
+        "no_open_ticket_for_machine"
+      ],
+      "readOnly": false,
+      "target": "MaintenanceTicket"
+    },
+    {
+      "description": "WRITE. Move a production order to the other factory and/or change its priority (1 = most urgent … 9). The simulation re-sequences both factory queues.",
+      "destructive": false,
+      "emits": [
+        "ProductionOrderUpdated"
+      ],
+      "input": [
+        {
+          "description": "Production order id, e.g. PRD-4204",
+          "multivalued": false,
+          "name": "orderId",
+          "range": "ProductionOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": false
+        },
+        {
+          "description": "1-9",
+          "multivalued": false,
+          "name": "priority",
+          "range": "float",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "erp",
+      "name": "update_production_order",
+      "preconditions": [
+        "priority_in_range"
+      ],
+      "readOnly": false,
+      "target": "ProductionOrder"
+    },
+    {
+      "description": "WRITE. Create the production order for a confirmed, unplanned sales order and put it into a factory queue.",
+      "destructive": false,
+      "emits": [
+        "ProductionOrderCreated"
+      ],
+      "input": [
+        {
+          "description": "Sales order id, e.g. SO-2301",
+          "multivalued": false,
+          "name": "salesOrderId",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "1-9, default 5",
+          "multivalued": false,
+          "name": "priority",
+          "range": "float",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "create_production_order",
+      "preconditions": [
+        "sales_order_unplanned",
+        "priority_in_range"
+      ],
+      "readOnly": false,
+      "target": "ProductionOrder"
+    },
+    {
+      "description": "WRITE. Book overtime in a factory for a date range: +25% output of the available staff (max 48 sofas/day). Costs EUR 1,400 per factory and day.",
+      "destructive": false,
+      "emits": [
+        "OvertimeBooked"
+      ],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "First day, YYYY-MM-DD",
+          "multivalued": false,
+          "name": "from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Last day, YYYY-MM-DD",
+          "multivalued": false,
+          "name": "to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "request_overtime",
+      "preconditions": [
+        "date_range_valid"
+      ],
+      "readOnly": false,
+      "target": "OvertimeShift"
+    },
+    {
+      "description": "WRITE. Book temporary workers from the agency for a factory and date range. Each delivers 15 sofas/day. They start 3 workdays after the request. Costs EUR 260 per worker and day.",
+      "destructive": false,
+      "emits": [
+        "TempWorkersBooked"
+      ],
+      "input": [
+        {
+          "description": "Factory id: F-NORTH or F-SOUTH",
+          "enum": [
+            "F-NORTH",
+            "F-SOUTH"
+          ],
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Number of workers (1-4)",
+          "multivalued": false,
+          "name": "count",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "First day, YYYY-MM-DD",
+          "multivalued": false,
+          "name": "from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Last day, YYYY-MM-DD",
+          "multivalued": false,
+          "name": "to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "request_temp_workers",
+      "preconditions": [
+        "date_range_valid",
+        "temp_worker_count_in_range"
+      ],
+      "readOnly": false,
+      "target": "TempWorkerAssignment"
+    },
+    {
+      "description": "WRITE. Write off a quantity of a warehouse lot (damaged goods). Cannot be undone.",
+      "destructive": true,
+      "emits": [
+        "StockWrittenOff"
+      ],
+      "input": [
+        {
+          "description": "Lot id, e.g. L-OAT-231",
+          "multivalued": false,
+          "name": "lotId",
+          "range": "InventoryItem",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Quantity to write off",
+          "multivalued": false,
+          "name": "quantity",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Reason",
+          "multivalued": false,
+          "name": "reason",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "erp",
+      "name": "write_off_stock",
+      "preconditions": [
+        "quantity_available_in_lot"
+      ],
+      "readOnly": false,
+      "target": "InventoryItem"
+    },
+    {
+      "description": "WRITE. Release a quarantined lot (or part of it) for production after inspection.",
+      "destructive": false,
+      "emits": [
+        "StockReleased"
+      ],
+      "input": [
+        {
+          "description": "Lot id",
+          "multivalued": false,
+          "name": "lotId",
+          "range": "InventoryItem",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Quantity to release",
+          "multivalued": false,
+          "name": "quantity",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Inspection reference",
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "erp",
+      "name": "release_stock",
+      "preconditions": [
+        "lot_quarantined",
+        "quantity_available_in_lot"
+      ],
+      "readOnly": false,
+      "target": "InventoryItem"
+    },
+    {
+      "description": "WRITE. File an incident report for the insurance (storm, fire, theft …). Returns the claim number.",
+      "destructive": false,
+      "emits": [
+        "IncidentReported"
+      ],
+      "input": [
+        {
+          "description": "Incident type, e.g. storm_damage",
+          "multivalued": false,
+          "name": "type",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "What happened",
+          "multivalued": false,
+          "name": "description",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Estimated loss in EUR",
+          "multivalued": false,
+          "name": "estimatedLossEur",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "erp",
+      "name": "file_incident_report",
+      "preconditions": [],
+      "readOnly": false,
+      "target": "Incident"
+    },
+    {
+      "description": "Customers with tier, late-delivery penalty and contact address.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "crm",
+      "name": "list_customers",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Customer"
+    },
+    {
+      "description": "Sales orders with promised delivery date, simulated expected delivery date and days late. Filter by customer or show only orders that are expected late or not yet planned.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Customer id, e.g. C-01",
+          "multivalued": false,
+          "name": "customerId",
+          "range": "Customer",
+          "rangeKind": "class",
+          "required": false
+        },
+        {
+          "description": "Only orders expected late, or not yet planned for production",
+          "multivalued": false,
+          "name": "riskOnly",
+          "range": "boolean",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "crm",
+      "name": "list_orders",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "SalesOrder"
+    },
+    {
+      "description": "One sales order in detail, including its production order.",
+      "destructive": false,
+      "emits": [],
+      "input": [
+        {
+          "description": "Sales order id",
+          "multivalued": false,
+          "name": "orderId",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        }
+      ],
+      "kind": "query",
+      "mcpGroup": "crm",
+      "name": "get_order",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "SalesOrder"
+    },
+    {
+      "description": "Marketing campaigns with period, status, budget level and observed effect on order intake.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "crm",
+      "name": "list_campaigns",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "Campaign"
+    },
+    {
+      "description": "Weekly sofas ordered versus the plan (order intake trend), including orders that are not planned for production yet.",
+      "destructive": false,
+      "emits": [],
+      "input": [],
+      "kind": "query",
+      "mcpGroup": "crm",
+      "name": "get_demand_trend",
+      "preconditions": [],
+      "readOnly": true,
+      "target": "DemandSignal"
+    },
+    {
+      "description": "WRITE. Send a notice (e-mail) to a customer about their orders, for example a delivery delay. The mail is recorded, not delivered.",
+      "destructive": false,
+      "emits": [
+        "CustomerNoticeSent"
+      ],
+      "input": [
+        {
+          "description": "Customer id",
+          "multivalued": false,
+          "name": "customerId",
+          "range": "Customer",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Sales orders concerned",
+          "multivalued": true,
+          "name": "orderIds",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "Subject",
+          "multivalued": false,
+          "name": "subject",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Message text",
+          "multivalued": false,
+          "name": "body",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "create",
+      "mcpGroup": "crm",
+      "name": "send_customer_notice",
+      "preconditions": [
+        "orders_belong_to_customer"
+      ],
+      "readOnly": false,
+      "target": "CustomerNotice"
+    },
+    {
+      "description": "WRITE. Record a new delivery date that was communicated to the customer for a sales order.",
+      "destructive": false,
+      "emits": [
+        "DeliveryDateUpdated"
+      ],
+      "input": [
+        {
+          "description": "Sales order id",
+          "multivalued": false,
+          "name": "orderId",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "YYYY-MM-DD",
+          "multivalued": false,
+          "name": "newDate",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Reason given to the customer",
+          "multivalued": false,
+          "name": "reason",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "crm",
+      "name": "update_delivery_date",
+      "preconditions": [],
+      "readOnly": false,
+      "target": "SalesOrder"
+    },
+    {
+      "description": "WRITE. Change a campaign: throttle the daily ad budget (percent of the normal budget, 0-100) or pause/resume it. Lower budget reduces new order intake after a few days.",
+      "destructive": false,
+      "emits": [
+        "CampaignUpdated"
+      ],
+      "input": [
+        {
+          "description": "Campaign id",
+          "multivalued": false,
+          "name": "campaignId",
+          "range": "Campaign",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "description": "0-100",
+          "multivalued": false,
+          "name": "dailyBudgetPct",
+          "range": "float",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "description": "active or paused",
+          "multivalued": false,
+          "name": "status",
+          "range": "CampaignStatus",
+          "rangeKind": "enum",
+          "required": false
+        },
+        {
+          "description": "Reason",
+          "multivalued": false,
+          "name": "reason",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "kind": "update",
+      "mcpGroup": "crm",
+      "name": "update_campaign",
+      "preconditions": [
+        "budget_in_range"
+      ],
+      "readOnly": false,
+      "target": "Campaign"
+    }
+  ],
+  "bindings": [
+    {
+      "class": "Factory",
+      "columns": {
+        "id": "id",
+        "name": "name"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_factories"
+    },
+    {
+      "class": "Machine",
+      "columns": {
+        "down_since": "down_since",
+        "factory": "factory_id",
+        "id": "id",
+        "name": "name",
+        "note": "note",
+        "rate_per_day": "rate_per_day",
+        "status": "status"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_machines"
+    },
+    {
+      "class": "Worker",
+      "columns": {
+        "factory": "factory_id",
+        "id": "id",
+        "name": "name"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_workers"
+    },
+    {
+      "class": "Absence",
+      "columns": {
+        "date_from": "date_from",
+        "date_to": "date_to",
+        "reason": "reason",
+        "worker": "worker_id"
+      },
+      "idTemplate": "{worker_id}:{date_from}",
+      "key": [
+        "worker_id",
+        "date_from"
+      ],
+      "table": "erp_absences"
+    },
+    {
+      "class": "Material",
+      "columns": {
+        "name": "name",
+        "sku": "sku",
+        "unit": "unit",
+        "unit_cost": "unit_cost"
+      },
+      "key": [
+        "sku"
+      ],
+      "table": "erp_materials"
+    },
+    {
+      "class": "Bom",
+      "columns": {
+        "beams": "beams",
+        "fabric_m": "fabric_m",
+        "foam": "foam",
+        "product": "product",
+        "product_name": "product_name"
+      },
+      "key": [
+        "product"
+      ],
+      "table": "erp_bom"
+    },
+    {
+      "class": "Supplier",
+      "columns": {
+        "express_lead_workdays": "express_lead_workdays",
+        "express_surcharge_per_unit": "express_surcharge_per_unit",
+        "id": "id",
+        "lead_workdays": "lead_workdays",
+        "max_qty": "max_qty",
+        "min_qty": "min_qty",
+        "name": "name",
+        "notice": "notice",
+        "rating": "rating",
+        "skus": "skus",
+        "status": "status",
+        "unit_price": "unit_price"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_suppliers",
+      "transforms": {
+        "skus": "json_array"
+      }
+    },
+    {
+      "class": "InventoryItem",
+      "columns": {
+        "location": "location",
+        "lot_id": "lot_id",
+        "note": "note",
+        "qty": "qty",
+        "sku": "sku",
+        "status": "status"
+      },
+      "key": [
+        "lot_id"
+      ],
+      "table": "erp_inventory"
+    },
+    {
+      "class": "PurchaseOrder",
+      "columns": {
+        "eta": "eta",
+        "express": "express",
+        "id": "id",
+        "note": "note",
+        "original_eta": "original_eta",
+        "qty": "qty",
+        "sku": "sku",
+        "status": "status",
+        "supplier": "supplier_id",
+        "unit_price": "unit_price"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_purchase_orders"
+    },
+    {
+      "class": "ProductionOrder",
+      "columns": {
+        "due_date": "due_date",
+        "fabric": "fabric",
+        "factory": "factory_id",
+        "id": "id",
+        "priority": "priority",
+        "product": "product",
+        "qty": "qty",
+        "sales_order": "sales_order_id",
+        "status": "status"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_production_orders"
+    },
+    {
+      "class": "MaintenanceTicket",
+      "columns": {
+        "description": "details",
+        "id": "id",
+        "machine": "machine_id",
+        "required_part": "required_part",
+        "status": "status"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "erp_maintenance_tickets",
+      "transforms": {
+        "description": "json_field_description"
+      }
+    },
+    {
+      "class": "Customer",
+      "columns": {
+        "contact": "contact",
+        "id": "id",
+        "name": "name",
+        "penalty_pct_per_week_late": "penalty_pct_per_week_late",
+        "tier": "tier"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "crm_customers"
+    },
+    {
+      "class": "SalesOrder",
+      "columns": {
+        "communicated_delivery": "communicated_delivery",
+        "customer": "customer_id",
+        "fabric": "fabric",
+        "id": "id",
+        "product": "product",
+        "promised_delivery": "promised_delivery",
+        "qty": "qty",
+        "status": "status"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "crm_orders"
+    },
+    {
+      "class": "Campaign",
+      "columns": {
+        "daily_budget_pct": "daily_budget_pct",
+        "date_from": "date_from",
+        "date_to": "date_to",
+        "id": "id",
+        "name": "name",
+        "note": "note",
+        "status": "status"
+      },
+      "key": [
+        "id"
+      ],
+      "table": "crm_campaigns"
+    },
+    {
+      "class": "DemandSignal",
+      "columns": {
+        "customer": "customer_id",
+        "product": "product",
+        "promised_delivery": "promised_delivery",
+        "qty": "qty",
+        "sales_order_id": "sales_order_id",
+        "source": "source"
+      },
+      "key": [
+        "sales_order_id"
+      ],
+      "table": "crm_demand"
+    }
+  ],
+  "classes": [
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "description": "e.g. F-NORTH",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "A plant that produces sofas.",
+      "identifier": "id",
+      "name": "Factory"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "description": "e.g. N-CUT-1",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "Sofas per day at full staffing",
+          "identifier": false,
+          "multivalued": false,
+          "name": "rate_per_day",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "MachineStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "down_since",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A production machine; when one is down, its factory produces nothing.",
+      "identifier": "id",
+      "name": "Machine"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "confidential",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        }
+      ],
+      "description": "A regular worker of a factory.",
+      "identifier": "id",
+      "name": "Worker"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "confidential",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "description": "worker id + start date",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "worker",
+          "range": "Worker",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "reason",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A period in which a worker is absent (sick leave, vacation).",
+      "identifier": "id",
+      "name": "Absence"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "Approved overtime in a factory (capacity x1.25).",
+      "identifier": "id",
+      "name": "OvertimeShift"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "count",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "Temporary workers booked for a factory.",
+      "identifier": "id",
+      "name": "TempWorkerAssignment"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-logistics"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "sku",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "unit",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "unit_cost",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "A purchased material or spare part, identified by SKU.",
+      "identifier": "sku",
+      "name": "Material"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "product",
+          "range": "ProductCode",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "product_name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "beams",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "fabric_m",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "foam",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "Bill of materials of a sofa model.",
+      "identifier": "product",
+      "name": "Bom"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "confidential",
+        "mcp_group": "erp",
+        "owner": "head-of-logistics"
+      },
+      "attributes": [
+        {
+          "description": "e.g. S-NORDHOLZ",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": true,
+          "name": "skus",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "lead_workdays",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "unit_price",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "min_qty",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "max_qty",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "express_lead_workdays",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "express_surcharge_per_unit",
+          "range": "float",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "rating",
+          "range": "SupplierRating",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "SupplierStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "notice",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A supplier of materials or spare parts.",
+      "identifier": "id",
+      "name": "Supplier"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-logistics"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "lot_id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "qty",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "location",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "LotStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A lot of material in the warehouse.",
+      "identifier": "lot_id",
+      "name": "InventoryItem"
+    },
+    {
+      "annotations": {
+        "criticality": "payment_critical",
+        "data_class": "confidential",
+        "mcp_group": "erp",
+        "owner": "head-of-logistics"
+      },
+      "attributes": [
+        {
+          "description": "e.g. PO-4411",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "supplier",
+          "range": "Supplier",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "sku",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "qty",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "unit_price",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "eta",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "original_eta",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "PurchaseOrderStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "express",
+          "range": "boolean",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "An order to a supplier; commits money.",
+      "identifier": "id",
+      "name": "PurchaseOrder"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "sales_order",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "factory",
+          "range": "Factory",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "product",
+          "range": "Bom",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "fabric",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "qty",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "1 = most urgent",
+          "identifier": false,
+          "multivalued": false,
+          "name": "priority",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "due_date",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "ProductionOrderStatus",
+          "rangeKind": "enum",
+          "required": true
+        }
+      ],
+      "description": "An order to produce the sofas of a sales order in a factory.",
+      "identifier": "id",
+      "name": "ProductionOrder"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-production"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "machine",
+          "range": "Machine",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "MaintenanceTicketStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "required_part",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "description",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A repair order for a machine.",
+      "identifier": "id",
+      "name": "MaintenanceTicket"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "erp",
+        "owner": "head-of-logistics"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "type",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "description",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "estimated_loss_eur",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "An incident report for insurance (e.g. storm damage).",
+      "identifier": "id",
+      "name": "Incident"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "confidential",
+        "mcp_group": "crm",
+        "owner": "head-of-sales"
+      },
+      "attributes": [
+        {
+          "description": "e.g. C-01",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "tier",
+          "range": "CustomerTier",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "penalty_pct_per_week_late",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "description": "E-mail address",
+          "identifier": false,
+          "multivalued": false,
+          "name": "contact",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "A B2B customer (retailer).",
+      "identifier": "id",
+      "name": "Customer"
+    },
+    {
+      "annotations": {
+        "criticality": "business_critical",
+        "data_class": "confidential",
+        "mcp_group": "crm",
+        "owner": "head-of-sales"
+      },
+      "attributes": [
+        {
+          "description": "e.g. SO-2101",
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "customer",
+          "range": "Customer",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "product",
+          "range": "Bom",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "qty",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "fabric",
+          "range": "Material",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "promised_delivery",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "communicated_delivery",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "SalesOrderStatus",
+          "rangeKind": "enum",
+          "required": true
+        }
+      ],
+      "description": "A customer order with a promised delivery date.",
+      "identifier": "id",
+      "name": "SalesOrder"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "confidential",
+        "mcp_group": "crm",
+        "owner": "head-of-sales"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "customer",
+          "range": "Customer",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": true,
+          "name": "orders",
+          "range": "SalesOrder",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "subject",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "body",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        }
+      ],
+      "description": "A message sent to a customer about their orders (recorded, not delivered).",
+      "identifier": "id",
+      "name": "CustomerNotice"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "crm",
+        "owner": "head-of-sales"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "name",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_from",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "date_to",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "status",
+          "range": "CampaignStatus",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "daily_budget_pct",
+          "range": "float",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "note",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        }
+      ],
+      "description": "A marketing campaign that drives order intake.",
+      "identifier": "id",
+      "name": "Campaign"
+    },
+    {
+      "annotations": {
+        "criticality": "normal",
+        "data_class": "internal",
+        "mcp_group": "crm",
+        "owner": "head-of-sales"
+      },
+      "attributes": [
+        {
+          "identifier": true,
+          "multivalued": false,
+          "name": "sales_order_id",
+          "range": "string",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "customer",
+          "range": "Customer",
+          "rangeKind": "class",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "product",
+          "range": "ProductCode",
+          "rangeKind": "enum",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "qty",
+          "range": "integer",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "promised_delivery",
+          "range": "date",
+          "rangeKind": "type",
+          "required": true
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "source",
+          "range": "DemandSource",
+          "rangeKind": "enum",
+          "required": true
+        }
+      ],
+      "description": "Planned order intake per sales order (basis of the production plan and the demand trend).",
+      "identifier": "sales_order_id",
+      "name": "DemandSignal"
+    }
+  ],
+  "description": "A sofa maker with two factories, suppliers, a warehouse and B2B customers (scripts/sofa-company/mock-mcp.mjs).",
+  "enums": [
+    {
+      "name": "MachineStatus",
+      "values": [
+        {
+          "value": "running"
+        },
+        {
+          "description": "Out of order; capacity of its factory is 0 until repaired",
+          "value": "down"
+        }
+      ]
+    },
+    {
+      "name": "SupplierStatus",
+      "values": [
+        {
+          "value": "ok"
+        },
+        {
+          "description": "Supplier reported it cannot deliver for a period (see notice)",
+          "value": "cannot_deliver"
+        }
+      ]
+    },
+    {
+      "name": "SupplierRating",
+      "values": [
+        {
+          "value": "A"
+        },
+        {
+          "value": "B"
+        },
+        {
+          "value": "C"
+        }
+      ]
+    },
+    {
+      "name": "LotStatus",
+      "values": [
+        {
+          "value": "ok"
+        },
+        {
+          "description": "Blocked for use, e.g. after damage; not counted as usable stock",
+          "value": "quarantined"
+        }
+      ]
+    },
+    {
+      "name": "PurchaseOrderStatus",
+      "values": [
+        {
+          "value": "open"
+        },
+        {
+          "description": "Supplier moved the ETA",
+          "value": "delayed"
+        },
+        {
+          "value": "cancelled"
+        }
+      ]
+    },
+    {
+      "name": "ProductionOrderStatus",
+      "values": [
+        {
+          "value": "planned"
+        }
+      ]
+    },
+    {
+      "name": "MaintenanceTicketStatus",
+      "values": [
+        {
+          "value": "open"
+        },
+        {
+          "value": "closed"
+        }
+      ]
+    },
+    {
+      "name": "CustomerTier",
+      "values": [
+        {
+          "description": "Key account, highest priority",
+          "value": "A"
+        },
+        {
+          "value": "B"
+        }
+      ]
+    },
+    {
+      "name": "SalesOrderStatus",
+      "values": [
+        {
+          "value": "confirmed"
+        },
+        {
+          "description": "Confirmed to the customer but no production order yet",
+          "value": "confirmed_unplanned"
+        }
+      ]
+    },
+    {
+      "name": "CampaignStatus",
+      "values": [
+        {
+          "value": "active"
+        },
+        {
+          "value": "paused"
+        }
+      ]
+    },
+    {
+      "name": "ProductCode",
+      "values": [
+        {
+          "description": "Lund 2-seater",
+          "value": "LUND"
+        },
+        {
+          "description": "Oslo 3-seater",
+          "value": "OSLO"
+        },
+        {
+          "description": "Bergen corner sofa",
+          "value": "BERGEN"
+        }
+      ]
+    },
+    {
+      "name": "DemandSource",
+      "values": [
+        {
+          "description": "Order intake the production plan is based on",
+          "value": "plan"
+        },
+        {
+          "description": "Intake caused by a marketing campaign",
+          "value": "campaign"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "description": "A purchase order was placed with a supplier",
+      "name": "PurchaseOrderCreated",
+      "objectType": "PurchaseOrder"
+    },
+    {
+      "description": "An open or delayed purchase order was cancelled",
+      "name": "PurchaseOrderCancelled",
+      "objectType": "PurchaseOrder"
+    },
+    {
+      "description": "The supplier moved the ETA of a purchase order",
+      "name": "PurchaseOrderDelayed",
+      "objectType": "PurchaseOrder"
+    },
+    {
+      "description": "A repair was ordered for a machine",
+      "name": "MaintenanceTicketOpened",
+      "objectType": "MaintenanceTicket"
+    },
+    {
+      "description": "A production order was put into a factory queue",
+      "name": "ProductionOrderCreated",
+      "objectType": "ProductionOrder"
+    },
+    {
+      "description": "A production order moved factory or changed priority",
+      "name": "ProductionOrderUpdated",
+      "objectType": "ProductionOrder"
+    },
+    {
+      "description": "Overtime was booked for a factory",
+      "name": "OvertimeBooked",
+      "objectType": "OvertimeShift"
+    },
+    {
+      "description": "Temporary workers were booked for a factory",
+      "name": "TempWorkersBooked",
+      "objectType": "TempWorkerAssignment"
+    },
+    {
+      "description": "A quantity of a lot was written off",
+      "name": "StockWrittenOff",
+      "objectType": "InventoryItem"
+    },
+    {
+      "description": "A quarantined quantity was released for production",
+      "name": "StockReleased",
+      "objectType": "InventoryItem"
+    },
+    {
+      "description": "An incident report was filed with the insurance",
+      "name": "IncidentReported",
+      "objectType": "Incident"
+    },
+    {
+      "description": "A notice was sent to a customer",
+      "name": "CustomerNoticeSent",
+      "objectType": "CustomerNotice"
+    },
+    {
+      "description": "A new delivery date was communicated to the customer",
+      "name": "DeliveryDateUpdated",
+      "objectType": "SalesOrder"
+    },
+    {
+      "description": "The budget or status of a campaign changed",
+      "name": "CampaignUpdated",
+      "objectType": "Campaign"
+    },
+    {
+      "description": "A supplier reported it cannot deliver for a period",
+      "name": "SupplierCannotDeliver",
+      "objectType": "Supplier"
+    },
+    {
+      "description": "A machine went out of order",
+      "name": "MachineBrokeDown",
+      "objectType": "Machine"
+    },
+    {
+      "description": "A new confirmed sales order arrived (e.g. campaign demand)",
+      "name": "SalesOrderReceived",
+      "objectType": "SalesOrder"
+    },
+    {
+      "description": "A worker reported an absence",
+      "name": "AbsenceReported",
+      "objectType": "Absence"
+    },
+    {
+      "description": "A lot was blocked, e.g. after damage",
+      "name": "LotQuarantined",
+      "objectType": "InventoryItem"
+    }
+  ],
+  "hash": "47c5052c50791e50d7bd89bc9c72e58bf8b1242f42044d59d40ceb4fe67c69cd",
+  "irVersion": 1,
+  "links": [
+    {
+      "attribute": "factory",
+      "from": "Machine",
+      "multivalued": false,
+      "required": true,
+      "to": "Factory"
+    },
+    {
+      "attribute": "factory",
+      "from": "Worker",
+      "multivalued": false,
+      "required": true,
+      "to": "Factory"
+    },
+    {
+      "attribute": "worker",
+      "from": "Absence",
+      "multivalued": false,
+      "required": true,
+      "to": "Worker"
+    },
+    {
+      "attribute": "factory",
+      "from": "OvertimeShift",
+      "multivalued": false,
+      "required": true,
+      "to": "Factory"
+    },
+    {
+      "attribute": "factory",
+      "from": "TempWorkerAssignment",
+      "multivalued": false,
+      "required": true,
+      "to": "Factory"
+    },
+    {
+      "attribute": "skus",
+      "from": "Supplier",
+      "multivalued": true,
+      "required": true,
+      "to": "Material"
+    },
+    {
+      "attribute": "sku",
+      "from": "InventoryItem",
+      "multivalued": false,
+      "required": true,
+      "to": "Material"
+    },
+    {
+      "attribute": "supplier",
+      "from": "PurchaseOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Supplier"
+    },
+    {
+      "attribute": "sku",
+      "from": "PurchaseOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Material"
+    },
+    {
+      "attribute": "sales_order",
+      "from": "ProductionOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "SalesOrder"
+    },
+    {
+      "attribute": "factory",
+      "from": "ProductionOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Factory"
+    },
+    {
+      "attribute": "product",
+      "from": "ProductionOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Bom"
+    },
+    {
+      "attribute": "fabric",
+      "from": "ProductionOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Material"
+    },
+    {
+      "attribute": "machine",
+      "from": "MaintenanceTicket",
+      "multivalued": false,
+      "required": true,
+      "to": "Machine"
+    },
+    {
+      "attribute": "required_part",
+      "from": "MaintenanceTicket",
+      "multivalued": false,
+      "required": false,
+      "to": "Material"
+    },
+    {
+      "attribute": "customer",
+      "from": "SalesOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Customer"
+    },
+    {
+      "attribute": "product",
+      "from": "SalesOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Bom"
+    },
+    {
+      "attribute": "fabric",
+      "from": "SalesOrder",
+      "multivalued": false,
+      "required": true,
+      "to": "Material"
+    },
+    {
+      "attribute": "customer",
+      "from": "CustomerNotice",
+      "multivalued": false,
+      "required": true,
+      "to": "Customer"
+    },
+    {
+      "attribute": "orders",
+      "from": "CustomerNotice",
+      "multivalued": true,
+      "required": true,
+      "to": "SalesOrder"
+    },
+    {
+      "attribute": "customer",
+      "from": "DemandSignal",
+      "multivalued": false,
+      "required": true,
+      "to": "Customer"
+    }
+  ],
+  "name": "sofa",
+  "source": {
+    "files": {
+      "actions.yaml": "6833d6fe00c4e8332f74728c52be74dc305c1b68d456ec21a62820d205194d23",
+      "bindings.yaml": "82298c939f57aa45825c18242e5ca663ccf030ab3efe4d96d05e2f8e22b0389d",
+      "schema.yaml": "b49dfeefc6d7deb66e086dbbe84ab66347abdca33c6c5679fa3999dd8845d625"
+    },
+    "hash": "647df56556758e7fb263b9cd9c02eac5fea221ae0b2449d8c315b034ddd9c699"
+  },
+  "title": "Sofa company",
+  "version": "0.1.0"
+}

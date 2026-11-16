@@ -162,14 +162,78 @@ The Overview page shows the event log, the flush state and every raw table:
 
 Why LinkML is the bridge between LLM proposals and generated code, with a worked example: [link-ml.md](link-ml.md).
 
-*(planned, M2)* The ontology source, the annotations the compiler reads (`criticality`, `data_class`, `owner`,
-`mcp_group`), the IR schema, the generator outputs and the versioning rules.
+Decision record: [ADR-0041](adr/0041-ontology-linkml-ir-generators.md).
+
+**Source** — `ontology/sofa/`, three files, the only place where the meaning of business data is written down:
+
+| File | Content |
+|---|---|
+| `schema.yaml` | LinkML schema: 19 classes with class-local attributes, 12 enums, links (attributes whose range is a class), one identifier per class |
+| `actions.yaml` | 31 typed actions (exactly the tools of the sofa mock) with kind, read-only/destructive flags, input fields, named preconditions and emitted events; the event catalog (19 events, incl. the scenario disruptions) |
+| `bindings.yaml` | 15 classes bound to their raw-zone tables (`lake.raw.erp_*`, `lake.raw.crm_*`) with key and column mapping; the other classes exist only through actions |
+
+Annotations the compiler requires on every class:
+
+| Annotation | Values | Used by |
+|---|---|---|
+| `criticality` | `normal`, `business_critical`, `payment_critical` | policy (e.g. four eyes for agent writes on payment-critical objects, M4), blast radius (M7) |
+| `data_class` | `public`, `internal`, `confidential` | policy, app registry (M9) |
+| `owner` | a role, e.g. `head-of-logistics` | approves structural changes of the class (proposals, M6) |
+| `mcp_group` | `erp`, `crm` | tool groups of the parity phase (M3) |
+
+**Compiler** — `tools/ontology-compiler` (Python, LinkML 1.12.1, pinned image `coworking/ontology-compiler:local`;
+its tests run in the image build). It validates all references and rules and reports every error with its path, for
+example `actions.yaml#create_purchase_order.emits: unknown event 'PurchaseOrderMade'`.
+
+**IR (the contract)** — `packages/ontology-sofa/ir/ontology.ir.json`, schema in `packages/ontology-ir`: name, semver,
+enums, classes (attributes with range kind, required, multivalued, identifier), links, events, actions, bindings,
+SHA-256 of each source file and a content hash over canonical JSON. Generators read only the IR. The TypeScript side
+recomputes the hash and rejects an edited IR.
+
+**Generated** (pure functions IR → files, `packages/ontology-codegen`; every file starts with `GENERATED from ontology
+sofa@0.1.0 (<hash>) — do not edit`):
+
+| Artefact | File | Used by |
+|---|---|---|
+| zod schemas + TS types per enum, class, action input | `packages/ontology-sofa/src/generated/types.ts` | ontology server (validation, M3), SDK |
+| MCP tool definitions | `…/src/generated/mcp-tools.ts` | ontology server `/onto/mcp`, `/erp/mcp`, `/crm/mcp` (M3) |
+| data-quality checks | `…/src/generated/dq.ts` | projection checks (M3), ontology validation (E2) |
+| SDK client | `…/src/generated/sdk.ts` | UIs (M9) |
+| projection DDL | `packages/ontology-sofa/generated/projection.sql` | projection in `ontology-db` (M3) |
+| OPA data + Rego test skeleton | `…/generated/opa/` | policy bundle (M4) |
+
+**Changing the ontology** (until proposals exist, M6): edit the YAML, then
+
+```bash
+node scripts/liquid/ontology-build.mjs --verify   # compile (twice, must be identical) and regenerate
+node scripts/liquid/check.mjs                     # includes the stale check: sources ↔ IR ↔ generated files
+```
+
+and commit sources, IR and generated files together. Versioning: patch for descriptions/annotations, minor for
+additive changes, major for removals or narrowing (enforced from M8). Why this matters, with a worked example from data
+to UI: [link-ml.md](link-ml.md).
 
 ## Ontology editor
 
-*(planned, E1–E4)* Admin console → Liquid enterprise → **Ontology**: classes as nodes, links as edges, enums and actions
-in a side panel. Changes are made in a draft, validated by the compiler, submitted as a proposal and go live after the
-owner approves.
+Decision record: [ADR-0042](adr/0042-ontology-editor-react-flow.md).
+
+Admin console → Liquid enterprise → **Ontology** shows the ontology the ontology server is running on (React Flow):
+
+- **Nodes** are classes: name, criticality (orange: business critical, red: payment critical), a lock for confidential
+  data, scalar and enum fields (key icon = identifier, bold = required), and the number of read and write actions.
+- **Edges** are links, from the referencing class to the referenced one; dashed = optional, `[*]` = multi-valued.
+- **Search and filters** (group, criticality) dim everything that does not match.
+- **Selecting a class** zooms to it and its linked classes and shows attributes, incoming links, actions with their
+  preconditions and events, and the raw table it is bound to. Without a selection the panel shows version, hash, counts,
+  enums and company-wide actions.
+- Dragged positions are remembered in the browser; **Reset layout** returns to the automatic layout.
+
+| Graph | Selected class | Filter |
+|---|---|---|
+| ![Ontology graph](images/liquid/ontology-graph.png) | ![Selected class](images/liquid/ontology-selected.png) | ![Filter by criticality](images/liquid/ontology-filter.png) |
+
+E1 is read-only. Next: drafts and validation in the editor (E2), proposals with a diff graph (E3, with M6), the
+compatibility class and live apply (E4, with M8).
 
 ## Policies
 
@@ -350,6 +414,43 @@ Deviations
 
 Open
 - Baseline runs 2 and 3 (before M3).
+
+### M2 — Ontology and compiler, editor E1 (2026-11-16)
+
+Done
+- `ontology/sofa`: LinkML schema (19 classes, 12 enums, annotations), `actions.yaml` (31 actions = every mock tool,
+  event catalog of 19 events), `bindings.yaml` (15 classes onto the M1 raw tables).
+- `tools/ontology-compiler`: LinkML 1.12.1 SchemaView → IR; collected, path-addressed errors; CLI and HTTP mode;
+  pinned image with tests in the build. [ADR-0041](adr/0041-ontology-linkml-ir-generators.md).
+- `packages/ontology-ir`: IR schema, canonical hash (identical to Python), reference checks, browser entry, `irToGraph`.
+- `packages/ontology-codegen`: generators for types, MCP tools, DQ checks, SDK, projection DDL, OPA data; CLI with
+  `--check`. `packages/ontology-sofa`: IR + generated artefacts.
+- `scripts/liquid/ontology-build.mjs` (`--verify`: two compiles, identical bytes) and `check-generated.mjs` (in
+  `check.mjs`).
+- Editor E1: `/liquid/ontology` with React Flow 12.12.1 and dagre; IR served by the ontology server and passed through
+  the control plane. [ADR-0042](adr/0042-ontology-editor-react-flow.md).
+- [docs/link-ml.md](link-ml.md) and diagram `24-linkml-bridge.svg`.
+
+Verified
+- Build deterministic: two compiler runs give the same bytes (hash `47c5052c5079`); the container output equals a local
+  LinkML run.
+- Compiler tests 15 (validation errors, determinism, hash coverage, canonical form). IR tests 9 (TS hash = Python hash,
+  stale source detection, edited IR rejected, dangling reference rejected, graph view). Codegen tests 7 on a synthetic
+  ontology. Sofa package tests 38: **generated MCP tools equal the mock's tools one to one** (31 tools: groups, names,
+  read-only/destructive hints, fields, types, required, enums, descriptions), **DDL applies to an empty Postgres**, DQ
+  checks pass on consistent data and catch a dangling multi-valued link, the DDL rejects bad enums and dangling links,
+  generated types validate real objects, generated files are not stale.
+- Stale check negative test: editing `schema.yaml` without a rebuild makes `check-generated.mjs` fail.
+- **End to end** (`node scripts/liquid/e2e-ontology.mjs`, result `scripts/liquid/results/m2-ontology-e2e.json`): 7/7 —
+  repair picked up the new images, the nav offers the Ontology page, the ontology server serves the committed IR (same
+  hash), React Flow renders 19 nodes and 21 edges, selecting a class shows its details and source table.
+
+Deviations
+- DQ checks on the *seeded projection* move to M3 (the projection is built there); in M2 they run against a test
+  projection.
+- `pnpm ontology:build` is `node scripts/liquid/ontology-build.mjs` (root `package.json` untouched).
+- The SDK lives in `packages/ontology-sofa` until M9 publishes `packages/liquid-sdk`.
+- Editor E2 (drafts and validation) is done with M3 instead of M2.
 
 ### Later
 

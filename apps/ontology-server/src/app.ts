@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { z, ZodError } from 'zod';
 import type { EventStore, Lake } from '@cw/lake';
 import { freshWorld, sofaExtract } from '@cw/sofa-domain';
+import { loadIr } from '@cw/ontology-sofa';
 
 /*
  * HTTP surface of the ontology server, M1 part (ADR-0040). Everything under /internal is for the control plane and the
@@ -15,6 +16,7 @@ import { freshWorld, sofaExtract } from '@cw/sofa-domain';
  *   GET  /internal/lake/status           high-water mark, snapshots, extracts, last flush, event log stats
  *   GET  /internal/lake/counts?extract=  rows per raw table
  *   POST /internal/lake/query            read-only SQL { sql } (single SELECT)
+ *   GET  /internal/ontology              the compiled ontology IR this server runs on (M2; the editor reads it)
  */
 
 export interface AppDeps {
@@ -72,6 +74,7 @@ export function createApp(d: AppDeps) {
     const { sql } = z.object({ sql: z.string().min(1).max(10_000) }).parse(req.body);
     res.json({ rows: await d.lake.query(sql) });
   });
+  internal.get('/ontology', (_req, res) => res.json(loadIr()));
   app.use('/internal', internal);
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

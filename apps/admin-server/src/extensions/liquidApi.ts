@@ -25,5 +25,13 @@ export function liquidAdminRouter(ext: ExtensionService): Router {
       throw err instanceof HttpError ? err : new HttpError(502, (err as Error).message);
     }
   });
+  /** The compiled ontology (IR) the ontology server runs on; the editor's graph is built from it. */
+  r.get('/liquid/ontology', async (_req, res) => {
+    try {
+      res.json(await ontologyCall<Record<string, unknown>>(ctx, 'GET', '/internal/ontology'));
+    } catch (err) {
+      throw err instanceof HttpError ? err : new HttpError(502, (err as Error).message);
+    }
+  });
   return r;
 }

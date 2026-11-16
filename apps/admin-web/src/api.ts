@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@cw/ui';
 import type { ExtensionStatus } from '@cw/extensions';
+import type { OntologyIr } from '@cw/ontology-ir/browser';
 import type {
   AdminAuditEntry,
   AgentEntra,
@@ -231,6 +232,7 @@ export const api = {
   repairExtension: (extId: string) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/repair`, { method: 'POST', json: {} }),
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
+  liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
   extensionLogs: (extId: string, service: string) =>
     fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {
       if (!r.ok) throw new Error(`logs: HTTP ${r.status}`);

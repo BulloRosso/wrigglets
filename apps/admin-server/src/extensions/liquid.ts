@@ -57,7 +57,10 @@ export const liquidManifest: ExtensionManifestInput = {
     },
   ],
   bootstrap: [{ id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true }],
-  uiRoutes: [{ label: 'Overview', path: '/liquid' }],
+  uiRoutes: [
+    { label: 'Overview', path: '/liquid' },
+    { label: 'Ontology', path: '/liquid/ontology' },
+  ],
 };
 
 /** Calls an internal endpoint of the ontology server with the extension's token. */

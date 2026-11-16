@@ -64,12 +64,12 @@
   <text x="244" y="233" class="d">event log (Postgres),</text>
   <text x="244" y="249" class="d">DuckLake / Parquet, seed</text>
   <!-- M2 -->
-  <rect x="230" y="330" width="150" height="76" rx="10" class="wip"/>
+  <rect x="230" y="330" width="150" height="76" rx="10" class="done"/>
   <text x="244" y="353" class="id">M2</text><text x="278" y="353" class="h">Ontology</text>
   <text x="244" y="373" class="d">LinkML, IR, compiler,</text>
   <text x="244" y="389" class="d">generators</text>
   <!-- M3 -->
-  <rect x="420" y="260" width="150" height="76" rx="10" class="plan"/>
+  <rect x="420" y="260" width="150" height="76" rx="10" class="wip"/>
   <text x="434" y="283" class="id">M3</text><text x="468" y="283" class="h">Ontology server</text>
   <text x="434" y="303" class="d">only write path, MCP +</text>
   <text x="434" y="319" class="d">REST, parity with mock</text>
@@ -118,7 +118,7 @@
   <text x="44" y="540" class="d">delivered with the</text>
   <text x="44" y="556" class="d">milestone it needs</text>
   <rect x="230" y="512" width="365" height="50" rx="8" class="ed"/>
-  <text x="244" y="533" class="h">E1 viewer · E2 drafts + validate</text>
+  <text x="244" y="533" class="h">E1 viewer (done) · E2 drafts + validate</text>
   <text x="244" y="551" class="d">with M2 / M3: graph of classes and links, edits as YAML operations</text>
   <rect x="800" y="512" width="150" height="50" rx="8" class="ed"/>
   <text x="814" y="533" class="h">E3 proposals</text>

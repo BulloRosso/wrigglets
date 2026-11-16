@@ -22,6 +22,7 @@ export const liquidManifest: ExtensionManifestInput = {
   secrets: [
     { name: 'ontology_db_password', bytes: 24 },
     { name: 'ontology_internal_token', bytes: 32 },
+    { name: 'ontology_mcp_token', bytes: 32 },
   ],
   services: [
     {
@@ -49,6 +50,7 @@ export const liquidManifest: ExtensionManifestInput = {
         PGUSER: 'onto',
         PGPASSWORD: '{{secret:ontology_db_password}}',
         INTERNAL_TOKEN: '{{secret:ontology_internal_token}}',
+        MCP_TOKEN: '{{secret:ontology_mcp_token}}',
         LAKE_DATA_PATH: '/lake/',
       },
       volumes: [{ name: 'lake-data', target: '/lake' }],
@@ -57,6 +59,8 @@ export const liquidManifest: ExtensionManifestInput = {
     },
   ],
   bootstrap: [{ id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true }],
+  // New ontology tools for agents; the parity groups erp/crm are re-pointed by scripts/liquid/setup.mjs (not owned).
+  upstreams: [{ name: 'onto', description: 'Ontology actions of the sofa company (Liquid Enterprise): the only write path for business data', service: 'ontology-server', path: '/onto/mcp', tokenSecret: 'ontology_mcp_token' }],
   uiRoutes: [
     { label: 'Overview', path: '/liquid' },
     { label: 'Ontology', path: '/liquid/ontology' },
@@ -84,6 +88,6 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
 };
 
 /** Overlay mode (docker-compose.liquid.yml): the services run from compose, secrets come from the environment. */
-export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string }): OverlayOptions {
-  return { active: !!env.LIQUID_OVERLAY, secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN } };
+export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string }): OverlayOptions {
+  return { active: !!env.LIQUID_OVERLAY, secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN } };
 }

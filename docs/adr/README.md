@@ -47,3 +47,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0040](0040-lake-ducklake-event-log.md) | Lake on DuckLake, event log in Postgres, DuckDB 2 embedded in the ontology server | Accepted |
 | [0041](0041-ontology-linkml-ir-generators.md) | Ontology in LinkML, compiled to an IR, every layer generated from the IR | Accepted |
 | [0042](0042-ontology-editor-react-flow.md) | Ontology editor in the admin console with React Flow | Accepted |
+| [0043](0043-ontology-server-action-pipeline.md) | Ontology server, action pipeline, event-sourced projection | Accepted |

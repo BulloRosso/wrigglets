@@ -42,6 +42,7 @@ const laterSecrets = () => ({
   // Liquid Enterprise as compose overlay (docker-compose.liquid.yml); console installs generate their own secrets
   LIQUID_ONTOLOGY_DB_PASSWORD: secret(24),
   LIQUID_ONTOLOGY_INTERNAL_TOKEN: secret(32),
+  LIQUID_ONTOLOGY_MCP_TOKEN: secret(32),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
   CW_LITELLM_SALT_KEY: `sk-${secret(32)}`,

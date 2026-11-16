@@ -154,6 +154,41 @@ nothing.
 **Seed:** with *Seed the sofa-company demo data*, the install step `seed-sofa` writes the extract `sofa-T0` from
 `packages/sofa-domain` (a port of the mock's initial state, checked against the mock by a test).
 
+### Ontology server: the only write path
+
+Decision record: [ADR-0043](adr/0043-ontology-server-action-pipeline.md).
+
+Every change to business data goes through one pipeline, for agents (MCP through the gateway) and for apps (REST):
+
+1. **Validate** the input with the generated schema of the action.
+2. **Policy** hook (allow until M4; fail closed when configured).
+3. Run the action on a **copy** of the state (the domain logic, `packages/sofa-domain`).
+4. A failed precondition (e.g. "Supplier S-NORDHOLZ cannot deliver at the moment") is answered — **nothing is written**.
+5. A success is **one transaction**: append the event with input, answer and the changed objects, update the projection.
+
+Read-only actions never write. Each event records the agent the gateway verified, the task and the person
+(`actor_agent`, `task_id`, `actor_user`).
+
+| Endpoint | Who | What |
+|---|---|---|
+| `/onto/mcp` | agents via gateway upstream `onto` (owned by the extension) | all 31 actions as MCP tools |
+| `/erp/mcp`, `/crm/mcp` | agents via upstreams `erp`/`crm` after `scripts/liquid/setup.mjs` | the parity groups — same tools as the mock |
+| `/objects/:class`, `/actions/:name`, `/kpi` | control plane, SDK/apps (M9) | REST over the same pipeline |
+| `/api/liquid/sim/*` (control plane) | parity runner | KPI, write log, notices, reset, scenarios — as events |
+| `/api/liquid/projection/rebuild`, `/dq` | operators | rebuild and data-quality checks |
+
+**Projection:** schema `projection` in `ontology-db` (generated DDL, one table per class, plus `company_meta`). It is a
+cache: `POST /api/liquid/projection/rebuild?dryRun=true` rebuilds it from T0 and the event log into a scratch schema and
+compares row hashes; without `dryRun` the rebuilt schema is swapped in.
+
+**Backend swap (D1):**
+
+```bash
+node scripts/liquid/setup.mjs                    # erp/crm → ontology server (same upstream names)
+node scripts/sofa-company/run.mjs --backend onto --no-shots --prefix onto-1
+node scripts/liquid/setup.mjs --restore          # erp/crm → mock
+```
+
 The Overview page shows the event log, the flush state and every raw table:
 
 ![Liquid overview with event log and lake](images/liquid/liquid-overview-lake.png)
@@ -276,8 +311,10 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
   `raw/<table>/`; any Parquet reader can open them, and DuckDB with the `ducklake` extension can attach the catalog.
 - **Failed install:** the Extensions page shows the failed step and its error; *Retry install* continues there,
   *Repair* re-runs all steps and re-creates containers whose image was rebuilt.
-- *(planned)* Rebuilding the projection, replaying a window, restoring after a playbook run, rotating the ontology DB
-  credentials.
+- **Rebuild the projection:** `POST /api/liquid/projection/rebuild?dryRun=true` (verify: `identical` must be true), then
+  without `dryRun` to swap. **Data quality:** `GET /api/liquid/projection/dq`.
+- **Switch the sofa agents' backend:** `node scripts/liquid/setup.mjs` (ontology server) / `--restore` (mock).
+- *(planned)* Replaying a window, restoring after a playbook run, rotating the ontology DB credentials.
 
 ## Results D1–D3
 
@@ -451,6 +488,45 @@ Deviations
 - `pnpm ontology:build` is `node scripts/liquid/ontology-build.mjs` (root `package.json` untouched).
 - The SDK lives in `packages/ontology-sofa` until M9 publishes `packages/liquid-sdk`.
 - Editor E2 (drafts and validation) is done with M3 instead of M2.
+
+### M3 — Ontology server and backend swap (2026-11-16)
+
+Done
+- `packages/sofa-domain`: the mock's logic ported 1:1 (`SofaCompany`: capacity, simulation, KPI, scenarios, 31 tools);
+  world ⇄ ontology objects (lossless), diff and apply of changes.
+- Ontology: attributes the mock uses added (sales-order source, ticket technician/opened, incident claim/filed, notice
+  recipient/sent); DDL generator adds `ord` and applies foreign keys idempotently.
+- `apps/ontology-server`: action pipeline (validation, policy hook, copy-on-write handler, one transaction for event +
+  projection), projection store (T0 seed, upserts, rebuild + atomic swap, row hash, DQ), MCP `onto`/`erp`/`crm` with caller
+  identity, REST, simulation control as events. [ADR-0043](adr/0043-ontology-server-action-pipeline.md).
+- Extension: MCP token, owned upstream `onto`; control-plane routes `/api/liquid/sim/*`, `/projection/*`;
+  `scripts/liquid/setup.mjs` (swap/restore); `run.mjs --backend onto`.
+
+Verified
+- **Deterministic parity:** 6 states (baseline + 5 scenarios) × 57 calls — every answer byte-identical to the mock,
+  plus world, id sequences, write count and KPI (sofa-domain tests). The same through the full pipeline against Postgres;
+  the only input the generated schema rejects is one the mock's own schema forbids (`get_capacity` with an unknown
+  factory).
+- Pipeline tests (PGlite): read-only never writes, invalid input and failed preconditions write nothing, a failing
+  transaction rolls back completely, the policy hook denies, events carry caller and changes, rebuild is identical and
+  swaps, reset restores T0, the write log restarts, DQ passes on the seeded projection (the M2 criterion), MCP groups and
+  caller fields.
+- Found by the tests: the generated DDL was not idempotent (foreign keys) — the server would have failed on its second
+  start; fixed in the generator, the sofa package test now applies the DDL twice.
+- **End to end** (`node scripts/liquid/e2e-backend.mjs`, `scripts/liquid/results/m3-backend-e2e.json`): 13/13 — the
+  gateway lists 31 `onto__` and 31 `erp__/crm__` tools from the ontology server; agent Lara's calls **through the gateway**
+  answer byte-identically to the mock (read, write, failed precondition, KPI); exactly one event, with `actor_agent
+  sofa-lara`; KPI equals the mock; rebuild identical; 112 DQ checks pass on the live projection; events reach the lake.
+
+Open
+- **D1 with the real model:** baseline runs 2 and 3 on the mock and the five scenarios with `--backend onto` (about 15
+  runs of up to 45 min, model costs) — to be scheduled; until then D1 rests on deterministic parity and the agent call
+  through the gateway.
+
+Deviations
+- Editor E2 (drafts + validation) moves to M6 together with E3 (a draft is only useful once it can become a proposal).
+- T0 of the projection comes from the domain package's initial world (the same data as the lake extract); loading it
+  through the bindings is part of the projection migration in M8.
 
 ### Later
 

@@ -75,11 +75,11 @@ describe('generators', () => {
   it('SQL: tables first, then deferred FKs for single-valued links only; enum CHECKs incl. arrays', () => {
     const sql = genSql(ir);
     expect(sql.indexOf('CREATE TABLE IF NOT EXISTS projection.product')).toBeLessThan(sql.indexOf('ALTER TABLE'));
-    expect(sql).toContain('ALTER TABLE projection.order_line ADD CONSTRAINT order_line_product_fk FOREIGN KEY (product) REFERENCES projection.product (sku) DEFERRABLE INITIALLY DEFERRED;');
+    expect(sql).toContain('ALTER TABLE projection.order_line DROP CONSTRAINT IF EXISTS order_line_product_fk, ADD CONSTRAINT order_line_product_fk FOREIGN KEY (product) REFERENCES projection.product (sku) DEFERRABLE INITIALLY DEFERRED;');
     expect(sql).not.toContain('product_tags_fk');
     expect(sql).toContain("colors text[] CHECK (colors <@ ARRAY['red', 'blue']::text[])");
     expect(sql).toContain('qty bigint NOT NULL');
-    expect(sql).toMatch(/version bigint NOT NULL DEFAULT 1,\n {2}updated_seq bigint NOT NULL DEFAULT 0/);
+    expect(sql).toMatch(/version bigint NOT NULL DEFAULT 1,\n {2}updated_seq bigint NOT NULL DEFAULT 0,\n {2}ord bigint NOT NULL DEFAULT 0/);
   });
 
   it('MCP: JSON types, required, hints; read-only tools carry no destructiveHint', () => {

@@ -15,6 +15,7 @@ services:
       LIQUID_OVERLAY: "true"
       LIQUID_ONTOLOGY_DB_PASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_DB_PASSWORD}
       LIQUID_ONTOLOGY_INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_INTERNAL_TOKEN}
+      LIQUID_ONTOLOGY_MCP_TOKEN: ${LIQUID_ONTOLOGY_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_MCP_TOKEN}
 
   ontology-db:
     image: postgres:17.6-alpine
@@ -49,6 +50,7 @@ services:
       PGUSER: onto
       PGPASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?}
       INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?}
+      MCP_TOKEN: ${LIQUID_ONTOLOGY_MCP_TOKEN:?}
       LAKE_DATA_PATH: /lake/
     depends_on:
       ontology-db: { condition: service_healthy }

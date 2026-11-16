@@ -4,7 +4,9 @@
 // would: a scripted person signs in, looks at the plan and decides. Prerequisite: scripts/sofa-company/setup.mjs.
 //
 //   cd scripts/sofa-company && npm install          # once, for the screenshots (playwright-core)
-//   node scripts/sofa-company/run.mjs [--only 1,2,3] [--no-shots] [--timeout-min 45]
+//   node scripts/sofa-company/run.mjs [--only 1,2,3] [--no-shots] [--timeout-min 45] [--prefix p] [--backend mock|onto]
+//   --backend onto: the company systems are the Liquid Enterprise ontology server (docs/liquid-enterprise.md, D1);
+//   run scripts/liquid/setup.mjs first. KPI, reset, scenarios, log and notices then go through the admin console API.
 //
 // Results: docs/images/mitigations/*.png and scripts/sofa-company/results/<scenario>.json (plans, decisions, reports,
 // KPIs before and after, every change the agents made in ERP/CRM).
@@ -114,8 +116,12 @@ const SCENARIOS = [
 
 /* ------------------------------------------------------------------ helpers */
 
-const kpi = async () => (await fetch(`${MOCK_HOST}/kpi`)).json();
-const post = (p) => fetch(`${MOCK_HOST}${p}`, { method: 'POST' }).then((r) => r.json());
+const BACKEND = args.backend ?? 'mock';
+if (!['mock', 'onto'].includes(BACKEND)) throw new Error(`--backend must be mock or onto, not ${BACKEND}`);
+/** The company systems' control surface: the mock's own HTTP endpoints, or the ontology server through the admin API. */
+const simGet = async (p) => (BACKEND === 'onto' ? admin.json('GET', `${ADMIN}/api/liquid/sim${p}`) : (await fetch(`${MOCK_HOST}${p}`)).json());
+const post = (p) => (BACKEND === 'onto' ? admin.json('POST', `${ADMIN}/api/liquid/sim${p}`) : fetch(`${MOCK_HOST}${p}`, { method: 'POST' }).then((r) => r.json()));
+const kpi = () => simGet('/kpi');
 
 const admin = new Session();
 log('signing in to the admin console');
@@ -202,7 +208,7 @@ async function runScenario(sc, shots, attempt = 1, guardStops = []) {
   const afterIncident = await kpi();
   log(`   incident injected: ${afterIncident.lateOrders} late orders, ${afterIncident.unplannedOrders.length} unplanned, shortages ${JSON.stringify(afterIncident.materialShortages)}`);
   await sleep(500);
-  await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-incident', { fullPage: true });
+  if (BACKEND === 'mock') await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-incident', { fullPage: true });
 
   const known = new Set((await allTasks()).map((t) => t.taskId));
   const requester = await as(sc.requester, sc.agent);
@@ -295,7 +301,7 @@ async function runScenario(sc, shots, attempt = 1, guardStops = []) {
   log(`   result: late orders ${afterIncident.lateOrders} → ${after.lateOrders}, unplanned ${afterIncident.unplannedOrders.length} → ${after.unplannedOrders.length}, cost € ${after.costOfMeasuresEur}`);
 
   // evidence of the outcome, from the people's point of view
-  await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-mitigation', { fullPage: true });
+  if (BACKEND === 'mock') await shot(adminMail, `${MOCK_HOST}/dashboard?blur=customers`, 'erp-after-mitigation', { fullPage: true });
   for (const d of described) {
     const owner = HUMANS[AGENTS[d.agentId].owner];
     await shot(owner.email, `${baseUrl[d.agentId]}/tasks/${d.taskId}`, `done-${d.agent.toLowerCase()}`, { height: 1100, wait: 2000 });
@@ -304,7 +310,7 @@ async function runScenario(sc, shots, attempt = 1, guardStops = []) {
   for (const d of described) wiki[d.agent] = await wikiSnapshot(d.agentId).catch(() => []);
   const wikiOwner = described.find((d) => (wiki[d.agent] ?? []).length);
   if (wikiOwner) await shot(HUMANS[AGENTS[wikiOwner.agentId].owner].email, `${baseUrl[wikiOwner.agentId]}/workspace/wiki`, `wiki-${wikiOwner.agent.toLowerCase()}`, { height: 900, wait: 2500 });
-  const result = { scenario: sc.id, n: sc.n, title: sc.title, request: { by: HUMANS[sc.requester].name, to: AGENTS[sc.agent].name, ...sc.task }, timedOut, attempts: attempt, wiki, guardStops, kpi: { baseline: before, afterIncident, afterMitigation: after }, tasks: described, changes: await (await fetch(`${MOCK_HOST}/log`)).json(), customerNotices: await (await fetch(`${MOCK_HOST}/notices`)).json(), primaryTaskId: primaryId };
+  const result = { scenario: sc.id, n: sc.n, title: sc.title, request: { by: HUMANS[sc.requester].name, to: AGENTS[sc.agent].name, ...sc.task }, timedOut, attempts: attempt, wiki, guardStops, kpi: { baseline: before, afterIncident, afterMitigation: after }, tasks: described, changes: await simGet('/log'), customerNotices: await simGet('/notices'), primaryTaskId: primaryId, backend: BACKEND };
   const dir = path.join(root, 'scripts/sofa-company/results');
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, `${prefix}-${sc.id}.json`), JSON.stringify(result, null, 2));
@@ -389,7 +395,7 @@ try {
   for (const id of Object.keys(AGENTS)) await admin.json('PUT', `${ADMIN}/api/agents/${id}/killswitch`, { level: 'normal' }).catch(() => undefined);
   for (const id of Object.keys(AGENTS)) await until(`${id} healthy`, async () => (await (await fetch(`${baseUrl[id]}/health`)).json()).harness?.state === 'up', 240_000, 3000);
   for (const t of await allTasks()) if (!TERMINAL.has(t.status)) await (await as(AGENTS[t.agentId].owner, t.agentId).catch(() => undefined))?.raw(`${baseUrl[t.agentId]}/api/tasks/${t.taskId}/cancel`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => undefined);
-  if (shots && !only) {
+  if (shots && !only && BACKEND === 'mock') {
     await post('/reset');
     await shots.snap(env.BOOTSTRAP_ADMIN_EMAIL, `${MOCK_HOST}/dashboard?blur=customers`, 's0-erp-baseline', { fullPage: true });
   }

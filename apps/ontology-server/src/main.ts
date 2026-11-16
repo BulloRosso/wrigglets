@@ -2,7 +2,9 @@ import pg from 'pg';
 import pino from 'pino';
 import { z } from 'zod';
 import { EventStore, Lake } from '@cw/lake';
+import { loadIr } from '@cw/ontology-sofa';
 import { createApp } from './app.js';
+import { OntologyService } from './service.js';
 
 /*
  * Ontology server (Liquid Enterprise). M1: owns the append-only event log in the ontology DB and flushes it into the
@@ -19,6 +21,8 @@ const env = z
     PGUSER: z.string().default('onto'),
     PGPASSWORD: z.string().min(16),
     INTERNAL_TOKEN: z.string().min(24),
+    /** Bearer the MCP gateway sends (upstreams onto, erp, crm). */
+    MCP_TOKEN: z.string().min(24),
     LAKE_DATA_PATH: z.string().default('/lake/'),
     FLUSH_INTERVAL_SEC: z.coerce.number().int().min(0).default(60),
     FLUSH_GRACE_SEC: z.coerce.number().int().min(0).default(60),
@@ -51,7 +55,11 @@ const lake = await Lake.open({
 });
 log.info({ dataPath, hwm: await lake.hwm() }, 'event log and lake ready');
 
-const app = createApp({ store, lake, token: env.INTERNAL_TOKEN, ping: async () => (await pool.query('SELECT 1')).rows.length === 1, flushGraceMs: env.FLUSH_GRACE_SEC * 1000 });
+const svc = new OntologyService(pool, loadIr());
+await svc.init();
+log.info({ ontology: `${svc.ir.name}@${svc.ir.version}`, hash: svc.ir.hash.slice(0, 12), kpi: svc.company.kpi().lateOrders }, 'projection loaded, action pipeline ready');
+
+const app = createApp({ store, lake, svc, token: env.INTERNAL_TOKEN, mcpToken: env.MCP_TOKEN, ping: async () => (await pool.query('SELECT 1')).rows.length === 1, flushGraceMs: env.FLUSH_GRACE_SEC * 1000 });
 const server = app.listen(env.PORT, '0.0.0.0', () => log.info({ port: env.PORT }, 'ontology server listening'));
 
 let timer: NodeJS.Timeout | undefined;

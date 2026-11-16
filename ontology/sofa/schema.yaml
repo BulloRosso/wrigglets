@@ -215,6 +215,8 @@ classes:
       status: { range: MaintenanceTicketStatus, required: true }
       required_part: { range: Material }
       description: {}
+      technician_booked: { range: date, description: Day the external technician comes }
+      opened_at: { range: date }
 
   Incident:
     description: An incident report for insurance (e.g. storm damage).
@@ -224,6 +226,8 @@ classes:
       type: { required: true }
       description: { required: true }
       estimated_loss_eur: { range: float, required: true }
+      claim: { description: State of the insurance claim }
+      filed_at: { range: date }
 
   Customer:
     description: A B2B customer (retailer).
@@ -247,6 +251,7 @@ classes:
       promised_delivery: { range: date, required: true }
       communicated_delivery: { range: date }
       status: { range: SalesOrderStatus, required: true }
+      source: { description: 'Where the order came from, e.g. campaign CMP-HERBST' }
 
   CustomerNotice:
     description: A message sent to a customer about their orders (recorded, not delivered).
@@ -257,6 +262,8 @@ classes:
       orders: { range: SalesOrder, multivalued: true, required: true }
       subject: { required: true }
       body: { required: true }
+      recipient: { description: E-mail address the notice was sent to }
+      sent_at: { range: datetime }
 
   Campaign:
     description: A marketing campaign that drives order intake.

@@ -1,8 +1,8 @@
-// GENERATED from ontology sofa@0.1.0 (47c5052c5079) — do not edit; run node scripts/liquid/ontology-build.mjs
+// GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs
 
 import { z } from 'zod';
 
-export const ONTOLOGY = { name: "sofa", version: "0.1.0", hash: "47c5052c50791e50d7bd89bc9c72e58bf8b1242f42044d59d40ceb4fe67c69cd" } as const;
+export const ONTOLOGY = { name: "sofa", version: "0.1.0", hash: "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7" } as const;
 
 export const MachineStatus = z.enum(["running","down"]);
 export type MachineStatus = z.infer<typeof MachineStatus>;
@@ -179,6 +179,8 @@ export const MaintenanceTicket = z.object({
   status: MaintenanceTicketStatus,
   required_part: z.string().min(1).nullish(),
   description: z.string().nullish(),
+  technician_booked: z.iso.date().describe("Day the external technician comes").nullish(),
+  opened_at: z.iso.date().nullish(),
 });
 export type MaintenanceTicket = z.infer<typeof MaintenanceTicket>;
 
@@ -188,6 +190,8 @@ export const Incident = z.object({
   type: z.string(),
   description: z.string(),
   estimated_loss_eur: z.number(),
+  claim: z.string().describe("State of the insurance claim").nullish(),
+  filed_at: z.iso.date().nullish(),
 });
 export type Incident = z.infer<typeof Incident>;
 
@@ -211,6 +215,7 @@ export const SalesOrder = z.object({
   promised_delivery: z.iso.date(),
   communicated_delivery: z.iso.date().nullish(),
   status: SalesOrderStatus,
+  source: z.string().describe("Where the order came from, e.g. campaign CMP-HERBST").nullish(),
 });
 export type SalesOrder = z.infer<typeof SalesOrder>;
 
@@ -221,6 +226,8 @@ export const CustomerNotice = z.object({
   orders: z.array(z.string().min(1)),
   subject: z.string(),
   body: z.string(),
+  recipient: z.string().describe("E-mail address the notice was sent to").nullish(),
+  sent_at: z.iso.datetime({ offset: true }).nullish(),
 });
 export type CustomerNotice = z.infer<typeof CustomerNotice>;
 

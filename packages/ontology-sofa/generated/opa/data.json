@@ -1,10 +1,10 @@
 {
-  "$generated": "GENERATED from ontology sofa@0.1.0 (47c5052c5079) — do not edit; run node scripts/liquid/ontology-build.mjs",
+  "$generated": "GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs",
   "liquid": {
     "ontology": {
       "name": "sofa",
       "version": "0.1.0",
-      "hash": "47c5052c50791e50d7bd89bc9c72e58bf8b1242f42044d59d40ceb4fe67c69cd",
+      "hash": "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7",
       "classes": {
         "Factory": {
           "identifier": "id",

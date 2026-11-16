@@ -218,8 +218,8 @@ everything else regenerated.
 | Compiler (Python, LinkML 1.12.1, pinned image, CLI and HTTP) → IR | done (M2) |
 | Generators: types, SQL, MCP tools, OPA data, DQ checks, SDK; stale check | done (M2) |
 | Ontology editor: viewer (E1) | done (M2) |
-| Ontology editor: drafts and validation (E2) | M3 |
-| Ontology server using the generated artefacts as the only write path | M3 |
+| Ontology editor: drafts and validation (E2) | M6 |
+| Ontology server using the generated artefacts as the only write path | done (M3) |
 | Proposals and review queue, diff graph (E3) | M6 |
 | Compatibility check, live apply, modelling agent (E4) | M8 |
 | The walkthrough above as an automated scenario (D3) | M10 |

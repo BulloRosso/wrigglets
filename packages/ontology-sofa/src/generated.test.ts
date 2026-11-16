@@ -47,8 +47,9 @@ describe('MCP tools match the mock one to one (M2 exit criterion)', () => {
 });
 
 describe('projection DDL and data-quality checks', () => {
-  it('the DDL applies to an empty Postgres, one table per class', async () => {
+  it('the DDL applies to an empty Postgres, one table per class, and again (idempotent: applied on every start)', async () => {
     const db = new PGlite();
+    await db.exec(projectionSql());
     await db.exec(projectionSql());
     const t = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'projection'");
     expect(t.rows[0]!.n).toBe(loadIr().classes.length);

@@ -103,6 +103,7 @@ const schema = z.object({
   LIQUID_OVERLAY: bool('false'),
   LIQUID_ONTOLOGY_DB_PASSWORD: z.string().optional(),
   LIQUID_ONTOLOGY_INTERNAL_TOKEN: z.string().optional(),
+  LIQUID_ONTOLOGY_MCP_TOKEN: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

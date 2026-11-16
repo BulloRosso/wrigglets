@@ -1,4 +1,4 @@
-# GENERATED from ontology sofa@0.1.0 (47c5052c5079) — do not edit; run node scripts/liquid/ontology-build.mjs
+# GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs
 package liquid.ontology_test
 
 import rego.v1

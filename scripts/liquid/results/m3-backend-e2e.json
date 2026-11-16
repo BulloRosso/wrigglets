@@ -1,0 +1,107 @@
+{
+  "startedAt": "2026-11-16T17:21:54.753Z",
+  "checks": [
+    {
+      "name": "repair applied the new image and registered the owned upstream onto",
+      "ok": true,
+      "detail": [
+        "onto"
+      ]
+    },
+    {
+      "name": "erp/crm now point at the ontology server",
+      "ok": true,
+      "detail": "18:22:09 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp | 18:22:09 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp"
+    },
+    {
+      "name": "the gateway lists 31 onto__ and 31 erp__/crm__ tools from the ontology server",
+      "ok": true,
+      "detail": {
+        "onto": 31
+      }
+    },
+    {
+      "name": "erp__list_suppliers through the gateway answers like the mock",
+      "ok": true,
+      "detail": "1044 chars"
+    },
+    {
+      "name": "erp__create_purchase_order through the gateway answers like the mock",
+      "ok": true,
+      "detail": "263 chars"
+    },
+    {
+      "name": "erp__create_purchase_order through the gateway answers like the mock",
+      "ok": true,
+      "detail": "Supplier S-NORDHOLZ cannot deliver at the moment: Sawmill Nordholz, 2026-10-05: "
+    },
+    {
+      "name": "erp__get_kpi through the gateway answers like the mock",
+      "ok": true,
+      "detail": "325 chars"
+    },
+    {
+      "name": "exactly one event written (read-only and failed precondition write nothing)",
+      "ok": true,
+      "detail": "1 new event(s)"
+    },
+    {
+      "name": "the event records the agent the gateway verified, the action and its changes",
+      "ok": true,
+      "detail": "PurchaseOrderCreated|PO-4430|sofa-lara|create_purchase_order|1"
+    },
+    {
+      "name": "KPI equals the mock after the same steps",
+      "ok": true,
+      "detail": {
+        "lateOrders": 5,
+        "cost": 29400
+      }
+    },
+    {
+      "name": "projection rebuilt from T0 + the whole event log is identical (row hash)",
+      "ok": true,
+      "detail": {
+        "events": 3,
+        "hash": "3de25de89ef0"
+      }
+    },
+    {
+      "name": "generated data-quality checks pass on the live projection",
+      "ok": true,
+      "detail": "112 checks, 0 failed"
+    },
+    {
+      "name": "action events reach the lake (flush)",
+      "ok": true,
+      "detail": {
+        "flush": "{\"flushed\":3,\"hwm\":3003,\"waiting\":0}",
+        "hwm": 3003
+      }
+    }
+  ],
+  "answers": [
+    {
+      "tool": "erp__list_suppliers",
+      "equal": true,
+      "isError": false
+    },
+    {
+      "tool": "erp__create_purchase_order",
+      "equal": true,
+      "isError": false
+    },
+    {
+      "tool": "erp__create_purchase_order",
+      "equal": true,
+      "isError": true
+    },
+    {
+      "tool": "erp__get_kpi",
+      "equal": true,
+      "isError": false
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T17:22:15.665Z"
+}

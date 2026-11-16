@@ -355,7 +355,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
   r.use(extensionsAdminRouter(d.extensions, by));
-  r.use(liquidAdminRouter(d.extensions));
+  r.use(liquidAdminRouter(d.extensions, d.audit, by));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

@@ -1125,8 +1125,10 @@
         "description": "details",
         "id": "id",
         "machine": "machine_id",
+        "opened_at": "opened_at",
         "required_part": "required_part",
-        "status": "status"
+        "status": "status",
+        "technician_booked": "technician_booked"
       },
       "key": [
         "id"
@@ -1160,6 +1162,7 @@
         "product": "product",
         "promised_delivery": "promised_delivery",
         "qty": "qty",
+        "source": "source",
         "status": "status"
       },
       "key": [
@@ -1986,6 +1989,23 @@
           "range": "string",
           "rangeKind": "type",
           "required": false
+        },
+        {
+          "description": "Day the external technician comes",
+          "identifier": false,
+          "multivalued": false,
+          "name": "technician_booked",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "opened_at",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
         }
       ],
       "description": "A repair order for a machine.",
@@ -2031,6 +2051,23 @@
           "range": "float",
           "rangeKind": "type",
           "required": true
+        },
+        {
+          "description": "State of the insurance claim",
+          "identifier": false,
+          "multivalued": false,
+          "name": "claim",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "filed_at",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
         }
       ],
       "description": "An incident report for insurance (e.g. storm damage).",
@@ -2164,6 +2201,15 @@
           "range": "SalesOrderStatus",
           "rangeKind": "enum",
           "required": true
+        },
+        {
+          "description": "Where the order came from, e.g. campaign CMP-HERBST",
+          "identifier": false,
+          "multivalued": false,
+          "name": "source",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
         }
       ],
       "description": "A customer order with a promised delivery date.",
@@ -2217,6 +2263,23 @@
           "range": "string",
           "rangeKind": "type",
           "required": true
+        },
+        {
+          "description": "E-mail address the notice was sent to",
+          "identifier": false,
+          "multivalued": false,
+          "name": "recipient",
+          "range": "string",
+          "rangeKind": "type",
+          "required": false
+        },
+        {
+          "identifier": false,
+          "multivalued": false,
+          "name": "sent_at",
+          "range": "datetime",
+          "rangeKind": "type",
+          "required": false
         }
       ],
       "description": "A message sent to a customer about their orders (recorded, not delivered).",
@@ -2603,7 +2666,7 @@
       "objectType": "InventoryItem"
     }
   ],
-  "hash": "47c5052c50791e50d7bd89bc9c72e58bf8b1242f42044d59d40ceb4fe67c69cd",
+  "hash": "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7",
   "irVersion": 1,
   "links": [
     {
@@ -2759,9 +2822,9 @@
     "files": {
       "actions.yaml": "6833d6fe00c4e8332f74728c52be74dc305c1b68d456ec21a62820d205194d23",
       "bindings.yaml": "82298c939f57aa45825c18242e5ca663ccf030ab3efe4d96d05e2f8e22b0389d",
-      "schema.yaml": "b49dfeefc6d7deb66e086dbbe84ab66347abdca33c6c5679fa3999dd8845d625"
+      "schema.yaml": "df1221bd04614b55076f01d2b3ba028e3abf5691ec24a569ef43219953cc79e9"
     },
-    "hash": "647df56556758e7fb263b9cd9c02eac5fea221ae0b2449d8c315b034ddd9c699"
+    "hash": "773b78c23c6b61b5567f2e31f5074d40cc6538aeb60b41f719fbfce8593c73da"
   },
   "title": "Sofa company",
   "version": "0.1.0"

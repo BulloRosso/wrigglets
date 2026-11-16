@@ -3,7 +3,8 @@ import { header, q, tableOf } from './util.js';
 
 /*
  * Postgres DDL of the projection (M3): schema `projection`, one table per class, columns per attribute, a CHECK per
- * enum, `version` and `updated_seq` (the event seq that last changed the row). Single-valued links get a foreign key
+ * enum, `version`, `updated_seq` (the event seq that last changed the row) and `ord` (insertion order, so lists keep the
+ * order in which objects were created). Single-valued links get a foreign key
  * (added after all tables exist, so declaration order and cycles do not matter); multi-valued links are text[] and
  * checked by the data-quality checks instead. The projection is a cache rebuilt from the event log (plan §1.3).
  */
@@ -33,10 +34,11 @@ export function genSql(ir: OntologyIr): string {
       cols.push(col);
       if (a.rangeKind === 'class' && !a.multivalued) {
         const target = classOf(ir, a.range)!;
-        fks.push(`ALTER TABLE projection.${tableOf(c.name)} ADD CONSTRAINT ${tableOf(c.name)}_${a.name}_fk FOREIGN KEY (${a.name}) REFERENCES projection.${tableOf(target.name)} (${identifierOf(target).name}) DEFERRABLE INITIALLY DEFERRED;`);
+        // drop + add keeps the DDL idempotent (the server applies it on every start)
+        fks.push(`ALTER TABLE projection.${tableOf(c.name)} DROP CONSTRAINT IF EXISTS ${tableOf(c.name)}_${a.name}_fk, ADD CONSTRAINT ${tableOf(c.name)}_${a.name}_fk FOREIGN KEY (${a.name}) REFERENCES projection.${tableOf(target.name)} (${identifierOf(target).name}) DEFERRABLE INITIALLY DEFERRED;`);
       }
     }
-    cols.push('  version bigint NOT NULL DEFAULT 1', '  updated_seq bigint NOT NULL DEFAULT 0');
+    cols.push('  version bigint NOT NULL DEFAULT 1', '  updated_seq bigint NOT NULL DEFAULT 0', '  ord bigint NOT NULL DEFAULT 0');
     out.push(`-- ${c.name}: ${c.description ?? ''} (identifier ${id.name})`.trimEnd(), `CREATE TABLE IF NOT EXISTS projection.${tableOf(c.name)} (`, cols.join(',\n'), ');', '');
   }
   out.push('-- foreign keys of single-valued links (deferred: a transaction may write both ends)');

@@ -1,4 +1,4 @@
-// GENERATED from ontology sofa@0.1.0 (47c5052c5079) — do not edit; run node scripts/liquid/ontology-build.mjs
+// GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs
 
 import type { Factory, Machine, Worker, Absence, OvertimeShift, TempWorkerAssignment, Material, Bom, Supplier, InventoryItem, PurchaseOrder, ProductionOrder, MaintenanceTicket, Incident, Customer, SalesOrder, CustomerNotice, Campaign, DemandSignal, GetOverviewInput, GetKpiInput, SimulateChangeInput, ListMachinesInput, ListWorkersInput, GetCapacityInput, ListProductionOrdersInput, GetInventoryInput, GetMaterialProjectionInput, ListPurchaseOrdersInput, ListSuppliersInput, GetBomInput, ListMaintenanceTicketsInput, CreatePurchaseOrderInput, CancelPurchaseOrderInput, CreateMaintenanceTicketInput, UpdateProductionOrderInput, CreateProductionOrderInput, RequestOvertimeInput, RequestTempWorkersInput, WriteOffStockInput, ReleaseStockInput, FileIncidentReportInput, ListCustomersInput, ListOrdersInput, GetOrderInput, ListCampaignsInput, GetDemandTrendInput, SendCustomerNoticeInput, UpdateDeliveryDateInput, UpdateCampaignInput } from './types.js';
 
@@ -29,7 +29,7 @@ export function createClient(o: ClientOptions) {
     get: (id: string) => call<T>('GET', `/objects/${cls}/${encodeURIComponent(id)}`),
   });
   return {
-    ontology: {"name":"sofa","version":"0.1.0","hash":"47c5052c50791e50d7bd89bc9c72e58bf8b1242f42044d59d40ceb4fe67c69cd"},
+    ontology: {"name":"sofa","version":"0.1.0","hash":"0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7"},
     objects: {
       factory: objects<Factory>("Factory"),
       machine: objects<Machine>("Machine"),

@@ -173,7 +173,8 @@ CMD ["node", "dist/main.js"]
 FROM ${TEMPORAL_CLI_IMAGE} AS temporal-cli
 
 FROM ${NODE_IMAGE} AS control-plane
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates && rm -rf /var/lib/apt/lists/*
+# git: the Liquid config repository (ADR-0046) is a bare Git repository handled with git plumbing commands
+RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates git && rm -rf /var/lib/apt/lists/*
 # Temporal CLI (contains the dev server and the Temporal Web UI) — unmodified upstream binary.
 COPY --from=temporal-cli /usr/local/bin/temporal /usr/local/bin/temporal
 WORKDIR /app
@@ -183,6 +184,8 @@ COPY --from=build /src/apps/admin-web/dist ./web
 COPY assets/agent-reference.png /app/assets/agent-reference.png
 # Liquid Enterprise policies (ADR-0044): served to OPA as a bundle by the control plane
 COPY policies/liquid /app/policies/liquid
+# Liquid Enterprise ontology sources: seed of the config repository (ADR-0046)
+COPY ontology /app/ontology
 ENV NODE_ENV=production DATA_DIR=/data WEB_DIST_DIR=/app/web PORT=8080 TEMPORAL_BIN=/usr/local/bin/temporal TEMPORAL_ADDRESS=127.0.0.1:7233
 VOLUME ["/data"]
 EXPOSE 7233 8233 8080

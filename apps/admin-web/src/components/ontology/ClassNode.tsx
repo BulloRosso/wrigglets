@@ -13,18 +13,24 @@ import { NODE_WIDTH } from './layout';
 /* One ontology class on the canvas: name, criticality, data class, scalar/enum fields and its actions. */
 
 export const CRITICALITY_COLOR = { payment_critical: 'error', business_critical: 'warning', normal: 'default' } as const;
-export type ClassNodeData = { [K in keyof GraphNode]: GraphNode[K] } & { dimmed: boolean; selected: boolean };
+/** Change of the class in a draft or proposal (E2/E3): added = green, removed = red, changed = amber. */
+export type ClassChange = 'added' | 'removed' | 'changed';
+export const CHANGE_COLOR: Record<ClassChange, string> = { added: 'success.main', removed: 'error.main', changed: 'warning.main' };
+export type ClassNodeData = { [K in keyof GraphNode]: GraphNode[K] } & { dimmed: boolean; selected: boolean; change?: ClassChange };
 export type ClassFlowNode = Node<ClassNodeData, 'class'>;
 
-function ClassNodeView({ data }: NodeProps<ClassFlowNode>) {
+function ClassNodeView({ data, isConnectable }: NodeProps<ClassFlowNode>) {
+  // in draft mode the handles are visible: drag from the bottom dot to another class to add a link
+  const handle = isConnectable ? { width: 10, height: 10, background: '#1f5fad' } : { opacity: 0 };
   const writes = data.actions.filter((a) => !a.readOnly).length;
   return (
     <Box
       sx={{
         width: NODE_WIDTH,
         bgcolor: 'background.paper',
-        border: 2,
-        borderColor: data.selected ? 'primary.main' : data.criticality === 'payment_critical' ? 'error.light' : data.criticality === 'business_critical' ? 'warning.light' : 'divider',
+        border: data.change ? 3 : 2,
+        borderStyle: data.change === 'removed' ? 'dashed' : 'solid',
+        borderColor: data.selected ? 'primary.main' : data.change ? CHANGE_COLOR[data.change] : data.criticality === 'payment_critical' ? 'error.light' : data.criticality === 'business_critical' ? 'warning.light' : 'divider',
         borderRadius: 2,
         boxShadow: data.selected ? 4 : 1,
         opacity: data.dimmed ? 0.25 : 1,
@@ -32,8 +38,8 @@ function ClassNodeView({ data }: NodeProps<ClassFlowNode>) {
         overflow: 'hidden',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Top} style={handle} />
+      <Handle type="source" position={Position.Bottom} style={handle} />
       <Stack direction="row" spacing={0.5} sx={{ px: 1.25, py: 0.75, bgcolor: 'action.hover', alignItems: 'center' }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }} noWrap>
           {data.label}
@@ -43,6 +49,7 @@ function ClassNodeView({ data }: NodeProps<ClassFlowNode>) {
             <LockOutlined sx={{ fontSize: 15, color: 'text.secondary' }} />
           </Tooltip>
         )}
+        {data.change && <Chip size="small" label={data.change} sx={{ height: 18, fontSize: 10, bgcolor: CHANGE_COLOR[data.change], color: 'common.white' }} />}
         {data.criticality !== 'normal' && <Chip size="small" color={CRITICALITY_COLOR[data.criticality]} label={data.criticality === 'payment_critical' ? 'payment' : 'critical'} sx={{ height: 18, fontSize: 10 }} />}
       </Stack>
       <Box sx={{ px: 1.25, py: 0.5 }}>

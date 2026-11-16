@@ -165,6 +165,13 @@ export class ExtensionService {
     return r.overlay.active ? r.overlay.secrets[name] : this.secrets[id]?.[name];
   }
 
+  /** Every secret value of an extension (to keep them out of the config repository, ADR-0046). */
+  secretValues(id: string): string[] {
+    const r = this.registered.get(id);
+    if (!r) return [];
+    return Object.values(r.overlay.active ? r.overlay.secrets : (this.secrets[id] ?? {})).filter((v): v is string => typeof v === 'string' && v.length > 0);
+  }
+
   url(id: string, service: string): string {
     const svc = this.reg(id).manifest.services.find((s) => s.name === service);
     if (!svc?.port) throw new ExtensionError(500, `extension ${id}: service "${service}" has no port`);
@@ -345,6 +352,15 @@ export class ExtensionService {
     this.availability.delete(id);
     await this.persist();
     await this.deps.audit.write({ by: op.by, action: `extension.${op.kind}.done`, target: id });
+    await this.onOperationDone?.(id, op.kind, op.by)?.catch?.((err: unknown) => logger.warn({ extension: id, err: String(err) }, 'onOperationDone failed'));
+  }
+
+  /** Called after an install/repair/uninstall finished (e.g. to record owned upstreams in the config repository). */
+  onOperationDone?: (id: string, kind: ExtensionOperation['kind'], by: string) => Promise<unknown> | undefined;
+
+  /** An install/repair/uninstall is running right now. */
+  busy(id: string): boolean {
+    return this.running.has(id);
   }
 
   private context(id: string): BootstrapContext {
@@ -426,7 +442,7 @@ export class ExtensionService {
       for (const u of m.upstreams) {
         const token = u.tokenSecret ? this.secrets[id]?.[u.tokenSecret] : undefined;
         const headers: UpstreamServer['headers'] = u.tokenSecret ? { Authorization: this.deps.secretStore ? { secretRef: upstreamSecretRef(id, u.tokenSecret) } : `Bearer ${token}` } : {};
-        await this.deps.gateway.setUpstream({ name: u.name, description: u.description, url: `${this.url(id, u.service)}${u.path}`, headers, enabled: true, auth: 'static', oboFallback: 'deny', policy: u.policy });
+        await this.deps.gateway.setUpstream({ name: u.name, description: u.description, url: u.url ?? `${this.url(id, u.service!)}${u.path}`, headers, enabled: true, auth: 'static', oboFallback: 'deny', policy: u.policy });
         if (!rec.upstreams.includes(u.name)) rec.upstreams.push(u.name);
       }
       return;

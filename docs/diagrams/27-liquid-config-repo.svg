@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Config repository: proposals, review, reconciler</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.6; }
+    .lnb { fill: none; stroke: #1f5fad; stroke-width: 2; }
+    .lnr { fill: none; stroke: #c62828; stroke-width: 1.6; stroke-dasharray: 5 4; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .git { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .db { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .chk { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.2; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c62828"/></marker>
+  </defs>
+  <rect width="1200" height="620" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Config repository (M6): desired state in Git, reviewed proposals, a reconciler</text>
+  <text x="40" y="68" class="st">Agents and the ontology editor propose; owners approve; the reconciler applies main to the stores. No secrets in Git.</text>
+
+  <!-- sources -->
+  <rect x="40" y="100" width="230" height="84" rx="10" class="ag"/>
+  <text x="58" y="126" class="h">Agent (e.g. sofa-max)</text>
+  <text x="58" y="148" class="mono">config__read</text>
+  <text x="58" y="166" class="mono">config__propose_change</text>
+  <rect x="40" y="204" width="230" height="74" rx="10" class="usr"/>
+  <text x="58" y="230" class="h">Ontology editor (E2)</text>
+  <text x="58" y="252" class="lbl">draft → compile on every change</text>
+  <text x="58" y="268" class="lbl">→ Submit</text>
+  <rect x="40" y="298" width="230" height="74" rx="10" class="usr"/>
+  <text x="58" y="324" class="h">Admin console edit</text>
+  <text x="58" y="346" class="lbl">allow-list, upstream, agent, safety rule,</text>
+  <text x="58" y="362" class="lbl">overlay → commit on main (author = admin)</text>
+
+  <!-- proposal + validation -->
+  <rect x="320" y="100" width="300" height="190" rx="12" class="cp"/>
+  <text x="340" y="128" class="h">Proposal = branch proposal/&lt;id&gt;</text>
+  <circle cx="350" cy="154" r="10" class="bd"/><text x="350" y="158" class="num">1</text>
+  <text x="368" y="158" class="d">validated at once (invalid ⇒ no approve)</text>
+  <rect x="340" y="172" width="125" height="22" rx="5" class="chk"/><text x="348" y="187" class="lbl">layout + schemas</text>
+  <rect x="475" y="172" width="125" height="22" rx="5" class="chk"/><text x="483" y="187" class="lbl">no secret values</text>
+  <rect x="340" y="200" width="125" height="22" rx="5" class="chk"/><text x="348" y="215" class="lbl">ontology compile</text>
+  <rect x="475" y="200" width="125" height="22" rx="5" class="chk"/><text x="483" y="215" class="lbl">opa check + test</text>
+  <circle cx="350" cy="248" r="10" class="bd"/><text x="350" y="252" class="num">2</text>
+  <text x="368" y="252" class="d">review: text diff + ontology diff graph</text>
+  <text x="340" y="276" class="lbl">validators run in the ontology-compiler service</text>
+
+  <!-- review -->
+  <rect x="320" y="320" width="300" height="120" rx="12" class="usr"/>
+  <text x="340" y="348" class="h">Owner decides (Proposals page)</text>
+  <circle cx="350" cy="372" r="10" class="bd"/><text x="350" y="376" class="num">3</text>
+  <text x="368" y="376" class="d">owner of every touched path (OWNERS.yaml,</text>
+  <text x="368" y="392" class="d">class owner → team), not the requester</text>
+  <text x="340" y="420" class="lbl">re-validated on top of main, conflicts reported</text>
+
+  <!-- git -->
+  <rect x="670" y="100" width="230" height="340" rx="12" class="git"/>
+  <text x="690" y="128" class="h">config.git — main</text>
+  <text x="690" y="154" class="mono">gateway/upstreams.yaml</text>
+  <text x="690" y="172" class="mono">gateway/allow-lists.yaml</text>
+  <text x="690" y="190" class="mono">gateway/limits.yaml</text>
+  <text x="690" y="208" class="mono">safety/rules.yaml</text>
+  <text x="690" y="226" class="mono">agents/&lt;id&gt;.yaml</text>
+  <text x="690" y="244" class="mono">policies/liquid/**</text>
+  <text x="690" y="262" class="mono">  overlays.yaml</text>
+  <text x="690" y="280" class="mono">ontology/sofa/*.yaml</text>
+  <text x="690" y="298" class="mono">playbooks/  OWNERS.yaml</text>
+  <text x="690" y="330" class="lbl">merge commit with trailers:</text>
+  <text x="690" y="348" class="mono">Requested-By  Agent</text>
+  <text x="690" y="366" class="mono">Approved-By   Change-Id</text>
+  <text x="690" y="398" class="lbl">credentials only as Key Vault</text>
+  <text x="690" y="414" class="lbl">references (secretRef)</text>
+
+  <!-- reconciler -->
+  <rect x="950" y="100" width="210" height="190" rx="12" class="cp"/>
+  <text x="970" y="128" class="h">Reconciler</text>
+  <circle cx="980" cy="154" r="10" class="bd"/><text x="980" y="158" class="num">4</text>
+  <text x="998" y="158" class="d">every 60 s, after merge,</text>
+  <text x="998" y="174" class="d">on drift</text>
+  <text x="970" y="200" class="lbl">parse + validate main</text>
+  <text x="970" y="218" class="lbl">apply differences</text>
+  <text x="970" y="236" class="lbl">record applied revision</text>
+  <text x="970" y="268" class="lbl">never deletes agents</text>
+
+  <rect x="950" y="320" width="210" height="120" rx="12" class="db"/>
+  <text x="970" y="348" class="h2">Stores (/data/admin)</text>
+  <text x="970" y="370" class="lbl">gateway.json → gateway push</text>
+  <text x="970" y="388" class="lbl">safety-rules.json</text>
+  <text x="970" y="406" class="lbl">agents.json (spec part)</text>
+  <text x="970" y="424" class="lbl">overlays → OPA bundle</text>
+
+  <path d="M270,140 L316,140" class="ln" marker-end="url(#a)"/>
+  <path d="M270,240 L292,240 L292,150 L316,150" class="ln" marker-end="url(#a)"/>
+  <path d="M470,290 L470,316" class="ln" marker-end="url(#a)"/>
+  <path d="M620,380 L645,380 L645,200 L666,200" class="lnb" marker-end="url(#b)"/>
+  <text x="626" y="300" class="lbl" fill="#1f5fad" transform="rotate(-90 640 300)">approve = merge</text>
+  <path d="M270,335 L300,335 L300,470 L780,470 L780,444" class="ln" marker-end="url(#a)"/>
+  <path d="M900,190 L946,190" class="lnb" marker-end="url(#b)"/>
+  <path d="M1055,290 L1055,316" class="lnb" marker-end="url(#b)"/>
+
+  <!-- reject + recovery -->
+  <rect x="40" y="500" width="540" height="90" rx="10" fill="#fdecea" stroke="#c62828" stroke-width="1.2"/>
+  <text x="58" y="526" class="h2">Reject or invalid</text>
+  <text x="58" y="548" class="d">main stays as it was; the agent sees the decision with config__get_proposal.</text>
+  <text x="58" y="568" class="d">A broken policy or ontology never reaches review as "valid".</text>
+  <rect x="620" y="500" width="540" height="90" rx="10" class="chk"/>
+  <text x="638" y="526" class="h2">Recovery</text>
+  <text x="638" y="548" class="d">Lost gateway.json / safety-rules.json: the next reconcile restores them from main</text>
+  <text x="638" y="568" class="d">(drift is compared after schema parsing, order-free).</text>
+</svg>

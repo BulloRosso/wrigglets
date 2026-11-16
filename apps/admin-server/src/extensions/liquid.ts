@@ -25,6 +25,8 @@ export const liquidManifest: ExtensionManifestInput = {
     { name: 'ontology_mcp_token', bytes: 32 },
     { name: 'opa_bundle_token', bytes: 32 },
     { name: 'opa_query_token', bytes: 32 },
+    { name: 'config_mcp_token', bytes: 32 },
+    { name: 'compiler_token', bytes: 32 },
   ],
   // the gateway reads OPA's query token from Key Vault (ADR-0044)
   vaultSecrets: ['opa_query_token'],
@@ -92,6 +94,16 @@ export const liquidManifest: ExtensionManifestInput = {
       memoryMb: 1024,
     },
     {
+      name: 'ontology-compiler',
+      description: 'LinkML compiler as a service (ontology → IR) and policy checker (opa check/test) for drafts and config proposals',
+      image: 'coworking/ontology-compiler:local',
+      local: true,
+      port: 7720,
+      env: { COMPILER_TOKEN: '{{secret:compiler_token}}' },
+      healthcheck: { test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7720/health', timeout=3)"], intervalSec: 10, timeoutSec: 5, retries: 12, startPeriodSec: 5 },
+      memoryMb: 512,
+    },
+    {
       name: 'business-worker',
       description: 'Business workflows (Temporal namespace business): holdable processes started by ontology events, approvals, the lake-flush schedule',
       image: 'coworking/business-worker:local',
@@ -110,14 +122,19 @@ export const liquidManifest: ExtensionManifestInput = {
     // before the worker starts: namespace + search attributes (the handler is injected by main.ts, it needs Temporal)
     { id: 'business-namespace', description: 'Temporal namespace business with search attributes OntologyObjects, BusinessState' },
     { id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true },
+    // the desired state in Git (ADR-0046): first commit = the running platform (handler injected by main.ts)
+    { id: 'config-repo', description: 'Config repository: bootstrap from the running platform (gateway, safety, agents, policies, ontology)' },
   ],
   // New ontology tools for agents; the parity groups erp/crm are re-pointed by scripts/liquid/setup.mjs (not owned).
-  upstreams: [{ name: 'onto', description: 'Ontology actions of the sofa company (Liquid Enterprise): the only write path for business data', service: 'ontology-server', path: '/onto/mcp', tokenSecret: 'ontology_mcp_token', policy: 'opa' }],
+  upstreams: [{ name: 'onto', description: 'Ontology actions of the sofa company (Liquid Enterprise): the only write path for business data', service: 'ontology-server', path: '/onto/mcp', tokenSecret: 'ontology_mcp_token', policy: 'opa' },
+    { name: 'config', description: 'Platform configuration (Liquid Enterprise): read the desired state, propose changes for review', url: 'http://temporal:8080/internal/liquid/config/mcp', tokenSecret: 'config_mcp_token', policy: 'none' },
+  ],
   uiRoutes: [
     { label: 'Overview', path: '/liquid' },
     { label: 'Ontology', path: '/liquid/ontology' },
     { label: 'Policies', path: '/liquid/policies' },
     { label: 'Business processes', path: '/liquid/processes' },
+    { label: 'Proposals', path: '/liquid/proposals' },
   ],
 };
 
@@ -142,9 +159,9 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
 };
 
 /** Overlay mode (docker-compose.liquid.yml): the services run from compose, secrets come from the environment. */
-export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_OPA_BUNDLE_TOKEN?: string; LIQUID_OPA_QUERY_TOKEN?: string }): OverlayOptions {
+export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_OPA_BUNDLE_TOKEN?: string; LIQUID_OPA_QUERY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string }): OverlayOptions {
   return {
     active: !!env.LIQUID_OVERLAY,
-    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, opa_bundle_token: env.LIQUID_OPA_BUNDLE_TOKEN, opa_query_token: env.LIQUID_OPA_QUERY_TOKEN },
+    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, opa_bundle_token: env.LIQUID_OPA_BUNDLE_TOKEN, opa_query_token: env.LIQUID_OPA_QUERY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN },
   };
 }

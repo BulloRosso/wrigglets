@@ -1,0 +1,171 @@
+{
+  "startedAt": "2026-11-16T19:32:25.165Z",
+  "checks": [
+    {
+      "name": "config repository initialised from the running platform; main applied, no drift",
+      "ok": true,
+      "detail": {
+        "head": "bd22bff09077",
+        "files": 28
+      }
+    },
+    {
+      "name": "layout: gateway, safety, agents, policies, ontology, OWNERS",
+      "ok": true
+    },
+    {
+      "name": "no secret value in any revision of the repository",
+      "ok": true,
+      "detail": {
+        "secrets": 37,
+        "revisions": 36,
+        "hits": 0
+      }
+    },
+    {
+      "name": "a console edit becomes a commit with the admin as author",
+      "ok": true,
+      "detail": {
+        "subject": "console: PUT /api/agents/sofa-max/tools",
+        "email": "admin@example.local"
+      }
+    },
+    {
+      "name": "agent reads gateway/allow-lists.yaml through the upstream config",
+      "ok": true,
+      "detail": "1242 chars"
+    },
+    {
+      "name": "a tool Max is not allowed to call",
+      "ok": true,
+      "detail": "erp__file_incident_report"
+    },
+    {
+      "name": "before the change the gateway denies it",
+      "ok": true,
+      "detail": "Tool erp__file_incident_report is not allowed for this agent."
+    },
+    {
+      "name": "agent proposal is validated immediately",
+      "ok": true,
+      "detail": {
+        "id": "cp-mwjnug0k-503a",
+        "approvers": [
+          {
+            "for": "gateway/allow-lists.yaml",
+            "owners": [
+              "role:Platform.Admin"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "proposal: author agent, one file, diff with the new line",
+      "ok": true
+    },
+    {
+      "name": "an invalid proposal cannot be approved",
+      "ok": true,
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/proposals/cp-mwjnug7r-1b5a/decide → 422 {\"error\":\"the proposal does not val"
+    },
+    {
+      "name": "a broken policy fails opa check before anyone reviews it",
+      "ok": true,
+      "detail": "1 error occurred during loading: liquid/common.rego:35: rego_parse_error: unexpected eof token"
+    },
+    {
+      "name": "approved by the owner (Platform.Admin), merged into main",
+      "ok": true,
+      "detail": "edf7b5ad98bb"
+    },
+    {
+      "name": "after approval the gateway offers erp__file_incident_report to the agent (4 s)",
+      "ok": true
+    },
+    {
+      "name": "the agent sees the decision",
+      "ok": true,
+      "detail": {
+        "id": "cp-mwjnug0k-503a",
+        "title": "sofa-max may call erp__file_incident_report",
+        "status": "approved",
+        "valid": true,
+        "checks": [
+          {
+            "name": "layout and schemas",
+            "ok": true
+          },
+          {
+            "name": "no secrets",
+            "ok": true
+          }
+        ],
+        "decidedBy": "admin@example.local",
+        "decidedAt": "2026-11-16T19:32:39.623Z",
+        "comment": "ok for read-only customer data",
+        "mergedAs": "edf7b5ad98bb9d3b18ba605c12ea2377e918d1b4"
+      }
+    },
+    {
+      "name": "rejection leaves main unchanged",
+      "ok": true
+    },
+    {
+      "name": "draft compiles; diff: Carrier added, PurchaseOrder changed",
+      "ok": true,
+      "detail": {
+        "added": 3,
+        "removed": 0,
+        "changed": 1
+      }
+    },
+    {
+      "name": "an invalid draft operation is rejected",
+      "ok": true,
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/ontology/drafts/dr-mwjnupi0-1b4f/op"
+    },
+    {
+      "name": "submitted as a proposal: compiled, with ontology diff and owners",
+      "ok": true,
+      "detail": {
+        "checks": [
+          "layout and schemas=true",
+          "no secrets=true",
+          "ontology sofa: compile=true"
+        ],
+        "owners": [
+          {
+            "for": "ontology/sofa/schema.yaml",
+            "owners": [
+              "role:Platform.Admin"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "restart with empty gateway/safety stores reproduces allow-lists and safety rules from the repository",
+      "ok": true,
+      "detail": [
+        "added upstream config",
+        "added upstream crm",
+        "added upstream erp",
+        "added upstream onto",
+        "added upstream redteam",
+        "allow-list of lara"
+      ]
+    },
+    {
+      "name": "gateway config after the restart equals the one before (upstreams, allow-lists, limits)",
+      "ok": true,
+      "detail": {
+        "upstreams": true,
+        "allowedTools": true,
+        "limits": true
+      }
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T19:33:08.638Z"
+}

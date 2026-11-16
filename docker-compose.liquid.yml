@@ -18,6 +18,8 @@ services:
       LIQUID_ONTOLOGY_MCP_TOKEN: ${LIQUID_ONTOLOGY_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_MCP_TOKEN}
       LIQUID_OPA_BUNDLE_TOKEN: ${LIQUID_OPA_BUNDLE_TOKEN:?run scripts/stack.mjs env to add LIQUID_OPA_BUNDLE_TOKEN}
       LIQUID_OPA_QUERY_TOKEN: ${LIQUID_OPA_QUERY_TOKEN:?run scripts/stack.mjs env to add LIQUID_OPA_QUERY_TOKEN}
+      LIQUID_CONFIG_MCP_TOKEN: ${LIQUID_CONFIG_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_CONFIG_MCP_TOKEN}
+      LIQUID_COMPILER_TOKEN: ${LIQUID_COMPILER_TOKEN:?run scripts/stack.mjs env to add LIQUID_COMPILER_TOKEN}
 
   opa:
     image: openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3
@@ -89,6 +91,22 @@ services:
       interval: 5s
       timeout: 4s
       retries: 30
+    networks: [coworking]
+
+  # Ontology compiler as a service + policy checker (ADR-0041, ADR-0046): drafts and config proposals are validated here.
+  ontology-compiler:
+    build: { context: ., dockerfile: infra/docker/ontology-compiler.Dockerfile }
+    image: coworking/ontology-compiler:local
+    container_name: cw-liquid-ontology-compiler
+    hostname: ontology-compiler
+    restart: unless-stopped
+    environment:
+      COMPILER_TOKEN: ${LIQUID_COMPILER_TOKEN:?}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7720/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     networks: [coworking]
 
   # Business workflows (ADR-0045): Temporal namespace `business`, event dispatcher, lake-flush schedule.

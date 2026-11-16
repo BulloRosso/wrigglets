@@ -35,6 +35,7 @@ import { extensionsAdminRouter } from './extensions/api.js';
 import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { LiquidProcesses } from './extensions/liquidProcesses.js';
+import { captureEdits, liquidConfigInternalRouter, liquidConfigRouter, type LiquidConfigDeps } from './liquid/configApi.js';
 import type { ExtensionService } from './extensions/service.js';
 
 export interface ExtensionDeps {
@@ -60,6 +61,8 @@ export interface ExtensionDeps {
   /** Liquid Enterprise policy as code: overlays, OPA bundle, decisions (ADR-0044). */
   liquidPolicy?: LiquidPolicyService;
   liquidProcesses?: LiquidProcesses;
+  /** Config repository, proposals, ontology drafts (ADR-0046). */
+  liquidConfig?: LiquidConfigDeps;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -101,6 +104,8 @@ export async function enrichAsync(d: ExtensionDeps, s: AgentSummary): Promise<Ag
 /** Routes for the admin console (mounted behind Platform.Admin authorization). */
 export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string): Router {
   const r = Router();
+  // console edits become commits in the config repository while Liquid is installed (ADR-0046)
+  if (d.liquidConfig) r.use(captureEdits(d.extensions, d.liquidConfig.repo, by, d.liquidConfig.logger));
 
   /* ------------------------------------------------------------ kill switch */
   r.get('/killswitch', (_req, res) => {
@@ -361,6 +366,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
   r.use(extensionsAdminRouter(d.extensions, by));
   r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy, d.liquidProcesses));
+  if (d.liquidConfig) r.use(liquidConfigRouter(d.extensions, d.liquidConfig, by));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
@@ -384,6 +390,7 @@ export function internalRouter(d: ExtensionDeps): Router {
   const r = Router();
   r.use(signalsInternalRouter({ config: d.config, signals: d.signals, registry: d.registry }));
   if (d.liquidPolicy) r.use(liquidInternalRouter(d.extensions, d.liquidPolicy));
+  if (d.liquidConfig) r.use(liquidConfigInternalRouter(d.extensions, d.liquidConfig.repo, d.audit));
   r.get('/gateway-config', (req, res) => {
     if (!safeEqual(bearer(req), d.config.GATEWAY_TOKEN)) return res.status(401).json({ error: 'unauthorized' });
     res.json(d.gateway.build());

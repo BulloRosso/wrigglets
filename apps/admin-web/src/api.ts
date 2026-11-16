@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@cw/ui';
 import type { ExtensionStatus } from '@cw/extensions';
-import type { OntologyIr } from '@cw/ontology-ir/browser';
+import type { IrDiff, OntologyIr } from '@cw/ontology-ir/browser';
 import type {
   AdminAuditEntry,
   AgentEntra,
@@ -41,6 +41,60 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+export interface ConfigCheck {
+  name: string;
+  ok: boolean;
+  detail?: string;
+  errors?: Array<{ path: string; message: string }>;
+}
+export interface ConfigProposal {
+  id: string;
+  title: string;
+  reason: string;
+  evidence?: string;
+  author: { kind: 'agent' | 'person'; id: string; user?: string; task?: string };
+  createdAt: string;
+  base: string;
+  head: string;
+  paths: string[];
+  status: 'pending' | 'approved' | 'rejected' | 'conflict';
+  validation: { ok: boolean; at: string; checks: ConfigCheck[] };
+  owners: Array<{ for: string; owners: string[] }>;
+  irDiff?: IrDiff;
+  decidedBy?: string;
+  decidedAt?: string;
+  comment?: string;
+  mergedAs?: string;
+  diff?: string;
+}
+export interface ConfigStatus {
+  initialized: boolean;
+  head: string | null;
+  applied: string | null;
+  inSync: boolean;
+  lastReconcile: { at: string; head: string | null; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> } | null;
+  pendingProposals: number;
+  log: Array<{ commit: string; author: string; email: string; at: string; subject: string; body: string }>;
+  files: string[];
+  drift: string[];
+}
+export interface OntologyDraft {
+  id: string;
+  domain: string;
+  base: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  ops: Array<Record<string, unknown> & { op: string }>;
+  proposal?: string;
+}
+export interface DraftValidation {
+  ok: boolean;
+  errors: Array<{ path: string; message: string }>;
+  ir?: OntologyIr;
+  diff?: IrDiff;
+}
+
 export interface LiquidHoldState {
   held: boolean;
   holds: Array<{ ref: string; reason: string; since: string }>;
@@ -280,6 +334,19 @@ export const api = {
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
+  liquidConfig: () => apiFetch<ConfigStatus>('/api/liquid/config'),
+  reconcileLiquidConfig: () => apiFetch<unknown>('/api/liquid/config/reconcile', { method: 'POST' }),
+  liquidProposals: () => apiFetch<ConfigProposal[]>('/api/liquid/proposals'),
+  liquidProposal: (pid: string) => apiFetch<ConfigProposal>(`/api/liquid/proposals/${id(pid)}`),
+  liquidProposalIr: (pid: string) => apiFetch<OntologyIr | null>(`/api/liquid/proposals/${id(pid)}/ir`),
+  decideLiquidProposal: (pid: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<ConfigProposal>(`/api/liquid/proposals/${id(pid)}/decide`, { method: 'POST', json: { decision, comment } }),
+  createOntologyDraft: (domain = 'sofa') => apiFetch<OntologyDraft>('/api/liquid/ontology/drafts', { method: 'POST', json: { domain } }),
+  ontologyDrafts: () => apiFetch<OntologyDraft[]>('/api/liquid/ontology/drafts'),
+  ontologyDraft: (did: string) => apiFetch<OntologyDraft>(`/api/liquid/ontology/drafts/${id(did)}`),
+  applyDraftOps: (did: string, ops: Array<Record<string, unknown>>) => apiFetch<OntologyDraft>(`/api/liquid/ontology/drafts/${id(did)}/ops`, { method: 'POST', json: { ops } }),
+  validateDraft: (did: string) => apiFetch<DraftValidation>(`/api/liquid/ontology/drafts/${id(did)}/validate`, { method: 'POST' }),
+  submitDraft: (did: string, title: string, reason: string) => apiFetch<ConfigProposal>(`/api/liquid/ontology/drafts/${id(did)}/submit`, { method: 'POST', json: { title, reason } }),
+  deleteDraft: (did: string) => apiFetch<void>(`/api/liquid/ontology/drafts/${id(did)}`, { method: 'DELETE' }),
   liquidPolicy: () => apiFetch<LiquidPolicyStatus>('/api/liquid/policy'),
   addLiquidOverlay: (o: Pick<LiquidOverlay, 'effect' | 'reason' | 'match' | 'expires_at'>) => apiFetch<LiquidOverlay>('/api/liquid/policy/overlays', { method: 'POST', json: o }),
   liquidProcesses: () => apiFetch<LiquidProcesses>('/api/liquid/processes'),

@@ -116,5 +116,47 @@ class Canonical(unittest.TestCase):
         self.assertEqual(canonical({"b": [1, 4.2, "Süd"], "a": {"d": None, "c": True}}), '{"a":{"c":true,"d":null},"b":[1,4.2,"Süd"]}')
 
 
+@unittest.skipUnless(shutil.which("opa") or Path("/usr/local/bin/opa").exists(), "opa binary not available")
+class CheckRego(unittest.TestCase):
+    """POST /check-rego of the serve mode (config proposals, M6)."""
+
+    POLICY = "package x\nimport rego.v1\nallow if input.a == 1\n"
+
+    def call(self, files: dict) -> dict:
+        import threading
+        import urllib.error
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        from ontology_compiler.__main__ import Handler
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}/check-rego", data=json.dumps({"files": files}).encode(), headers={"content-type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return {"status": e.code}
+        finally:
+            srv.shutdown()
+
+    @staticmethod
+    def rego_test(a: int) -> str:
+        return "package x_test\nimport rego.v1\nimport data.x\ntest_a if x.allow with input as {\"a\": %d}\n" % a
+
+    def test_valid_policy_and_tests_pass(self) -> None:
+        self.assertEqual(self.call({"x.rego": self.POLICY, "x_test.rego": self.rego_test(1)}), {"ok": True, "errors": []})
+
+    def test_syntax_error_and_failing_test_are_reported(self) -> None:
+        self.assertFalse(self.call({"x.rego": "package x\nallow if {"})["ok"])
+        r = self.call({"x.rego": self.POLICY, "x_test.rego": self.rego_test(2)})
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["errors"][0]["path"], "opa test")
+
+    def test_path_traversal_is_rejected(self) -> None:
+        self.assertEqual(self.call({"a/../../x.rego": "package x"}), {"status": 400})
+
+
 if __name__ == "__main__":
     unittest.main()

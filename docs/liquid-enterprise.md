@@ -267,8 +267,18 @@ Admin console → Liquid enterprise → **Ontology** shows the ontology the onto
 |---|---|---|
 | ![Ontology graph](images/liquid/ontology-graph.png) | ![Selected class](images/liquid/ontology-selected.png) | ![Filter by criticality](images/liquid/ontology-filter.png) |
 
-E1 is read-only. Next: drafts and validation in the editor (E2), proposals with a diff graph (E3, with M6), the
-compatibility class and live apply (E4, with M8).
+**Editing (E2) and proposals (E3).** *Edit as draft* forks the three ontology files from the config repository
+(branch `main`). Changes are typed operations: add class, add or change attribute, add link (drag from the blue dot of
+one class to another), add enum value, change an annotation. They are applied to the YAML with comments and order
+preserved. Every change is compiled by the compiler service; the panel shows errors and the changes against the base,
+the canvas colours them (green added, amber changed, red removed) and zooms to them. *Submit* turns the draft into a
+proposal (see [Config repository and proposals](#config-repository-and-proposals)); the owners of the touched classes
+approve it.
+
+![Ontology draft: new class Carrier linked from PurchaseOrder](images/liquid/liquid-ontology-draft.png)
+
+Approving an ontology proposal records the new ontology in `main`; the compatibility class (patch/minor/major) and
+applying it to the running ontology server follow in E4 with M8.
 
 ## Policies
 
@@ -349,7 +359,51 @@ histories.
 
 ## Config repository and proposals
 
-*(planned, M6)*
+Decision record: [ADR-0046](adr/0046-config-repository-proposals.md).
+
+<img src="diagrams/27-liquid-config-repo.svg" alt="Config repository: proposals, review, reconciler" width="100%">
+
+While Liquid is installed, the platform's desired state lives in a Git repository owned by the control plane
+(`/data/liquid/config.git`, outside `/data/admin`). Branch **`main`** is applied by the **reconciler** every 60 seconds
+and right after each approval.
+
+```
+gateway/upstreams.yaml   gateway/allow-lists.yaml   gateway/limits.yaml
+safety/rules.yaml        agents/<id>.yaml
+policies/liquid/*.rego   policies/liquid/roles/data.json   policies/liquid/overlays.yaml
+ontology/sofa/{schema,actions,bindings}.yaml
+playbooks/               OWNERS.yaml
+```
+
+**Three ways in:**
+
+| Who | How | Lands as |
+|---|---|---|
+| Admin in the console | any change of upstreams, allow-lists, agents, safety rules, overlays | a commit on `main`, author = the admin |
+| Agent | MCP upstream `config`: `config__read`, `config__propose_change`, `config__get_proposal` | a proposal (branch) |
+| Person in the ontology editor | *Edit as draft*, then *Submit* | a proposal (branch) |
+
+**Proposals** are validated when they are created: layout and schemas, no secret values, ontology compile with a
+structural diff, `opa check` + `opa test` for policies. An invalid proposal cannot be approved. Liquid enterprise →
+**Proposals** shows reason, evidence, checks, approvers, the text diff and, for ontology changes, the diff graph.
+*Approve and apply* needs a person who is an owner of every touched path (`OWNERS.yaml` on `main`; the ontology's
+class `owner` annotations are resolved through its `teams`) and who is not the requester. The proposal is validated
+again on top of the current `main`, merged with `Approved-By`, and applied. *Reject* leaves `main` unchanged.
+
+**Giving an agent the config tools:** add `config__*` (or only `config__read` and `config__get_proposal`) to its
+allow-list. Proposing changes nothing by itself.
+
+**No secrets in the repository.** Upstream credentials appear only as Key Vault references (`secretRef`); literal
+credential headers stay in `/data` and are kept on apply; agent files have no secrets. Every commit is checked against
+the known secret values and refused if one appears.
+
+**Drift and recovery.** If the stores differ from `main` (for example after `/data/admin/gateway.json` was lost), the
+next reconcile restores them from the repository. The Proposals page shows the applied revision, the last reconcile
+and any drift; *Reconcile now* forces a run.
+
+| Agent proposal under review | Ontology proposal with diff graph |
+|---|---|
+| ![Agent proposal: allow-list change](images/liquid/liquid-proposals.png) | ![Ontology proposal with diff graph](images/liquid/liquid-proposal-ontology.png) |
 
 ## Playbooks
 
@@ -666,6 +720,42 @@ Verified
 Open
 - Notifications are events (`BusinessNotification`); delivery by mail later.
 - The sofa scenarios with real agents (D1 runs) still need the go-ahead for model cost.
+
+### M6 — Config repository and proposals, editor E2/E3 (2026-11-16)
+
+Done
+- Config repository in Git (bare, plumbing only; `git` in the control-plane image), bootstrap step `config-repo` from
+  the running platform plus the ontology and policies of the image; layout, export/parse with schemas, secret scan.
+  [ADR-0046](adr/0046-config-repository-proposals.md).
+- Commit-on-edit for console changes and extension operations; reconciler (60 s, after merges, on drift) applying
+  upstreams, allow-lists, limits, safety rules, agents, overlays; OPA bundle from the applied revision.
+- Proposals: branches, validation (schemas, secrets, ontology compile + `diffIr`, `opa check`/`opa test` via the
+  compiler service, which now ships a pinned OPA and `POST /check-rego`), owners from `OWNERS.yaml` and class owners,
+  four eyes, merge on top of the current `main` with conflict detection, audit.
+- MCP upstream `config` served by the control plane (extension upstreams can now point at a URL). Extension service
+  `ontology-compiler` (also in the overlay).
+- Editor E2 (drafts as typed YAML operations, compile on every change, diff colouring, link by drag) and E3 (submit as
+  proposal, review page with text diff and diff graph). `diffIr` in `@cw/ontology-ir`.
+
+Verified
+- Unit tests: config repository and layout 15 (bootstrap, capture, reconcile and drift, agent proposal approve/reject,
+  invalid, secrets, paths, conflicts, owners, normalisation); drafts 4; `diffIr` 2; compiler `check-rego` 3.
+- **End to end** (`node scripts/liquid/e2e-config.mjs`, `scripts/liquid/results/e2e-config.json`): 20/20. The
+  repository is created and in sync, with **no secret value in any revision**; a console edit becomes a commit by the
+  admin; Max reads the allow-lists through `config` and **proposes a tool he is denied**, and the proposal validates;
+  an invalid proposal cannot be approved; a broken policy fails `opa check` before review; **after approval the gateway
+  offers the tool within 8 s**; a rejected proposal leaves `main` unchanged; an ontology draft (class Carrier + link)
+  compiles and becomes a proposal with diff; **a restart with `gateway.json` and `safety-rules.json` removed reproduces
+  upstreams, allow-lists, limits and safety rules** from the repository.
+- Found on the way: the bootstrap commit ran before the extension registered its own upstream, so the reconciler would
+  have removed it. Extension operations are now captured, and the reconciler pauses while one runs. Hand-written
+  allow-lists in a different order looked like permanent drift; states are now compared normalised.
+
+Open
+- Applying ontology changes to the running ontology server (E4, M8). Removing agents through the repository is not
+  supported (console only).
+- An early variant of the e2e called a tool on the sofa mock with empty arguments; the mock accepted it and filed
+  incident `INC-0001` in its simulated world (gone with the next reset or scenario start).
 
 ### Later
 

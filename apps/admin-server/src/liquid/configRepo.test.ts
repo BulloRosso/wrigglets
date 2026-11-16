@@ -1,0 +1,190 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import YAML from 'yaml';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_GATEWAY_LIMITS, DEFAULT_SAFETY_RULES } from '@cw/shared';
+import { ConfigRepoService, type ConfigTargets } from './configRepo.js';
+import { exportState, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
+
+const SECRET = 'very-secret-internal-token-1234567890';
+const ADMIN = { email: 'ada@example.local', roles: ['Platform.Admin'] };
+
+function state(): DesiredState {
+  return {
+    upstreams: [
+      { name: 'erp', description: 'ERP', url: 'http://mcp-sofa:7660/erp/mcp', headers: { Authorization: { secretRef: 'erp-token' }, 'X-Literal-Token': SECRET, 'X-Tenant': 'sofa' }, enabled: true, auth: 'static', oboFallback: 'deny', policy: 'none' },
+    ],
+    allowedTools: { 'sofa-lara': ['erp__*'], 'sofa-max': ['erp__get_kpi'] },
+    limits: { ...DEFAULT_GATEWAY_LIMITS },
+    safetyRules: structuredClone(DEFAULT_SAFETY_RULES),
+    agents: [{ agentId: 'sofa-lara', displayName: 'Lara', gitEmail: 'lara@agents.local', image: 'coworking/agent:local', model: 'gpt-5.4-mini', resources: { cpus: 1, memoryMb: 2048 } }],
+    overlays: [],
+  };
+}
+
+class FakeTargets implements ConfigTargets {
+  s = state();
+  applied: string[][] = [];
+  current() {
+    return structuredClone(this.s);
+  }
+  async apply(d: DesiredState) {
+    const changes: string[] = [];
+    if (JSON.stringify(d.allowedTools) !== JSON.stringify(this.s.allowedTools)) changes.push('allow-lists');
+    if (JSON.stringify(d.safetyRules) !== JSON.stringify(this.s.safetyRules)) changes.push('safety');
+    // literal credential headers are not in the repository: keep them (they live in /data)
+    const keep = this.s.upstreams;
+    this.s = { ...structuredClone(d), upstreams: d.upstreams.map((u) => ({ ...u, headers: { ...Object.fromEntries(Object.entries(keep.find((k) => k.name === u.name)?.headers ?? {}).filter(([h, v]) => typeof v === 'string' && /token/i.test(h))), ...u.headers } })) };
+    this.applied.push(changes);
+    return changes;
+  }
+  secrets() {
+    return [SECRET];
+  }
+}
+
+let dir: string;
+let t: FakeTargets;
+let svc: ConfigRepoService;
+const seed = { 'ontology/sofa/README.md': 'x' };
+
+beforeEach(async () => {
+  dir = await mkdtemp(path.join(os.tmpdir(), 'cw-config-'));
+  t = new FakeTargets();
+  svc = new ConfigRepoService(dir, t);
+  await svc.load();
+});
+afterEach(async () => {
+  svc.stop();
+  await rm(dir, { recursive: true, force: true });
+});
+
+const allowList = async (rev = 'main') => YAML.parse(((await svc.read('gateway/allow-lists.yaml', rev)) as { content: string }).content).allowedTools as Record<string, string[]>;
+
+describe('layout', () => {
+  it('export → parse round trip; literal credentials never reach the files', () => {
+    const files = exportState(state());
+    const { state: back, errors } = parseState(files);
+    expect(errors).toEqual([]);
+    expect(back!.allowedTools).toEqual(state().allowedTools);
+    expect(back!.upstreams[0]!.headers).toEqual({ Authorization: { secretRef: 'erp-token' }, 'X-Tenant': 'sofa' });
+    expect(Object.values(files).join('\n')).not.toContain(SECRET);
+  });
+  it('order and duplicates in hand-written files do not count as a difference', () => {
+    const files = exportState(state());
+    files['gateway/allow-lists.yaml'] = 'allowedTools:\n  sofa-max: [erp__get_kpi]\n  sofa-lara: ["erp__*", "erp__*"]\n';
+    expect(parseState(files).state!.allowedTools).toEqual(parseState(exportState(state())).state!.allowedTools);
+  });
+  it('reports every schema error with its file', () => {
+    const files = exportState(state());
+    files['gateway/allow-lists.yaml'] = 'allowedTools:\n  sofa-lara: ["erp__*", "BAD TOOL"]\n';
+    files['agents/sofa-lara.yaml'] = 'agentId: sofa-lara\ndisplayName: Lara\n';
+    files['secrets.txt'] = 'x';
+    const paths = parseState(files).errors.map((e) => e.path);
+    expect(paths).toEqual(expect.arrayContaining(['gateway/allow-lists.yaml', 'agents/sofa-lara.yaml', 'secrets.txt']));
+  });
+  it('a literal credential header in a file is rejected', () => {
+    const files = exportState(state());
+    files['gateway/upstreams.yaml'] = files['gateway/upstreams.yaml']!.replace('X-Tenant: sofa', 'X-Api-Key: abc');
+    expect(parseState(files).errors[0]!.message).toMatch(/Key Vault reference/);
+  });
+  it('owners: last matching rule wins, class owners resolve through teams', () => {
+    const owners = { teams: { 'head-of-logistics': ['bea@x'] }, rules: [{ path: '**', owners: ['role:Platform.Admin'] }, { path: 'gateway/**', owners: ['ops@x'] }] };
+    expect(requiredOwners(owners, ['gateway/allow-lists.yaml'])).toEqual([{ for: 'gateway/allow-lists.yaml', owners: ['ops@x'] }]);
+    const sets = requiredOwners(owners, ['ontology/sofa/schema.yaml'], ['head-of-logistics', 'unknown-team']);
+    expect(sets.map((s) => s.owners)).toEqual([['role:Platform.Admin'], ['bea@x']]);
+    expect(satisfies({ email: 'BEA@x', roles: [] }, ['bea@x'])).toBe(true);
+    expect(satisfies(ADMIN, ['ops@x'])).toBe(false);
+  });
+});
+
+describe('config repository', () => {
+  it('bootstraps once from the running state, without secrets', async () => {
+    const r = await svc.init(seed, 'ada@example.local');
+    expect(r.created).toBe(true);
+    expect((await svc.init(seed, 'ada@example.local')).created).toBe(false);
+    const st = await svc.status();
+    expect(st.files).toEqual(expect.arrayContaining(['OWNERS.yaml', 'README.md', 'agents/sofa-lara.yaml', 'gateway/allow-lists.yaml', 'safety/rules.yaml', 'ontology/sofa/README.md']));
+    expect(st.inSync).toBe(true);
+    const all = await svc.git.files('main');
+    expect(Object.values(all).join('\n')).not.toContain(SECRET);
+    expect(st.log[0]!.body).toMatch(/Requested-By: ada@example.local/);
+  });
+
+  it('console edits become commits with the admin as author; no change → no commit', async () => {
+    await svc.init(seed, 'ada@example.local');
+    t.s.allowedTools['sofa-max'] = ['erp__get_kpi', 'erp__list_suppliers'];
+    const c = await svc.capture('ben@example.local', 'PUT /api/agents/sofa-max/tools');
+    expect(c).toBeTruthy();
+    expect((await allowList())['sofa-max']).toEqual(['erp__get_kpi', 'erp__list_suppliers']);
+    const [last] = (await svc.status()).log;
+    expect(last).toMatchObject({ email: 'ben@example.local', subject: 'console: PUT /api/agents/sofa-max/tools' });
+    expect(await svc.capture('ben@example.local', 'again')).toBeNull();
+    expect((await svc.status()).inSync).toBe(true);
+  });
+
+  it('reconcile is idempotent and restores the stores from the repository (empty /data/admin)', async () => {
+    await svc.init(seed, 'ada@example.local');
+    expect(await svc.reconcile()).toMatchObject({ ok: true, unchanged: true });
+    // stores lost their state (fresh /data/admin with defaults)
+    t.s.allowedTools = {};
+    t.s.safetyRules = [];
+    const r = await svc.reconcile(); // no force: the drift alone triggers the apply
+    expect(r).toMatchObject({ ok: true });
+    expect(t.s.allowedTools).toEqual(state().allowedTools);
+    expect(t.s.safetyRules).toEqual([...state().safetyRules].sort((a, b) => a.id.localeCompare(b.id)));
+    expect(await svc.drift()).toEqual([]);
+    expect(await svc.reconcile()).toMatchObject({ unchanged: true });
+  });
+
+  it('an approved agent proposal changes the allow-list within one reconcile; rejection leaves main unchanged', async () => {
+    await svc.init(seed, 'ada@example.local');
+    const before = await svc.git.rev('main');
+    const files = exportState(t.current());
+    const next = files['gateway/allow-lists.yaml']!.replace('- erp__get_kpi', '- erp__get_kpi\n    - erp__list_suppliers');
+    const p = await svc.propose({ title: 'Max may list suppliers', reason: 'needed for capacity planning', changes: [{ path: 'gateway/allow-lists.yaml', content: next }], author: { kind: 'agent', id: 'sofa-max', user: 'stefan@example.local', task: 't-1' } });
+    expect(p.validation.ok).toBe(true);
+    expect(p.paths).toEqual(['gateway/allow-lists.yaml']);
+    expect(p.owners).toEqual([{ for: 'gateway/allow-lists.yaml', owners: ['role:Platform.Admin'] }]);
+    expect((await svc.get(p.id)).diff).toMatch(/\+ {4}- erp__list_suppliers/);
+    expect(await svc.git.rev('main')).toBe(before);
+
+    await expect(svc.decide(p.id, 'approve', { email: 'stefan@example.local', roles: ['Platform.Admin'] })).rejects.toThrow(/four eyes/);
+    await expect(svc.decide(p.id, 'approve', { email: 'eve@example.local', roles: [] })).rejects.toThrow(/not an owner/);
+    const done = await svc.decide(p.id, 'approve', ADMIN, 'ok');
+    expect(done.status).toBe('approved');
+    expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'erp__list_suppliers']);
+    const [merge] = (await svc.status()).log;
+    expect(merge!.body).toMatch(/Approved-By: ada@example.local/);
+    expect(merge!.body).toMatch(/Agent: sofa-max/);
+    await expect(svc.decide(p.id, 'reject', ADMIN)).rejects.toThrow(/already approved/);
+
+    const head = await svc.git.rev('main');
+    const q = await svc.propose({ title: 'Lara gets everything', reason: 'convenience', changes: [{ path: 'gateway/allow-lists.yaml', content: next.replace('- erp__*', '- "*"') }], author: { kind: 'agent', id: 'sofa-lara' } });
+    expect((await svc.decide(q.id, 'reject', ADMIN, 'no')).status).toBe('rejected');
+    expect(await svc.git.rev('main')).toBe(head);
+  });
+
+  it('an invalid proposal cannot be approved; secrets and paths outside the layout are refused', async () => {
+    await svc.init(seed, 'ada@example.local');
+    const bad = await svc.propose({ title: 'broken', reason: 'typo', changes: [{ path: 'gateway/allow-lists.yaml', content: 'allowedTools: [1, 2]\n' }], author: { kind: 'person', id: 'ben@example.local' } });
+    expect(bad.validation.ok).toBe(false);
+    await expect(svc.decide(bad.id, 'approve', ADMIN)).rejects.toThrow(/does not validate/);
+    await expect(svc.propose({ title: 'leak', reason: 'oops', changes: [{ path: 'playbooks/x.yaml', content: `token: ${SECRET}\n` }], author: { kind: 'agent', id: 'sofa-lara' } })).rejects.toThrow(/secret values/);
+    await expect(svc.propose({ title: 'escape', reason: 'nope', changes: [{ path: 'gateway/../../etc/passwd', content: 'x' }], author: { kind: 'agent', id: 'sofa-lara' } })).rejects.toThrow(/outside/);
+  });
+
+  it('a proposal whose file changed on main meanwhile is a conflict; a non-overlapping one merges', async () => {
+    await svc.init(seed, 'ada@example.local');
+    const files = exportState(t.current());
+    const a = await svc.propose({ title: 'Option A', reason: 'reason a', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_state') }], author: { kind: 'agent', id: 'sofa-max' } });
+    const b = await svc.propose({ title: 'Option B', reason: 'reason b', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_log') }], author: { kind: 'agent', id: 'sofa-max' } });
+    const c = await svc.propose({ title: 'Option C', reason: 'reason c', changes: [{ path: 'playbooks/x.yaml', content: 'id: x\n' }], author: { kind: 'agent', id: 'sofa-max' } });
+    await svc.decide(a.id, 'approve', ADMIN);
+    await expect(svc.decide(b.id, 'approve', ADMIN)).rejects.toThrow(/conflicts/);
+    expect((await svc.decide(c.id, 'approve', ADMIN)).status).toBe('approved');
+    expect((await allowList())['sofa-max']).toEqual(['erp__get_state']);
+    expect(Object.keys(await svc.git.files('main'))).toContain('playbooks/x.yaml');
+  });
+});

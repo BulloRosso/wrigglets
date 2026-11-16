@@ -147,7 +147,26 @@ export class LiquidPolicyService {
     return o;
   }
 
+  /** Config repository (ADR-0046): the overlays of the applied revision replace the store. */
+  async replaceOverlays(list: Overlay[]) {
+    this.overlays = list.map((o) => ({ ...o }));
+    await this.persist();
+  }
+
+  /** From M6 the policies come from the applied revision of the config repository when it exists. */
+  policySource?: () => Promise<Record<string, string> | undefined>;
+
   private async policyFiles(): Promise<{ rego: Record<string, string>; roles: unknown }> {
+    const fromRepo = await this.policySource?.().catch(() => undefined);
+    if (fromRepo && Object.keys(fromRepo).some((p) => p.endsWith('.rego'))) {
+      const rego: Record<string, string> = {};
+      for (const [p, text] of Object.entries(fromRepo)) {
+        const rel = p.replace(/^policies\/liquid\//, '');
+        if (rel.endsWith('.rego') && !rel.endsWith('_test.rego')) rego[rel] = text;
+      }
+      const roles = fromRepo['policies/liquid/roles/data.json'] ? JSON.parse(fromRepo['policies/liquid/roles/data.json']) : { roles: {}, agents: {} };
+      return { rego, roles };
+    }
     const rego: Record<string, string> = {};
     const walk = async (dir: string, rel: string) => {
       for (const e of await readdir(dir, { withFileTypes: true })) {

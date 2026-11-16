@@ -29,6 +29,9 @@ importers:
       '@cw/extensions':
         specifier: workspace:*
         version: link:../../packages/extensions
+      '@cw/ontology-ir':
+        specifier: workspace:*
+        version: link:../../packages/ontology-ir
       '@cw/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
@@ -56,6 +59,9 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -75,9 +81,6 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      yaml:
-        specifier: 2.9.1
-        version: 2.9.1
 
   apps/admin-web:
     dependencies:

@@ -61,6 +61,21 @@ export class GatewayConfigService {
     return this.data.allowedTools[agentId] ?? [];
   }
 
+  /** All allow-lists (config repository export, ADR-0046). */
+  get allAllowedTools(): Record<string, string[]> {
+    return structuredClone(this.data.allowedTools);
+  }
+
+  get limits(): GatewayLimits {
+    return { ...this.data.limits };
+  }
+
+  async setLimits(limits: GatewayLimits) {
+    this.data.limits = { ...limits };
+    await this.persist();
+    void this.push();
+  }
+
   async setUpstream(u: UpstreamServer) {
     this.data.upstreams = [...this.data.upstreams.filter((x) => x.name !== u.name), u].sort((a, b) => a.name.localeCompare(b.name));
     await this.persist();

@@ -42,7 +42,10 @@ export const extensionUpstream = z.object({
   /** Gateway upstream name, e.g. "onto". */
   name: z.string().regex(NAME),
   description: z.string().max(300),
-  service: z.string().regex(NAME),
+  /** Extension service that serves it … */
+  service: z.string().regex(NAME).optional(),
+  /** … or an absolute URL (e.g. served by the control plane: http://temporal:8080/internal/…); path is ignored then. */
+  url: z.string().url().optional(),
   path: z.string().startsWith('/').default('/mcp'),
   /** Secret sent as "Authorization: Bearer <secret>" to the upstream. */
   tokenSecret: z.string().regex(SECRET).optional(),
@@ -94,10 +97,15 @@ export const extensionManifest = z
     }
     for (const v of m.vaultSecrets) if (!secrets.has(v)) ctx.addIssue({ code: 'custom', message: `vault secret "${v}" is not a declared secret`, path: ['vaultSecrets'] });
     for (const u of m.upstreams) {
+      if (u.tokenSecret && !secrets.has(u.tokenSecret)) ctx.addIssue({ code: 'custom', message: `upstream "${u.name}": unknown secret "${u.tokenSecret}"`, path: ['upstreams'] });
+      if (!u.service === !u.url) {
+        ctx.addIssue({ code: 'custom', message: `upstream "${u.name}": exactly one of service or url`, path: ['upstreams'] });
+        continue;
+      }
+      if (u.url) continue;
       const svc = m.services.find((s) => s.name === u.service);
       if (!svc) ctx.addIssue({ code: 'custom', message: `upstream "${u.name}" refers to unknown service "${u.service}"`, path: ['upstreams'] });
       else if (svc.port === undefined) ctx.addIssue({ code: 'custom', message: `upstream "${u.name}": service "${u.service}" has no port`, path: ['upstreams'] });
-      if (u.tokenSecret && !secrets.has(u.tokenSecret)) ctx.addIssue({ code: 'custom', message: `upstream "${u.name}": unknown secret "${u.tokenSecret}"`, path: ['upstreams'] });
     }
     try {
       dependencyOrder(m.services);

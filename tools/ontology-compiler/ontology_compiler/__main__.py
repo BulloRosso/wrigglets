@@ -3,13 +3,18 @@
   python -m ontology_compiler compile <ontology dir> -o <ir.json>   compile; exit 1 with errors on stderr
   python -m ontology_compiler serve [--port 7720]                   HTTP: POST /compile {files: {schema.yaml, actions.yaml,
                                                                     bindings.yaml}} -> {ok, ir} | {ok: false, errors};
-                                                                    GET /health. Used by the ontology editor (E2).
+                                                                    POST /check-rego {files: {<path>: text}} -> opa check + opa test
+                                                                    (policies in config proposals, M6);
+                                                                    GET /health. Used by the ontology editor (E2) and
+                                                                    the config reconciler.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -57,13 +62,15 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/compile":
+        if self.path not in ("/compile", "/check-rego"):
             return self._send(404, {"error": "not found"})
         if self.token and self.headers.get("authorization", "") != f"Bearer {self.token}":
             return self._send(401, {"error": "unauthorized"})
         length = int(self.headers.get("content-length") or 0)
         if length <= 0 or length > MAX_BODY:
             return self._send(413, {"error": "body too large or empty"})
+        if self.path == "/check-rego":
+            return self._check_rego(length)
         try:
             files = json.loads(self.rfile.read(length))["files"]
             if not all(isinstance(files.get(n), str) for n in SOURCES):
@@ -78,6 +85,32 @@ class Handler(BaseHTTPRequestHandler):
             except CompileError as e:
                 return self._send(200, {"ok": False, "errors": e.errors})
         self._send(200, {"ok": True, "ir": ir})
+
+
+    def _check_rego(self, length: int) -> None:
+        try:
+            files = json.loads(self.rfile.read(length))["files"]
+            if not isinstance(files, dict) or not files or not all(isinstance(k, str) and isinstance(v, str) for k, v in files.items()):
+                raise ValueError
+            if any(not SAFE_PATH.match(k) or ".." in k.split("/") for k in files):
+                raise ValueError
+        except Exception:  # noqa: BLE001
+            return self._send(400, {"error": "expected {files: {<relative path .rego|.json>: text}}"})
+        with tempfile.TemporaryDirectory() as tmp:
+            for k, v in files.items():
+                Path(tmp, k).parent.mkdir(parents=True, exist_ok=True)
+                Path(tmp, k).write_text(v, encoding="utf-8", newline="\n")
+            errors: list[dict] = []
+            for step in (["check", "--strict"], ["test"]):
+                r = subprocess.run([OPA, *step, "."], cwd=tmp, capture_output=True, text=True, timeout=60)
+                if r.returncode != 0:
+                    errors.append({"path": f"opa {step[0]}", "message": (r.stdout + r.stderr).strip()[:4000]})
+                    break
+        self._send(200, {"ok": not errors, "errors": errors})
+
+
+SAFE_PATH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\.(rego|json)$")
+OPA = os.environ.get("OPA_BIN", "/usr/local/bin/opa")
 
 
 def cmd_serve(args: argparse.Namespace) -> int:

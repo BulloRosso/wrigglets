@@ -106,8 +106,12 @@ const schema = z.object({
   LIQUID_ONTOLOGY_MCP_TOKEN: z.string().optional(),
   LIQUID_OPA_BUNDLE_TOKEN: z.string().optional(),
   LIQUID_OPA_QUERY_TOKEN: z.string().optional(),
+  LIQUID_CONFIG_MCP_TOKEN: z.string().optional(),
+  LIQUID_COMPILER_TOKEN: z.string().optional(),
   /** Rego policies and roles of Liquid Enterprise (copied into the control-plane image). */
   LIQUID_POLICY_DIR: z.string().default('/app/policies/liquid'),
+  /** Ontology sources copied into the image; seed of the config repository (ADR-0046). */
+  LIQUID_ONTOLOGY_DIR: z.string().default('/app/ontology'),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

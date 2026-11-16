@@ -27,6 +27,10 @@ import { TemporalDevServer } from './temporal/devServer.js';
 import { TemporalPlatform } from './temporal/platform.js';
 import { BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES } from '@cw/business-workflows';
 import { LiquidProcesses } from './extensions/liquidProcesses.js';
+import { ConfigRepoService, type Validators } from './liquid/configRepo.js';
+import { DraftStore } from './liquid/drafts.js';
+import { storeTargets } from './liquid/targets.js';
+import { readTree } from './liquid/seed.js';
 
 /**
  * Control plane process of the "temporal" container:
@@ -113,20 +117,62 @@ async function main() {
   await signals.load();
   // Optional extensions installed from the admin console (ADR-0039)
   const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
-  // business workflows (ADR-0045): the namespace step needs the Temporal connection of this process
-  extensions.register(liquidManifest, { ...liquidBootstrap, 'business-namespace': async (ctx) => { await temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES); ctx.log(`Temporal namespace ${BUSINESS_NAMESPACE} ready`); } }, liquidOverlay(config));
-  await extensions.load();
-  // overlay mode runs no bootstrap steps: the business namespace is ensured here (idempotent)
-  if (config.LIQUID_OVERLAY) void temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES).catch((err) => logger.warn({ err: String(err) }, 'could not ensure the business namespace'));
   // Liquid Enterprise policy as code (ADR-0044): overlays + OPA bundle; the gateway gets OPA's address while installed
-  const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
-  const liquidPolicy = new LiquidPolicyService(
-    config.DATA_DIR,
-    policyDir,
-    () => ontologyCall({ url: (s) => extensions.url(LIQUID_ID, s), secret: (n) => extensions.secret(LIQUID_ID, n) ?? '' }, 'GET', '/internal/opa/data'),
-    () => extensions.secret(LIQUID_ID, 'opa_query_token'),
-  );
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(here, '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
+  const ontologyDir = [config.LIQUID_ONTOLOGY_DIR, path.resolve(here, '../../../ontology')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_ONTOLOGY_DIR;
+  const liquidCtx = { url: (s: string) => extensions.url(LIQUID_ID, s), secret: (n: string) => extensions.secret(LIQUID_ID, n) ?? '' };
+  const liquidPolicy = new LiquidPolicyService(config.DATA_DIR, policyDir, () => ontologyCall(liquidCtx, 'GET', '/internal/opa/data'), () => extensions.secret(LIQUID_ID, 'opa_query_token'));
   await liquidPolicy.load();
+  // Config repository (ADR-0046): desired state in Git, outside /data/admin; reconciled into the stores while installed
+  const compilerCall = async <T>(p: string, body: unknown): Promise<T> => {
+    const res = await fetch(`${extensions.url(LIQUID_ID, 'ontology-compiler')}${p}`, { method: 'POST', headers: { authorization: `Bearer ${extensions.secret(LIQUID_ID, 'compiler_token') ?? ''}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(90_000) });
+    if (!res.ok) throw new Error(`ontology compiler ${p}: HTTP ${res.status}`);
+    return (await res.json()) as T;
+  };
+  const validators: Validators = { compileOntology: (files) => compilerCall('/compile', { files }), checkRego: (files) => compilerCall('/check-rego', { files }) };
+  const configRepo = new ConfigRepoService(
+    path.join(config.DATA_DIR, 'liquid'),
+    storeTargets({
+      gateway,
+      safety,
+      agents: { list: () => registry.list(), create: (b, who) => agents.create(b, who), update: (id, p) => agents.update(id, p), setEntra: (id, e) => agents.setEntra(id, e) },
+      policy: liquidPolicy,
+      secrets: () => [...registry.list().flatMap((a) => Object.values(registry.get(a.agentId)?.secrets ?? {}).filter((v): v is string => typeof v === 'string')), ...extensions.secretValues(LIQUID_ID), config.GATEWAY_TOKEN].filter(Boolean),
+    }),
+    validators,
+    async () => JSON.stringify(await ontologyCall(liquidCtx, 'GET', '/internal/opa/data')),
+  );
+  await configRepo.load();
+  liquidPolicy.policySource = async () => (extensions.isInstalled(LIQUID_ID) ? configRepo.appliedFiles('policies/liquid/') : undefined);
+  const seedConfig = async () => ({ ...(await readTree(ontologyDir, 'ontology/')), ...(await readTree(policyDir, 'policies/liquid/')) });
+  // business workflows (ADR-0045): the namespace step needs the Temporal connection of this process
+  extensions.register(
+    liquidManifest,
+    {
+      ...liquidBootstrap,
+      'business-namespace': async (ctx) => {
+        await temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES);
+        ctx.log(`Temporal namespace ${BUSINESS_NAMESPACE} ready`);
+      },
+      'config-repo': async (ctx) => {
+        const r = await configRepo.init(await seedConfig(), 'install@liquid.local');
+        ctx.log(r.created ? `config repository created at ${r.head.slice(0, 12)}` : `config repository exists (main ${r.head.slice(0, 12)})`);
+      },
+    },
+    liquidOverlay(config),
+  );
+  await extensions.load();
+  // overlay mode runs no bootstrap steps: the business namespace and the config repository are ensured here (idempotent)
+  if (config.LIQUID_OVERLAY) {
+    void temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES).catch((err) => logger.warn({ err: String(err) }, 'could not ensure the business namespace'));
+    void seedConfig()
+      .then((seed) => configRepo.init(seed, 'overlay@liquid.local'))
+      .catch((err) => logger.warn({ err: String(err) }, 'could not initialise the config repository'));
+  }
+  // owned upstreams (onto, config) are registered by the extension, not through the console: record them after each operation
+  extensions.onOperationDone = (id, kind, who) => (id === LIQUID_ID ? configRepo.capture(who, `extension ${id} ${kind}`) : undefined);
+  configRepo.start(60_000, () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID));
   gateway.opaProvider = () => {
     if (!extensions.isInstalled(LIQUID_ID)) return undefined;
     const raw = extensions.secret(LIQUID_ID, 'opa_query_token');
@@ -145,7 +191,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidProcesses: new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined)), mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses: new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined)), mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

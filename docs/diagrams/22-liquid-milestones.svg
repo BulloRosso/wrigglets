@@ -85,7 +85,7 @@
   <text x="624" y="303" class="d">holdable Temporal</text>
   <text x="624" y="319" class="d">workflows, approvals</text>
   <!-- M6 -->
-  <rect x="800" y="120" width="150" height="76" rx="10" class="wip"/>
+  <rect x="800" y="120" width="150" height="76" rx="10" class="done"/>
   <text x="814" y="143" class="id">M6</text><text x="848" y="143" class="h">Config repo</text>
   <text x="814" y="163" class="d">desired state in Git,</text>
   <text x="814" y="179" class="d">proposals, reconciler</text>
@@ -121,7 +121,7 @@
   <text x="244" y="533" class="h">E1 viewer (done)</text>
   <text x="244" y="551" class="d">with M2: graph of classes, links, actions, source tables</text>
   <rect x="800" y="512" width="150" height="50" rx="8" class="ed"/>
-  <text x="814" y="533" class="h">E2 drafts · E3 proposals</text>
+  <text x="814" y="533" class="h">E2 · E3 (done)</text>
   <text x="814" y="551" class="d">with M6: validate, diff graph</text>
   <rect x="990" y="512" width="150" height="50" rx="8" class="ed"/>
   <text x="1004" y="533" class="h">E4 live apply</text>

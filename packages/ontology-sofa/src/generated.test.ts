@@ -3,8 +3,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
-import { generateAll } from '@cw/ontology-codegen';
-import { DQ_CHECKS, MCP_TOOLS, loadIr, opaData, projectionSql, types } from './index.js';
+import { dqChecks, generateAll, genSql, mcpTools, opaData as opaDataOf } from '@cw/ontology-codegen';
+import { loadIr, types } from './index.js';
+
+// computed from the IR at runtime by the enterprise core (ADR-0049); tested here against the built-in ontology
+const MCP_TOOLS = mcpTools(loadIr());
+const DQ_CHECKS = dqChecks(loadIr());
+const projectionSql = () => genSql(loadIr());
+const opaData = () => opaDataOf(loadIr()) as Record<string, unknown>;
 
 const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 type MockTool = { name: string; write?: boolean; inputSchema: { properties?: Record<string, Record<string, unknown>>; required?: string[] } };

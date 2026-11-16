@@ -3,7 +3,7 @@ import type pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { loadIr } from '@cw/ontology-sofa';
 import { worldToObjects, SofaCompany } from '@cw/sofa-domain';
-import { opaPolicy, touchedObjects } from './policy.js';
+import { touchedObjects, wasmPolicy } from './policy.js';
 import { OntologyService } from './service.js';
 
 const ir = loadIr();
@@ -17,10 +17,13 @@ async function service(decision: unknown, status = 200) {
     }
     return db.query(text, params);
   };
-  const fetchImpl = vi.fn(async () => new Response(JSON.stringify(decision), { status }));
-  const svc = new OntologyService({ query, connect: async () => ({ query, release: () => undefined }) } as unknown as pg.Pool, ir, opaPolicy(ir, { url: 'http://opa:8181', token: 't' }, fetchImpl as unknown as typeof fetch));
+  // a stand-in for the embedded engine: returns the given decision, records the inputs
+  const r = (decision as { result?: { allow?: boolean; reason?: string; obligations?: string[] } }).result;
+  const decide = vi.fn((_entry: string, _input: unknown) => (status === 200 && r && typeof r.allow === 'boolean' ? { allow: r.allow, reason: r.reason ?? '', obligations: r.obligations ?? [] } : { allow: false, reason: status !== 200 ? 'no policy loaded yet (fail closed)' : 'the policy returned no decision (fail closed)', obligations: [] }));
+  const fetchImpl = { mock: { calls: [] as unknown[] } };
+  const svc = new OntologyService({ query, connect: async () => ({ query, release: () => undefined }) } as unknown as pg.Pool, ir, wasmPolicy({ decide }));
   await svc.init();
-  return { svc, db, fetchImpl };
+  return { svc, db, fetchImpl, decide };
 }
 
 describe('touched objects', () => {
@@ -33,12 +36,12 @@ describe('touched objects', () => {
 });
 
 describe('object policy in the pipeline', () => {
-  it('sends action, caller (incl. step) and objects to OPA', async () => {
-    const { svc, fetchImpl } = await service({ result: { allow: true, reason: 'allowed', obligations: [] } });
+  it('evaluates action, caller (incl. step) and objects with the embedded policy', async () => {
+    const { svc, decide } = await service({ result: { allow: true, reason: 'allowed', obligations: [] } });
     const out = await svc.execute('cancel_purchase_order', { poId: 'PO-4418', reason: 'x' }, { agent: 'sofa-lara', task: 't-1', step: 'run' });
     expect(out.isError).toBe(false);
-    const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body.input).toMatchObject({ action: 'cancel_purchase_order', caller: { agent: 'sofa-lara', task: { id: 't-1', step: 'run' } }, objects: [{ class: 'PurchaseOrder', id: 'PO-4418', criticality: 'payment_critical' }] });
+    expect(decide.mock.calls[0]![0]).toBe('liquid/object/decision');
+    expect(decide.mock.calls[0]![1]).toMatchObject({ action: 'cancel_purchase_order', caller: { agent: 'sofa-lara', task: { id: 't-1', step: 'run' } }, objects: [{ class: 'PurchaseOrder', id: 'PO-4418', criticality: 'payment_critical' }] });
   });
 
   it('require_four_eyes: nothing changes, an approval request event is recorded', async () => {
@@ -60,10 +63,12 @@ describe('object policy in the pipeline', () => {
     expect((await a.svc.execute('update_campaign', { campaignId: 'CMP-HERBST', dailyBudgetPct: 10 })).text).toMatch(/step-up/);
     const b = await service({ result: { allow: false, reason: 'overlay ov-1: frozen', obligations: [] } });
     expect(await b.svc.execute('get_kpi', {})).toMatchObject({ isError: true, denied: true, text: 'Denied by policy: overlay ov-1: frozen' });
+    const ev = (await b.db.query<{ type: string; payload: { reason: string } }>("SELECT type, payload FROM events WHERE type = 'PolicyDecision'")).rows;
+    expect(ev).toMatchObject([{ type: 'PolicyDecision', payload: { reason: 'overlay ov-1: frozen' } }]);
   });
 
   it.each([
-    ['HTTP 401', { error: 'x' }, 401, /HTTP 401/],
+    ['no policy loaded', { error: 'x' }, 401, /no policy loaded/],
     ['no decision', {}, 200, /no decision/],
   ])('fail closed: %s', async (_n, body, status, reason) => {
     const { svc } = await service(body, status);

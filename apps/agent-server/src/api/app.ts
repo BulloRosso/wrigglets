@@ -39,6 +39,15 @@ export function createApp(deps: ApiDeps, auth: Auth): Express {
     if (!token || req.header('authorization') !== `Bearer ${token}`) return void res.status(401).json({ error: 'unauthorized' });
     next();
   };
+  // application audit for the control plane (Liquid Enterprise forwards it into the event log, ADR-0049)
+  app.get('/internal/app-audit', controlPlane, async (req, res, next) => {
+    try {
+      const since = typeof req.query.since === 'string' ? req.query.since : '';
+      res.json((await deps.audit.find((e) => e.at > since, 500)).reverse());
+    } catch (err) {
+      next(err);
+    }
+  });
   const agentsMd = agentsMdHandlers(deps);
   app.get('/internal/agents-md', controlPlane, agentsMd.get);
   app.put('/internal/agents-md', controlPlane, express.json({ limit: '512kb' }), (req, res, next) => {

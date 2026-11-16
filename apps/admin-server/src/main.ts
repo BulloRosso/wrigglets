@@ -32,6 +32,7 @@ import { DraftStore } from './liquid/drafts.js';
 import { storeTargets } from './liquid/targets.js';
 import { readTree } from './liquid/seed.js';
 import { PlaybookService } from './liquid/playbooks.js';
+import { EventFeed } from './liquid/eventFeed.js';
 
 /**
  * Control plane process of the "temporal" container:
@@ -118,12 +119,18 @@ async function main() {
   await signals.load();
   // Optional extensions installed from the admin console (ADR-0039)
   const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
-  // Liquid Enterprise policy as code (ADR-0044): overlays + OPA bundle; the gateway gets OPA's address while installed
+  // Liquid Enterprise policy as code (ADR-0044/0049): overlays + the policy package (Rego → WASM) for gateway and core
   const here = path.dirname(fileURLToPath(import.meta.url));
   const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(here, '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
   const ontologyDir = [config.LIQUID_ONTOLOGY_DIR, path.resolve(here, '../../../ontology')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_ONTOLOGY_DIR;
   const liquidCtx = { url: (s: string) => extensions.url(LIQUID_ID, s), secret: (n: string) => extensions.secret(LIQUID_ID, n) ?? '' };
-  const liquidPolicy = new LiquidPolicyService(config.DATA_DIR, policyDir, () => ontologyCall(liquidCtx, 'GET', '/internal/opa/data'), () => extensions.secret(LIQUID_ID, 'opa_query_token'));
+  const liquidPolicy = new LiquidPolicyService(
+    config.DATA_DIR,
+    policyDir,
+    () => ontologyCall(liquidCtx, 'GET', '/internal/opa/data'),
+    (files) => compilerCall('/build-wasm', { files }),
+    async () => ontologyCall(liquidCtx, 'GET', '/internal/policy/decisions?limit=50'),
+  );
   await liquidPolicy.load();
   // Config repository (ADR-0046): desired state in Git, outside /data/admin; reconciled into the stores while installed
   const compilerCall = async <T>(p: string, body: unknown): Promise<T> => {
@@ -210,13 +217,26 @@ async function main() {
     audit,
   });
   playbooks.start(() => extensions.isInstalled(LIQUID_ID));
+  // event log as the one source of truth (ADR-0049): audit trails and reconcile runs become events
+  const appendEvents = async (events: unknown[]) => void (await ontologyCall(liquidCtx, 'POST', '/internal/events', { events }));
+  configRepo.onReconciled = (r) => void appendEvents([{ type: 'ConfigReconciled', objectType: 'ConfigRepository', objectId: r.head.slice(0, 12), actorUser: 'reconciler', payload: r }]).catch(() => undefined);
+  const eventFeed = new EventFeed(config.DATA_DIR, {
+    adminAudit: () => audit.list(500),
+    gatewayAudit: async () => (await gateway.gatewayCall<Array<Record<string, unknown> & { at: string; agentId: string; tool: string; outcome: string }>>('/internal/audit?limit=1000')) ?? undefined,
+    agents: () => registry.list().map((a) => a.agentId),
+    agentAudit: async (agentId, since) => {
+      const entry = registry.get(agentId);
+      if (!entry) return undefined;
+      const res = await fetch(`${runtime.internalUrl(agentId)}/internal/app-audit?since=${encodeURIComponent(since)}`, { headers: { authorization: `Bearer ${entry.secrets.internalToken}` }, signal: AbortSignal.timeout(5000) });
+      return res.ok ? ((await res.json()) as Array<{ at: string; by: string; action: string; target: string; details?: Record<string, unknown> }>) : undefined;
+    },
+    append: appendEvents,
+    enabled: () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID),
+  });
+  await eventFeed.load();
+  eventFeed.start();
   safety.onTrip = (t) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'safety_metric', data: t }, 'safety-rules') : undefined);
-  gateway.opaProvider = () => {
-    if (!extensions.isInstalled(LIQUID_ID)) return undefined;
-    const raw = extensions.secret(LIQUID_ID, 'opa_query_token');
-    if (!raw) return undefined;
-    return { url: 'http://opa:8181', token: secrets && !liquidOverlay(config).active ? { secretRef: vaultSecretRef(LIQUID_ID, 'opa_query_token') } : raw };
-  };
+  gateway.policyProvider = () => (extensions.isInstalled(LIQUID_ID) ? { url: 'http://temporal:8080/internal/liquid/policy' } : undefined);
   const avatars = new AvatarService({
     dataDir: config.DATA_DIR,
     defaultReference: config.AVATAR_DEFAULT_REFERENCE,

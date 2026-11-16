@@ -104,13 +104,15 @@ describe('action pipeline', () => {
     expect((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM projection.purchase_order WHERE id = 'PO-4430'")).rows[0]!.n).toBe(0);
   });
 
-  it('the policy hook can deny (fail closed); nothing is written', async () => {
+  it('the policy hook can deny (fail closed); no business change, the denial is an event', async () => {
     const deny: PolicyHook = async () => ({ allow: false, reason: 'tools_off' });
     const s2 = new OntologyService(poolOf(db), loadIr(), deny);
     await s2.init();
     const out = await s2.execute('cancel_purchase_order', { poId: 'PO-4411', reason: 'x' });
     expect(out).toMatchObject({ isError: true, denied: true, text: 'Denied by policy: tools_off' });
-    expect(await events()).toBe(0);
+    const ev = (await db.query<{ type: string; payload: Record<string, unknown> }>('SELECT type, payload FROM events')).rows;
+    expect(ev).toMatchObject([{ type: 'PolicyDecision', payload: { point: 'object', allow: false, reason: 'tools_off' } }]);
+    expect(ev[0]!.payload.changes).toBeUndefined();
   });
 });
 

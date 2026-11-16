@@ -87,7 +87,7 @@ describe('install plan', () => {
   const m = extensionManifest.parse(base);
 
   it('orders steps: preflight, secrets, volumes, services by dependency, bootstrap, upstreams', () => {
-    expect(installSteps(m, { seedDemo: false }).map((s) => s.id)).toEqual(['preflight', 'secrets', 'volumes', 'service:db', 'service:server', 'bootstrap:migrate', 'upstreams']);
+    expect(installSteps(m, { seedDemo: false }).map((s) => s.id)).toEqual(['preflight', 'secrets', 'volumes', 'service:db', 'service:server', 'retired', 'bootstrap:migrate', 'upstreams']);
     expect(installSteps(m, { seedDemo: true }).map((s) => s.id)).toContain('bootstrap:seed');
   });
 

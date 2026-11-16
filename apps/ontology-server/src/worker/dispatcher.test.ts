@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
-import { createActivities } from './activities.js';
+import { describe, expect, it } from 'vitest';
 import { commandsFor, objectsOf, type DispatchEvent, type IrActionLite } from './dispatcher.js';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const ir = JSON.parse(readFileSync(path.join(root, 'packages/ontology-sofa/ir/ontology.ir.json'), 'utf8')) as { actions: IrActionLite[] };
 const actions = new Map(ir.actions.map((a) => [a.name, a]));
 const cfg = { today: '2026-10-05', msPerSimDay: 1000, releaseAfterMs: 5000, approvalReminderMs: 60_000, approvalExpireMs: 120_000 };
@@ -45,27 +44,5 @@ describe('dispatcher', () => {
 
   it('objectsOf resolves class-typed and multi-valued inputs', () => {
     expect(objectsOf(actions.get('send_customer_notice'), { customerId: 'C-01', orderIds: ['SO-1', 'SO-2'] })).toEqual(['Customer:C-01', 'SalesOrder:SO-1', 'SalesOrder:SO-2']);
-  });
-});
-
-describe('activities', () => {
-  const f = vi.fn();
-  const acts = createActivities({ ontologyUrl: 'http://onto:7710/', token: 'tok', fetchImpl: f as unknown as typeof fetch });
-
-  it('runAction posts the args with caller fields; business refusals are results, 5xx throws (retry)', async () => {
-    f.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, result: '{}', seq: 7 }), { status: 200 }));
-    expect(await acts.runAction({ action: 'release_purchase_order', args: { poId: 'PO-1' }, caller: { workflow: 'wf-1', approvedBy: 'ben@x' } })).toEqual({ ok: true, result: '{}', seq: 7 });
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://onto:7710/actions/release_purchase_order');
-    expect(JSON.parse(init.body as string)).toEqual({ poId: 'PO-1', _workflow: 'wf-1', _approvedBy: 'ben@x' });
-    f.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, result: 'PO-1 is cancelled' }), { status: 422 }));
-    expect(await acts.runAction({ action: 'release_purchase_order', args: { poId: 'PO-1' }, caller: {} })).toEqual({ ok: false, result: 'PO-1 is cancelled', seq: undefined });
-    f.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'db down' }), { status: 500 }));
-    await expect(acts.runAction({ action: 'x_y', args: {}, caller: {} })).rejects.toThrow(/500/);
-  });
-
-  it('getObject returns null for 404', async () => {
-    f.mockResolvedValueOnce(new Response('{}', { status: 404 }));
-    expect(await acts.getObject({ cls: 'PurchaseOrder', id: 'PO-9' })).toBeNull();
   });
 });

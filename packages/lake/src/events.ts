@@ -134,6 +134,11 @@ export class EventStore {
     return events.map((e) => (fresh.has(e.eventId) ? { eventId: e.eventId, seq: fresh.get(e.eventId)!, duplicate: false } : { eventId: e.eventId, seq: existing.get(e.eventId)!, duplicate: true }));
   }
 
+  /** Read-only query over the event log (audit, decisions): audit is a query over the event log (ADR-0049). */
+  async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+    return (await this.db.query(sql, params)).rows as T[];
+  }
+
   /** Events with seq > after, in seq order. */
   async readAfter(after: number, limit = 1000): Promise<StoredEvent[]> {
     const r = await this.db.query<Row>(`SELECT ${COLS} FROM events WHERE seq > $1 ORDER BY seq LIMIT $2`, [after, limit]);

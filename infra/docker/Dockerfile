@@ -38,7 +38,6 @@ COPY apps/mcp-web/package.json apps/mcp-web/
 COPY apps/mcp-wiki/package.json apps/mcp-wiki/
 COPY apps/signals-hub/package.json apps/signals-hub/
 COPY apps/ontology-server/package.json apps/ontology-server/
-COPY apps/business-worker/package.json apps/business-worker/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/signals/package.json packages/signals/
@@ -55,6 +54,7 @@ COPY packages/ontology-codegen/package.json packages/ontology-codegen/
 COPY packages/ontology-sofa/package.json packages/ontology-sofa/
 COPY packages/business-workflows/package.json packages/business-workflows/
 COPY packages/playbooks/package.json packages/playbooks/
+COPY packages/policy-wasm/package.json packages/policy-wasm/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY apps apps
 COPY packages packages
@@ -69,8 +69,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web && \
     pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki && \
     pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub && \
-    pnpm --filter @cw/ontology-server deploy --legacy --prod /out/ontology-server && \
-    pnpm --filter @cw/business-worker deploy --legacy --prod /out/business-worker
+    pnpm --filter @cw/ontology-server deploy --legacy --prod /out/ontology-server
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway
@@ -115,7 +114,8 @@ EXPOSE 7700
 CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- ontology-server (Liquid Enterprise, ADR-0040)
-# Event log + lake (DuckLake via embedded DuckDB 2). The ducklake and postgres extensions are installed at build time,
+# Enterprise core (ADR-0049): event log + lake (DuckLake via embedded DuckDB 2), ontology at runtime, embedded policy,
+# business worker (pre-bundled workflows in dist/workflow-bundle.js). The ducklake and postgres extensions are installed at build time,
 # so the server never downloads code at runtime.
 FROM ${NODE_IMAGE} AS ontology-server
 RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
@@ -127,19 +127,6 @@ USER node
 RUN node -e "import('@duckdb/node-api').then(async ({ DuckDBInstance }) => { const c = await (await DuckDBInstance.create(':memory:')).connect(); await c.run('INSTALL ducklake; INSTALL postgres;'); console.log('duckdb extensions installed'); })"
 VOLUME ["/lake"]
 EXPOSE 7710
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["node", "dist/main.js"]
-
-# ---------------------------------------------------------------- business-worker (Liquid Enterprise, ADR-0045)
-# Temporal worker for namespace `business` + event dispatcher; the workflow code is pre-bundled (dist/workflow-bundle.js).
-FROM ${NODE_IMAGE} AS business-worker
-RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY --from=build /out/business-worker ./
-ENV NODE_ENV=production DATA_DIR=/data
-RUN mkdir -p /data && chown node:node /data
-USER node
-VOLUME ["/data"]
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "dist/main.js"]
 

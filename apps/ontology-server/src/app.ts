@@ -25,6 +25,8 @@ import { OntologyService } from './service.js';
  */
 
 export interface AppDeps {
+  /** Embedded policy engine (status for /health and the console). */
+  engine?: { loaded: boolean; revision?: string; loadedAt?: string; lastError?: string };
   store: EventStore;
   lake: Lake;
   svc: OntologyService;
@@ -162,6 +164,55 @@ export function createApp(d: AppDeps) {
   );
   /** Generated OPA data (data.liquid.ontology) for the policy bundle the control plane builds (ADR-0044). */
   internal.get('/opa/data', (_req, res) => res.json(opaData(d.svc.ir)));
+  // policy decisions are events (ADR-0049): object-level denials of this core and the gateway's policy decisions
+  internal.get(
+    '/policy/decisions',
+    wrap(async (req, res) => {
+      const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
+      const r = await d.store.query(`SELECT occurred_at, type, action, actor_agent, actor_user, payload FROM events WHERE type = 'PolicyDecision' OR (type = 'GatewayToolCall' AND payload ? 'policy') ORDER BY seq DESC LIMIT $1`, [limit]);
+      res.json(
+        r.map((e) => ({
+          at: new Date(e.occurred_at as string).toISOString(),
+          path: e.type === 'PolicyDecision' ? 'liquid/object/decision' : 'liquid/gateway/decision',
+          allow: (e.payload as { allow?: boolean; outcome?: string }).allow ?? (e.payload as { outcome?: string }).outcome !== 'denied',
+          reason: (e.payload as { reason?: string; policyReason?: string }).reason ?? (e.payload as { policyReason?: string }).policyReason ?? null,
+          obligations: (e.payload as { obligations?: string[] }).obligations ?? [],
+          input: { agent: e.actor_agent ?? undefined, action: e.action ?? undefined, tool: (e.payload as { tool?: string }).tool, caller: e.actor_user ?? undefined },
+        })),
+      );
+    }),
+  );
+  /** Audit as a query over the event log (ADR-0049): types, actor (agent or person), object, text, time, limit. */
+  internal.get(
+    '/events/query',
+    wrap(async (req, res) => {
+      const q = (k: string) => (typeof req.query[k] === 'string' && (req.query[k] as string).trim() ? (req.query[k] as string).trim() : undefined);
+      const where: string[] = [];
+      const params: unknown[] = [];
+      const p = (v: unknown) => {
+        params.push(v);
+        return '$' + params.length;
+      };
+      if (q('types')) where.push('type = ANY(' + p(q('types')!.split(',').map((x) => x.trim())) + '::text[])');
+      if (q('actor')) {
+        const ph = p(q('actor'));
+        where.push('(actor_agent = ' + ph + ' OR actor_user = ' + ph + ')');
+      }
+      if (q('object')) {
+        const ph = p(q('object'));
+        where.push('(object_id = ' + ph + ' OR object_type = ' + ph + ')');
+      }
+      if (q('q')) where.push('payload::text ILIKE ' + p('%' + q('q') + '%'));
+      if (q('since')) where.push('occurred_at >= ' + p(q('since')) + '::timestamptz');
+      if (q('before')) where.push('seq < ' + p(Number(q('before'))));
+      const limit = Math.min(Number(q('limit') ?? 100) || 100, 500);
+      const sql = 'SELECT seq, event_id, type, object_type, object_id, action, actor_agent, actor_user, task_id, workflow_id, occurred_at, ontology_version, payload FROM events ' + (where.length ? 'WHERE ' + where.join(' AND ') : '') + ' ORDER BY seq DESC LIMIT ' + limit;
+      const rows = await d.store.query(sql, params);
+      const types = await d.store.query<{ type: string; n: number }>('SELECT type, count(*)::int AS n FROM events GROUP BY type ORDER BY n DESC');
+      res.json({ events: rows, types });
+    }),
+  );
+  internal.get('/policy/engine', (_req, res) => res.json(d.engine ?? { loaded: false }));
   // ontology evolution (ADR-0048): versions, check and live apply of a new IR, the SDK of the version in force
   internal.get('/ontology/versions', wrap(async (_req, res) => res.json(await d.svc.versions())));
   internal.post('/ontology/check', wrap(async (req, res) => res.json(await d.svc.check(req.body?.ir))));

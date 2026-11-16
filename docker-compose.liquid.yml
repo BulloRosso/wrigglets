@@ -16,35 +16,11 @@ services:
       LIQUID_ONTOLOGY_DB_PASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_DB_PASSWORD}
       LIQUID_ONTOLOGY_INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_INTERNAL_TOKEN}
       LIQUID_ONTOLOGY_MCP_TOKEN: ${LIQUID_ONTOLOGY_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_MCP_TOKEN}
-      LIQUID_OPA_BUNDLE_TOKEN: ${LIQUID_OPA_BUNDLE_TOKEN:?run scripts/stack.mjs env to add LIQUID_OPA_BUNDLE_TOKEN}
-      LIQUID_OPA_QUERY_TOKEN: ${LIQUID_OPA_QUERY_TOKEN:?run scripts/stack.mjs env to add LIQUID_OPA_QUERY_TOKEN}
+      LIQUID_POLICY_TOKEN: ${LIQUID_POLICY_TOKEN:?run scripts/stack.mjs env to add LIQUID_POLICY_TOKEN}
       LIQUID_CONFIG_MCP_TOKEN: ${LIQUID_CONFIG_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_CONFIG_MCP_TOKEN}
       LIQUID_COMPILER_TOKEN: ${LIQUID_COMPILER_TOKEN:?run scripts/stack.mjs env to add LIQUID_COMPILER_TOKEN}
       LIQUID_PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?run scripts/stack.mjs env to add LIQUID_PLAYBOOK_TOKEN}
       LIQUID_ALERTS_TOKEN: ${LIQUID_ALERTS_TOKEN:?run scripts/stack.mjs env to add LIQUID_ALERTS_TOKEN}
-
-  opa:
-    image: openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3
-    container_name: cw-liquid-opa
-    hostname: opa
-    restart: unless-stopped
-    command:
-      - "run"
-      - "--server"
-      - "--addr=0.0.0.0:8181"
-      - "--authentication=token"
-      - "--authorization=basic"
-      - "--set=services.cp.url=http://temporal:8080/internal/liquid/opa"
-      - "--set=services.cp.credentials.bearer.token=${LIQUID_OPA_BUNDLE_TOKEN:?}"
-      - "--set=bundles.liquid.service=cp"
-      - "--set=bundles.liquid.resource=bundle.tar.gz"
-      - "--set=bundles.liquid.polling.min_delay_seconds=5"
-      - "--set=bundles.liquid.polling.max_delay_seconds=10"
-      - "--set=decision_logs.service=cp"
-      - "--set=decision_logs.resource=logs"
-      - "--set=decision_logs.reporting.min_delay_seconds=5"
-      - "--set=decision_logs.reporting.max_delay_seconds=10"
-    networks: [coworking]
 
   ontology-db:
     image: postgres:17.6-alpine
@@ -80,14 +56,17 @@ services:
       PGPASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?}
       INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?}
       MCP_TOKEN: ${LIQUID_ONTOLOGY_MCP_TOKEN:?}
-      POLICY_MODE: opa
-      OPA_URL: http://opa:8181
-      OPA_TOKEN: ${LIQUID_OPA_QUERY_TOKEN:?}
+      POLICY_MODE: wasm
+      POLICY_URL: http://temporal:8080/internal/liquid/policy
+      POLICY_TOKEN: ${LIQUID_POLICY_TOKEN:?}
+      BUSINESS_WORKER: "on"
+      TEMPORAL_ADDRESS: temporal:7233
+      CONTROL_PLANE_URL: http://temporal:8080
+      PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?}
       LAKE_DATA_PATH: /lake/
       FLUSH_INTERVAL_SEC: "0"
     depends_on:
       ontology-db: { condition: service_healthy }
-      opa: { condition: service_started }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7710/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
@@ -111,27 +90,6 @@ services:
       retries: 12
     networks: [coworking]
 
-  # Business workflows (ADR-0045): Temporal namespace `business`, event dispatcher, lake-flush schedule.
-  # The namespace is created by the control plane (bootstrap step business-namespace); the worker waits for it.
-  business-worker:
-    build: { context: ., dockerfile: infra/docker/Dockerfile, target: business-worker }
-    image: coworking/business-worker:local
-    container_name: cw-liquid-business-worker
-    hostname: business-worker
-    restart: unless-stopped
-    volumes:
-      - liquid-business-worker-data:/data
-    environment:
-      TEMPORAL_ADDRESS: temporal:7233
-      ONTOLOGY_URL: http://ontology-server:7710
-      INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?}
-      CONTROL_PLANE_URL: http://temporal:8080
-      PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?}
-    depends_on:
-      ontology-server: { condition: service_healthy }
-    networks: [coworking]
-
 volumes:
   liquid-ontology-db-data:
   liquid-lake-data:
-  liquid-business-worker-data:

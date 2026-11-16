@@ -20,7 +20,11 @@ steps.push(['test', ...pnpm('--workspace-concurrency=1', 'run', 'test')]);
 export const OPA_IMAGE = 'openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3';
 if (existsSync(path.join(root, 'policies', 'liquid'))) {
   const docker = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], { encoding: 'utf8' }).stdout?.trim();
-  if (docker) steps.push(['opa test', 'docker', ['run', '--rm', '-v', `${root.split(path.sep).join('/')}:/w:ro`, '-w', '/w', OPA_IMAGE, 'test', 'policies', 'packages/ontology-sofa/generated/opa']]);
+  // fixtures (ontology data + generated ontology test) are computed from the IR (ADR-0049), written to .local/
+  if (docker) {
+    steps.push(['opa fixtures', 'node', ['scripts/liquid/opa-fixtures.mjs', '.local/opa-fixtures']]);
+    steps.push(['opa test', 'docker', ['run', '--rm', '-v', `${root.split(path.sep).join('/')}:/w:ro`, '-w', '/w', OPA_IMAGE, 'test', 'policies', '.local/opa-fixtures']]);
+  }
   else console.log('note: Docker is not running, skipping opa test');
 }
 if (existsSync(path.join(root, 'scripts', 'liquid', 'check-generated.mjs'))) steps.push(['generated files up to date', 'node', ['scripts/liquid/check-generated.mjs']]);

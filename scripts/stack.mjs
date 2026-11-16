@@ -48,6 +48,7 @@ const laterSecrets = () => ({
   LIQUID_CONFIG_MCP_TOKEN: secret(32),
   LIQUID_COMPILER_TOKEN: secret(32),
   LIQUID_PLAYBOOK_TOKEN: secret(32),
+  LIQUID_POLICY_TOKEN: secret(32),
   LIQUID_ALERTS_TOKEN: secret(32),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
@@ -120,7 +121,7 @@ function readEnv() {
 }
 
 /** Compose services of the Liquid Enterprise images built locally (grows per milestone). */
-const LIQUID_BUILD_SERVICES = ['ontology-server', 'business-worker', 'ontology-compiler'];
+const LIQUID_BUILD_SERVICES = ['ontology-server', 'ontology-compiler'];
 
 function build() {
   ensureEnv();

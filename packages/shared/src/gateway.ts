@@ -63,8 +63,11 @@ export interface GatewayConfig {
   agents: GatewayAgentConfig[];
   upstreams: UpstreamServer[];
   limits: GatewayLimits;
-  /** OPA decision endpoint for upstreams with policy `opa` (present while Liquid Enterprise is installed). */
-  opa?: { url: string; token: UpstreamHeaderValue };
+  /**
+   * Liquid Enterprise policy package for upstreams with policy `opa` (present while Liquid is installed, ADR-0049):
+   * the gateway fetches the compiled policy (WASM + data) from this control-plane URL with its gateway token.
+   */
+  policyPackage?: { url: string };
 }
 
 export const DEFAULT_GATEWAY_LIMITS: GatewayLimits = { callsPerMinute: 60, maxArgBytes: 64 * 1024, callTimeoutMs: 60_000 };

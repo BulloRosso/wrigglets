@@ -103,6 +103,8 @@ export class ConfigRepoService {
   private timer?: NodeJS.Timeout;
   /** Called after main changed through a proposal or a reconcile applied something (e.g. to rebuild the OPA bundle). */
   onApplied?: () => void;
+  /** A reconcile that changed something or failed (recorded as an event, ADR-0049). */
+  onReconciled?: (r: { head: string; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> }) => void;
   /** Applies the ontology of a domain to the ontology server when its files changed (M8). Returns a change summary. */
   onOntology?: (domain: string, files: { 'schema.yaml': string; 'actions.yaml': string; 'bindings.yaml': string }, note?: string) => Promise<string | undefined>;
 
@@ -211,6 +213,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       if (!state || errors.length) {
         this.meta.lastReconcile = { at: new Date().toISOString(), head, ok: false, changes: [], errors };
         await this.persist();
+        this.onReconciled?.({ head, ok: false, changes: [], errors });
         return { ok: false, head, errors };
       }
       const changes = await this.targets.apply(state, by);
@@ -229,6 +232,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
           } catch (err) {
             this.meta.lastReconcile = { at: new Date().toISOString(), head, ok: false, changes, errors: [{ path: `ontology/${d}`, message: (err as Error).message }] };
             await this.persist();
+            this.onReconciled?.({ head, ok: false, changes, errors: this.meta.lastReconcile.errors });
             return { ok: false, head, errors: this.meta.lastReconcile.errors };
           }
         }
@@ -237,6 +241,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       this.meta.lastReconcile = { at: new Date().toISOString(), head, ok: true, changes, errors: [] };
       await this.persist();
       if (changes.length || force) this.onApplied?.();
+      if (changes.length) this.onReconciled?.({ head, ok: true, changes, errors: [] });
       return { ok: true, head, changes };
     });
   }

@@ -1,50 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { UpstreamServer } from '@cw/shared';
-import { askOpa, gatewayVerdict, interpret, opaInput } from './opa.js';
+import { describe, expect, it } from 'vitest';
+import { PolicyEngine } from '@cw/policy-wasm';
+import { decide, gatewayVerdict, opaInput } from './opa.js';
 
-const upstream: UpstreamServer = { name: 'erp', url: 'http://ontology-server:7710/erp/mcp', headers: {}, enabled: true, auth: 'static', oboFallback: 'deny', policy: 'opa' };
-const input = opaInput({ agentId: 'sofa-lara', tool: 'erp__create_purchase_order', upstream, ctx: { taskId: 't-1', phase: 'run', interactive: false, requestedBy: { upn: 'stefan@x' } }, killSwitch: 'normal' });
-const opa = { url: 'http://opa:8181', token: { secretRef: 'ext-liquid-opa-query-token-raw' } };
-const resolve = async () => 'tok';
+const upstream = { name: 'erp', url: 'http://x', headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'opa' as const };
 
-describe('OPA input', () => {
-  it('derives the action from the tool name and carries task step and user', () => {
-    expect(input).toEqual({ agent: { id: 'sofa-lara' }, user: { upn: 'stefan@x', oid: undefined }, tool: 'erp__create_purchase_order', upstream: 'erp', action: 'create_purchase_order', task: { id: 't-1', step: 'run', interactive: false }, killSwitch: 'normal' });
+describe('gateway policy (embedded)', () => {
+  it('builds the decision input from the call', () => {
+    expect(opaInput({ agentId: 'sofa-max', tool: 'erp__request_overtime', upstream, ctx: { taskId: 't-1', phase: 'run', requestedBy: { upn: 'paula@x' } }, killSwitch: 'normal' })).toEqual({
+      agent: { id: 'sofa-max' },
+      user: { upn: 'paula@x', oid: undefined },
+      tool: 'erp__request_overtime',
+      upstream: 'erp',
+      action: 'request_overtime',
+      task: { id: 't-1', step: 'run', interactive: false },
+      killSwitch: 'normal',
+    });
   });
-});
-
-describe('fail closed', () => {
-  it.each([
-    ['no OPA configured', undefined, undefined, /no policy engine is configured/],
-    ['OPA unreachable', opa, () => Promise.reject(new Error('ECONNREFUSED')), /not reachable/],
-    ['HTTP 403 (wrong token)', opa, async () => new Response('{}', { status: 403 }), /HTTP 403/],
-    ['no decision (bundle not loaded)', opa, async () => new Response('{}', { status: 200 }), /no decision/],
-    ['malformed decision', opa, async () => new Response('{"result":{"allow":"yes"}}', { status: 200 }), /no decision/],
-  ])('%s → deny', async (_n, cfg, fetchImpl, reason) => {
-    const d = await askOpa(cfg, input, resolve, { fetchImpl: fetchImpl as typeof fetch });
-    expect(d.allow).toBe(false);
-    expect(d.reason).toMatch(reason);
+  it('fails closed without a policy package or before it is loaded', () => {
+    const input = opaInput({ agentId: 'a', tool: 'erp__x', upstream, killSwitch: 'normal' });
+    expect(decide(undefined, true, input)).toMatchObject({ allow: false });
+    expect(decide(new PolicyEngine(), false, input)).toMatchObject({ allow: false, reason: expect.stringMatching(/no policy package/) });
+    expect(decide(new PolicyEngine(), true, input)).toMatchObject({ allow: false, reason: expect.stringMatching(/fail closed/) });
   });
-
-  it('a token that cannot be resolved denies', async () => {
-    const d = await askOpa(opa, input, async () => Promise.reject(new Error('no Key Vault')), { fetchImpl: vi.fn() as unknown as typeof fetch });
-    expect(d).toMatchObject({ allow: false });
-  });
-});
-
-describe('decisions', () => {
-  it('posts the input with the bearer token to the gateway decision', async () => {
-    const f = vi.fn(async () => new Response(JSON.stringify({ result: { allow: true, reason: 'allowed', obligations: [] } }), { status: 200 }));
-    const d = await askOpa(opa, input, resolve, { fetchImpl: f as unknown as typeof fetch });
-    expect(d).toEqual({ allow: true, reason: 'allowed', obligations: [] });
-    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('http://opa:8181/v1/data/liquid/gateway/decision');
-    expect((init.headers as Record<string, string>).authorization).toBe('Bearer tok');
-    expect(JSON.parse(init.body as string)).toEqual({ input });
-  });
-
-  it('denials pass on their reason; obligations are allowed through and audited (enforced at object level)', () => {
-    expect(gatewayVerdict(interpret(200, { result: { allow: false, reason: 'agent sofa-horst has no role', obligations: [] } }))).toEqual({ allowed: false, reason: 'agent sofa-horst has no role', obligations: [] });
-    expect(gatewayVerdict(interpret(200, { result: { allow: true, reason: 'allowed', obligations: ['require_four_eyes'] } }))).toEqual({ allowed: true, reason: 'allowed', obligations: ['require_four_eyes'] });
+  it('denials are enforced, obligations only recorded', () => {
+    expect(gatewayVerdict({ allow: false, reason: 'agent sofa-horst has no role', obligations: [] })).toEqual({ allowed: false, reason: 'agent sofa-horst has no role', obligations: [] });
+    expect(gatewayVerdict({ allow: true, reason: 'allowed', obligations: ['require_four_eyes'] })).toEqual({ allowed: true, reason: 'allowed', obligations: ['require_four_eyes'] });
   });
 });

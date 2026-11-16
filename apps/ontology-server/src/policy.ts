@@ -6,7 +6,8 @@ import type { PolicyHook } from './service.js';
 /*
  * Object-level enforcement point (ADR-0044): data.liquid.object.decision with the objects the action touches — every
  * input field whose range is a class, resolved in the current state — and their classification from the ontology.
- * Fail closed: OPA unreachable, an error or no decision deny the action (reads included).
+ * Evaluated in-process by the embedded engine (ADR-0049). Fail closed: no policy loaded, an error or no decision deny
+ * the action (reads included).
  */
 
 export interface TouchedObject {
@@ -35,22 +36,11 @@ export function touchedObjects(ir: OntologyIr, action: string, args: Record<stri
   return out;
 }
 
-export function opaPolicy(_builtin: OntologyIr, opa: { url: string; token: string; timeoutMs?: number }, fetchImpl: typeof fetch = fetch): PolicyHook {
+/** Object-level policy evaluated in-process (Rego compiled to WASM, ADR-0049). Fail closed (the engine denies when empty). */
+export function wasmPolicy(engine: { decide(entry: string, input: unknown): { allow: boolean; reason: string; obligations: string[] } }): PolicyHook {
   return async ({ action, caller, args, ir, objects }) => {
     const input = { action, caller: { agent: caller.agent ?? null, user: caller.user ?? null, approved_by: caller.approvedBy ?? null, workflow: caller.workflow ?? null, task: { id: caller.task ?? null, step: caller.step ?? null } }, objects: touchedObjects(ir, action, args, objects) };
-    try {
-      const res = await fetchImpl(`${opa.url.replace(/\/$/, '')}/v1/data/liquid/object/decision`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${opa.token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ input }),
-        signal: AbortSignal.timeout(opa.timeoutMs ?? 2000),
-      });
-      if (res.status !== 200) return { allow: false, reason: `OPA answered HTTP ${res.status} (fail closed)` };
-      const r = ((await res.json().catch(() => ({}))) as { result?: { allow?: unknown; reason?: unknown; obligations?: unknown } }).result;
-      if (!r || typeof r.allow !== 'boolean') return { allow: false, reason: 'OPA returned no decision — is the policy bundle loaded? (fail closed)' };
-      return { allow: r.allow, reason: typeof r.reason === 'string' ? r.reason : undefined, obligations: Array.isArray(r.obligations) ? r.obligations.map(String) : [] };
-    } catch (err) {
-      return { allow: false, reason: `OPA not reachable: ${String(err).slice(0, 120)} (fail closed)` };
-    }
+    const d = engine.decide('liquid/object/decision', input);
+    return { allow: d.allow, reason: d.reason || undefined, obligations: d.obligations };
   };
 }

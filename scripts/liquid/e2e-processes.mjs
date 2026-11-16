@@ -24,7 +24,8 @@ const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
 const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8' });
 const ONTO = 'cw-ext-liquid-ontology-server';
-const WORKER = 'cw-ext-liquid-business-worker';
+// the business worker runs inside the enterprise core since ADR-0049
+const WORKER = 'cw-ext-liquid-ontology-server';
 
 /** Calls the ontology server's REST API from inside its container (internal token). */
 function onto(method, p, body) {
@@ -62,9 +63,9 @@ try {
     if (x.phase === 'failed') throw new Error(JSON.stringify(x.operation.steps.filter((y) => y.error)));
     return x.phase === 'installed' && x.operation?.finishedAt && x.available ? x : undefined;
   }, 300_000, 3000);
-  check('repair installed the business worker; all services running', st.services.every((x) => x.state === 'running') && st.services.some((x) => x.name === 'business-worker'), st.services.map((x) => `${x.name}=${x.state}`));
+  check('repair: all services running (business worker inside the enterprise core)', st.services.every((x) => x.state === 'running') && !st.services.some((x) => x.name === 'business-worker'), st.services.map((x) => `${x.name}=${x.state}`));
   check('bootstrap step business-namespace ran', st.operation.steps.some((x) => x.id === 'bootstrap:business-namespace' && x.state === 'done'));
-  await until('worker dispatching', async () => /dispatcher starting/.test(docker('logs', WORKER).stdout + docker('logs', WORKER).stderr) || undefined, 180_000, 3000);
+  await until('worker dispatching', async () => /business worker running/.test(docker('logs', WORKER).stdout + docker('logs', WORKER).stderr) || undefined, 180_000, 3000);
   const first = await api('GET', '/liquid/processes');
   check('processes API answers (namespace business reachable)', Array.isArray(first.running), `${first.running.length} running`);
 
@@ -112,7 +113,7 @@ try {
   // 4. worker restart: holds survive, nothing is started twice, new events are dispatched
   const before = (await api('GET', '/liquid/processes')).running.filter((p) => p.type === 'PurchaseOrderRelease').length;
   docker('restart', WORKER);
-  await until('worker back', async () => /dispatcher starting/.test(docker('logs', '--since', '60s', WORKER).stdout + docker('logs', '--since', '60s', WORKER).stderr) || undefined, 120_000, 2000);
+  await until('worker back', async () => /business worker running/.test(docker('logs', '--since', '60s', WORKER).stdout + docker('logs', '--since', '60s', WORKER).stderr) || undefined, 120_000, 2000);
   const after = await until('queries answer after restart', async () => {
     const p = await api('GET', '/liquid/processes');
     return nord.every((id) => runningFor(p, id)?.hold) ? p : undefined;

@@ -24,7 +24,7 @@ const callMock = (name: string, a: Args) => {
     return { text: `Tool failed: ${(e as Error).message}`, isError: true };
   }
 };
-const norm = (s: string) => s.replace(/"at": "[^"]+"/g, '"at": "<t>"');
+const norm = (s: string) => s.replace(/"at": ?"[^"]+"/g, '"at": "<t>"'); // wall-clock timestamps (pretty-printed answers and compact state)
 
 import { PARITY_CALLS as COMMON } from './calls.js';
 

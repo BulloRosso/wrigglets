@@ -2,16 +2,17 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { gunzipSync, gzipSync } from 'node:zlib';
 import { z } from 'zod';
+import { packageRevision, type PolicyPackage } from '@cw/policy-wasm';
 
 /*
- * Policy as code, control-plane side (ADR-0044):
- *   - tightening overlays (data.liquid.overlays): added by admins now, by playbooks from M7 (tighten automatically),
- *     removed only by a person (loosen with approval);
- *   - the OPA bundle: the Rego policies of policies/liquid, the roles, the generated ontology data, the overlays and
- *     OPA's own query token, as a deterministic tar.gz with a content revision (OPA polls it with If-None-Match);
- *   - the last decisions OPA reports (decision logs), for the Policies page.
+ * Policy as code, control-plane side (ADR-0044, embedded since ADR-0049):
+ *   - tightening overlays (data.liquid.overlays): added by admins and playbooks (tighten automatically), removed only
+ *     by a person (loosen with approval);
+ *   - the policy package: the Rego policies of the applied config revision compiled to WebAssembly (compiler service),
+ *     plus the data document (ontology from the enterprise core, roles, overlays), with a content revision. The MCP
+ *     gateway and the enterprise core poll it (ETag) and evaluate it in-process — no OPA service;
+ *   - recent decisions are events in the event log (PolicyDecision, GatewayToolCall), read for the Policies page.
  */
 
 export const overlayInput = z.object({
@@ -46,52 +47,7 @@ export interface DecisionLogEntry {
   input: { agent?: string; action?: string; tool?: string; caller?: string };
 }
 
-/* ---------------------------------------------------------------------------------------------- tar (ustar) */
-
-function header(name: string, size: number): Buffer {
-  const h = Buffer.alloc(512, 0);
-  const w = (s: string, off: number, len: number) => h.write(s, off, len, 'utf8');
-  if (Buffer.byteLength(name) > 100) throw new Error(`bundle path too long: ${name}`);
-  w(name, 0, 100);
-  w('0000644\0', 100, 8);
-  w('0000000\0', 108, 8);
-  w('0000000\0', 116, 8);
-  w(`${size.toString(8).padStart(11, '0')}\0`, 124, 12);
-  w('00000000000\0', 136, 12); // mtime 0: the bundle bytes depend only on its content
-  w('        ', 148, 8);
-  w('0', 156, 1);
-  w('ustar\0', 257, 6);
-  w('00', 263, 2);
-  let sum = 0;
-  for (const b of h) sum += b;
-  w(`${sum.toString(8).padStart(6, '0')}\0 `, 148, 8);
-  return h;
-}
-
-/** A gzip'd tar of the given files (sorted by path; deterministic). */
-export function tarGz(files: Record<string, string>): Buffer {
-  const parts: Buffer[] = [];
-  for (const name of Object.keys(files).sort()) {
-    const data = Buffer.from(files[name]!, 'utf8');
-    parts.push(header(name, data.length), data, Buffer.alloc((512 - (data.length % 512)) % 512, 0));
-  }
-  parts.push(Buffer.alloc(1024, 0));
-  return gzipSync(Buffer.concat(parts), { level: 9 });
-}
-
-/** Reads a tar.gz back into { path: content } (tests and diagnostics). */
-export function untarGz(buf: Buffer): Record<string, string> {
-  const tar = gunzipSync(buf);
-  const out: Record<string, string> = {};
-  for (let off = 0; off + 512 <= tar.length; ) {
-    const name = tar.subarray(off, off + 100).toString('utf8').replace(/\0.*$/s, '');
-    if (!name) break;
-    const size = parseInt(tar.subarray(off + 124, off + 136).toString('utf8').replace(/\0.*$/s, ''), 8);
-    out[name] = tar.subarray(off + 512, off + 512 + size).toString('utf8');
-    off += 512 + Math.ceil(size / 512) * 512;
-  }
-  return out;
-}
+export type CompileWasm = (files: Record<string, string>) => Promise<{ ok: boolean; wasm?: string; errors?: Array<{ path: string; message: string }> }>;
 
 /* ---------------------------------------------------------------------------------------------- service */
 
@@ -99,16 +55,18 @@ export class LiquidPolicyService {
   private overlays: Overlay[] = [];
   private readonly file: string;
   private ontologyData: unknown;
-  private lastBundle?: { revision: string; builtAt: string; files: string[] };
-  private lastFetch?: { at: string; revision: string; notModified: boolean };
-  private decisions: DecisionLogEntry[] = [];
-  onChange?: () => void;
+  private wasm?: { hash: string; wasm: string };
+  private last?: PolicyPackage;
+  private lastError?: string;
+  private fetches = new Map<string, { at: string; revision: string; notModified: boolean }>();
 
   constructor(
     dataDir: string,
     private readonly policyDir: string,
     private readonly fetchOntologyData: () => Promise<unknown>,
-    private readonly queryToken: () => string | undefined,
+    private readonly compileWasm: CompileWasm,
+    /** Recent policy decisions from the event log (PolicyDecision / GatewayToolCall events). */
+    private readonly recentDecisions: () => Promise<DecisionLogEntry[]> = async () => [],
   ) {
     this.file = path.join(dataDir, 'admin', 'liquid-overlays.json');
   }
@@ -121,14 +79,13 @@ export class LiquidPolicyService {
     await mkdir(path.dirname(this.file), { recursive: true });
     await writeFile(`${this.file}.tmp`, JSON.stringify(this.overlays, null, 2));
     await rename(`${this.file}.tmp`, this.file);
-    this.onChange?.();
   }
 
   listOverlays(): Overlay[] {
     return [...this.overlays];
   }
 
-  /** Tightening: always allowed for an authorised caller (admin now, playbooks later). */
+  /** Tightening: always allowed for an authorised caller (admin, playbooks). */
   async addOverlay(input: OverlayInput, by: string): Promise<Overlay> {
     const o = overlayInput.parse(input);
     const n = this.overlays.reduce((m, x) => Math.max(m, Number(x.id.replace(/^ov-/, '')) || 0), 0) + 1;
@@ -153,16 +110,17 @@ export class LiquidPolicyService {
     await this.persist();
   }
 
-  /** From M6 the policies come from the applied revision of the config repository when it exists. */
+  /** The policies come from the applied revision of the config repository when it exists (M6). */
   policySource?: () => Promise<Record<string, string> | undefined>;
 
+  /** Rego and data files relative to policies/ (e.g. liquid/object.rego), tests excluded, and the roles. */
   private async policyFiles(): Promise<{ rego: Record<string, string>; roles: unknown }> {
     const fromRepo = await this.policySource?.().catch(() => undefined);
     if (fromRepo && Object.keys(fromRepo).some((p) => p.endsWith('.rego'))) {
       const rego: Record<string, string> = {};
       for (const [p, text] of Object.entries(fromRepo)) {
-        const rel = p.replace(/^policies\/liquid\//, '');
-        if (rel.endsWith('.rego') && !rel.endsWith('_test.rego')) rego[rel] = text;
+        const rel = p.replace(/^policies\//, '');
+        if (rel.endsWith('.rego') && !rel.endsWith('_test.rego') && !rel.startsWith('liquid/system/')) rego[rel] = text;
       }
       const roles = fromRepo['policies/liquid/roles/data.json'] ? JSON.parse(fromRepo['policies/liquid/roles/data.json']) : { roles: {}, agents: {} };
       return { rego, roles };
@@ -172,8 +130,9 @@ export class LiquidPolicyService {
       for (const e of await readdir(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
         const r = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory()) await walk(p, r);
-        else if (e.name.endsWith('.rego') && !e.name.endsWith('_test.rego')) rego[r] = await readFile(p, 'utf8');
+        if (e.isDirectory()) {
+          if (r !== 'system') await walk(p, r);
+        } else if (e.name.endsWith('.rego') && !e.name.endsWith('_test.rego')) rego[`liquid/${r}`] = await readFile(p, 'utf8');
       }
     };
     await walk(this.policyDir, '');
@@ -182,49 +141,48 @@ export class LiquidPolicyService {
     return { rego, roles };
   }
 
-  /** Builds the bundle: policies under liquid/ (system/ stays at its own root), one data.json with all data. */
-  async bundle(): Promise<{ revision: string; body: Buffer }> {
+  /**
+   * The policy package: WASM (compiled when the Rego changed) + data. Compile errors keep the last good WASM: a broken
+   * policy never replaces a working one (proposals validate with opa check/test before they can be approved).
+   */
+  async package(): Promise<PolicyPackage> {
     try {
       this.ontologyData = (await this.fetchOntologyData()) ?? this.ontologyData;
     } catch {
-      /* ontology server not reachable: keep the last known data (none = unknown actions are denied) */
+      /* enterprise core not reachable: keep the last known data (none = unknown actions are denied) */
     }
     const { rego, roles } = await this.policyFiles();
-    const files: Record<string, string> = {};
-    for (const [p, content] of Object.entries(rego)) files[p.startsWith('system/') ? p : `liquid/${p}`] = content;
+    const hash = createHash('sha256').update(JSON.stringify(Object.entries(rego).sort())).digest('hex');
+    if (this.wasm?.hash !== hash) {
+      const out = await this.compileWasm(rego).catch((err: Error) => ({ ok: false, errors: [{ path: 'compiler', message: err.message }] }) as Awaited<ReturnType<CompileWasm>>);
+      if (out.ok && out.wasm) {
+        this.wasm = { hash, wasm: out.wasm };
+        this.lastError = undefined;
+      } else {
+        this.lastError = (out.errors ?? []).map((e) => `${e.path}: ${e.message}`).join('; ') || 'compile failed';
+        if (!this.wasm) throw new Error(`policy compile failed: ${this.lastError}`);
+      }
+    }
     const ontology = ((this.ontologyData as { liquid?: { ontology?: unknown } } | undefined)?.liquid?.ontology ?? {}) as Record<string, unknown>;
     const { _doc: _d, ...roleData } = roles as Record<string, unknown>;
-    const data = { liquid: { ontology, roles: roleData, overlays: this.overlays.map(({ createdBy: _c, createdAt: _a, ...o }) => o) }, system: { authz: { query_token: this.queryToken() ?? '' } } };
-    files['data.json'] = JSON.stringify(data);
-    const revision = createHash('sha256').update(JSON.stringify(Object.entries(files).sort())).digest('hex').slice(0, 16);
-    files['.manifest'] = JSON.stringify({ revision, roots: ['liquid', 'system'] });
-    this.lastBundle = { revision, builtAt: new Date().toISOString(), files: Object.keys(files).filter((f) => f !== 'data.json' && f !== '.manifest').sort() };
-    return { revision, body: tarGz(files) };
+    const data = { liquid: { ontology, roles: roleData, overlays: this.overlays.map(({ createdBy: _c, createdAt: _a, ...o }) => o) } };
+    const revision = packageRevision(this.wasm!.wasm, data);
+    if (this.last?.revision !== revision) this.last = { revision, wasm: this.wasm!.wasm, data, builtAt: new Date().toISOString() };
+    return this.last;
   }
 
-  recordFetch(revision: string, notModified: boolean) {
-    this.lastFetch = { at: new Date().toISOString(), revision, notModified };
+  recordFetch(consumer: string, revision: string, notModified: boolean) {
+    this.fetches.set(consumer, { at: new Date().toISOString(), revision, notModified });
   }
 
-  /** OPA decision logs (gzip'd JSON array or plain JSON). Keeps the last 200, without full inputs. */
-  recordDecisions(body: Buffer, gzipped: boolean) {
-    const list = JSON.parse((gzipped ? gunzipSync(body) : body).toString('utf8')) as Array<{ timestamp?: string; path?: string; result?: { allow?: boolean; reason?: string; obligations?: string[] }; input?: Record<string, unknown> }>;
-    for (const d of list) {
-      const inp = d.input ?? {};
-      const caller = (inp.caller as { agent?: string; user?: string } | undefined) ?? undefined;
-      this.decisions.push({
-        at: d.timestamp ?? new Date().toISOString(),
-        path: d.path ?? '',
-        allow: typeof d.result?.allow === 'boolean' ? d.result.allow : null,
-        reason: d.result?.reason ?? null,
-        obligations: d.result?.obligations ?? [],
-        input: { agent: (inp.agent as { id?: string } | undefined)?.id ?? caller?.agent ?? undefined, action: inp.action as string | undefined, tool: inp.tool as string | undefined, caller: caller?.user ?? undefined },
-      });
-    }
-    this.decisions = this.decisions.slice(-200);
-  }
-
-  status() {
-    return { bundle: this.lastBundle ?? null, lastFetchByOpa: this.lastFetch ?? null, overlays: this.listOverlays(), decisions: [...this.decisions].reverse().slice(0, 50) };
+  async status() {
+    return {
+      bundle: this.last ? { revision: this.last.revision, builtAt: this.last.builtAt, files: Object.keys((await this.policyFiles()).rego).sort(), engine: 'wasm' } : null,
+      compileError: this.lastError ?? null,
+      consumers: Object.fromEntries(this.fetches),
+      lastFetchByOpa: this.fetches.get('gateway') ?? this.fetches.get('core') ?? null,
+      overlays: this.listOverlays(),
+      decisions: await this.recentDecisions().catch(() => []),
+    };
   }
 }

@@ -18,6 +18,7 @@ export function installSteps(m: ExtensionManifest, opts: { seedDemo: boolean }):
     { id: 'secrets', label: 'Generate secrets' },
     { id: 'volumes', label: 'Create data volumes' },
     ...dependencyOrder(m.services).map((s) => ({ id: `service:${s.name}`, label: `Start ${s.name}` })),
+    { id: 'retired', label: 'Remove containers of services this version no longer has' },
     ...m.bootstrap.filter((b) => !b.demoOnly || opts.seedDemo).map((b) => ({ id: `bootstrap:${b.id}`, label: b.description })),
     ...(m.upstreams.length ? [{ id: 'upstreams', label: `Register gateway upstreams (${m.upstreams.map((u) => u.name).join(', ')})` }] : []),
   ];

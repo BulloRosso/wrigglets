@@ -5,7 +5,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { SecretStore } from '@cw/secrets';
-import { askOpa, gatewayVerdict, opaInput } from './opa.js';
+import { PolicyEngine, pollPolicy } from '@cw/policy-wasm';
+import { decide, gatewayVerdict, opaInput } from './opa.js';
 import { A2A_TOOL, toolAllowed, type GatewayAgentConfig, type Identity } from '@cw/shared';
 import { A2aBroker } from './a2a.js';
 import { hideCallerParams, withCaller } from './caller.js';
@@ -21,6 +22,15 @@ const env = loadConfig();
 const sync = new ConfigSync(env.CONTROL_PLANE_URL, env.GATEWAY_TOKEN, env.SYNC_INTERVAL_MS, env.MAX_STALENESS_MS, log);
 const secrets = SecretStore.fromEnv();
 const upstreams = new UpstreamPool(secrets, log);
+// Liquid Enterprise policy, embedded (ADR-0049): fetched from the control plane while Liquid is installed
+const policyEngine = new PolicyEngine();
+pollPolicy({
+  url: `${env.CONTROL_PLANE_URL.replace(/\/$/, '')}/internal/liquid/policy`,
+  token: () => (sync.config?.policyPackage ? env.GATEWAY_TOKEN : undefined),
+  engine: policyEngine,
+  onLoad: (rev) => log.info({ revision: rev }, 'policy package loaded'),
+  onError: (err) => log.warn({ err }, 'policy package not updated'),
+});
 const audit = new Audit(env.DATA_DIR);
 const broker = new A2aBroker(env.GATEWAY_TOKEN, env.DATA_DIR);
 const obo = new OboClient(env.GATEWAY_TOKEN);
@@ -113,13 +123,7 @@ function mcpServer(agent: GatewayAgentConfig): Server {
     const policyUpstream = upstreamFor(config!.upstreams, tool);
     if (policyUpstream?.policy === 'opa') {
       const ctx = stepContext.get(agent.agentId);
-      const verdict = gatewayVerdict(
-        await askOpa(config!.opa, opaInput({ agentId: agent.agentId, tool, upstream: policyUpstream, ctx, killSwitch: killLevel(config!, agent.agentId).level }), async (v) => {
-          if (typeof v === 'string') return v;
-          if (!secrets) throw new Error('no Key Vault configured for the OPA token');
-          return secrets.get(v.secretRef);
-        }),
-      );
+      const verdict = gatewayVerdict(decide(policyEngine, !!config!.policyPackage, opaInput({ agentId: agent.agentId, tool, upstream: policyUpstream, ctx, killSwitch: killLevel(config!, agent.agentId).level })));
       policyAudit = { policy: 'opa', policyReason: verdict.reason, obligations: verdict.obligations.length ? verdict.obligations : undefined };
       if (!verdict.allowed) {
         await record('denied', { reason: `policy: ${verdict.reason}` });

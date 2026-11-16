@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import tarfile
 import json
 import os
 import re
@@ -62,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path not in ("/compile", "/check-rego"):
+        if self.path not in ("/compile", "/check-rego", "/build-wasm"):
             return self._send(404, {"error": "not found"})
         if self.token and self.headers.get("authorization", "") != f"Bearer {self.token}":
             return self._send(401, {"error": "unauthorized"})
@@ -71,6 +73,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(413, {"error": "body too large or empty"})
         if self.path == "/check-rego":
             return self._check_rego(length)
+        if self.path == "/build-wasm":
+            return self._build_wasm(length)
         try:
             files = json.loads(self.rfile.read(length))["files"]
             if not all(isinstance(files.get(n), str) for n in SOURCES):
@@ -86,6 +90,38 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": False, "errors": e.errors})
         self._send(200, {"ok": True, "ir": ir})
 
+
+    def _read_files(self, length: int):
+        files = json.loads(self.rfile.read(length))["files"]
+        if not isinstance(files, dict) or not files or not all(isinstance(k, str) and isinstance(v, str) for k, v in files.items()):
+            raise ValueError
+        if any(not SAFE_PATH.match(k) or ".." in k.split("/") for k in files):
+            raise ValueError
+        return files
+
+    def _build_wasm(self, length: int) -> None:
+        """opa build -t wasm with the two decision entrypoints; returns policy.wasm (base64). Tests are left out."""
+        try:
+            files = self._read_files(length)
+        except Exception:  # noqa: BLE001
+            return self._send(400, {"error": "expected {files: {<relative path .rego|.json>: text}}"})
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp, "src")
+            for k, v in files.items():
+                if k.endswith("_test.rego"):
+                    continue
+                Path(src, k).parent.mkdir(parents=True, exist_ok=True)
+                Path(src, k).write_text(v, encoding="utf-8", newline="\n")
+            out = Path(tmp, "bundle.tar.gz")
+            r = subprocess.run([OPA, "build", "-t", "wasm", "-e", "liquid/gateway/decision", "-e", "liquid/object/decision", "-o", str(out), "."], cwd=src, capture_output=True, text=True, timeout=120)
+            if r.returncode != 0:
+                return self._send(200, {"ok": False, "errors": [{"path": "opa build", "message": (r.stdout + r.stderr).strip()[:4000]}]})
+            with tarfile.open(out, "r:gz") as tar:
+                member = next((m for m in tar.getmembers() if m.name.endswith("policy.wasm")), None)
+                if member is None:
+                    return self._send(200, {"ok": False, "errors": [{"path": "opa build", "message": "no policy.wasm in the bundle"}]})
+                wasm = tar.extractfile(member).read()
+        self._send(200, {"ok": True, "wasm": base64.b64encode(wasm).decode("ascii"), "entrypoints": ["liquid/gateway/decision", "liquid/object/decision"]})
 
     def _check_rego(self, length: int) -> None:
         try:

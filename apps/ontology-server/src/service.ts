@@ -153,7 +153,13 @@ export class OntologyService {
     // keep the agent's original argument object (key order and extra keys matter for answers identical to the mock)
     const args = rawArgs ?? {};
     const decision = await this.policy({ action: name, target: action.target, readOnly: action.readOnly, destructive: action.destructive, caller, args, company: this.company, ir: this.ir, objects: this.objects() });
-    if (!decision.allow) return { text: `Denied by policy: ${decision.reason ?? 'not allowed'}`, isError: true, denied: true };
+    if (!decision.allow) {
+      // denials are events: audit is a query over the event log (ADR-0049)
+      await new EventStore(this.pool)
+        .append([{ type: 'PolicyDecision', objectType: action.target ?? 'Company', objectId: '-', action: name, actorAgent: caller.agent, actorUser: caller.user, taskId: caller.task, workflowId: caller.workflow, payload: { point: 'object', allow: false, reason: decision.reason ?? null, obligations: decision.obligations ?? [] }, ontologyVersion: this.ir.version }])
+        .catch(() => undefined);
+      return { text: `Denied by policy: ${decision.reason ?? 'not allowed'}`, isError: true, denied: true };
+    }
     const obligations = decision.obligations ?? [];
     if (obligations.includes('require_step_up')) return { text: 'Denied by policy: this action requires a step-up authentication of the person (not available in the prototype)', isError: true, denied: true };
     if (obligations.includes('require_four_eyes')) return this.requestApproval(action.name, action.target, args, caller, decision.reason);

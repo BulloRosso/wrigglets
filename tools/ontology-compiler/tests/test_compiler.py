@@ -123,6 +123,9 @@ class CheckRego(unittest.TestCase):
     POLICY = "package x\nimport rego.v1\nallow if input.a == 1\n"
 
     def call(self, files: dict) -> dict:
+        return self.call_path("/check-rego", files)
+
+    def call_path(self, route: str, files: dict) -> dict:
         import threading
         import urllib.error
         import urllib.request
@@ -133,7 +136,7 @@ class CheckRego(unittest.TestCase):
         srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         try:
-            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}/check-rego", data=json.dumps({"files": files}).encode(), headers={"content-type": "application/json"}, method="POST")
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}{route}", data=json.dumps({"files": files}).encode(), headers={"content-type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=60) as r:
                 return json.loads(r.read())
         except urllib.error.HTTPError as e:
@@ -153,6 +156,18 @@ class CheckRego(unittest.TestCase):
         r = self.call({"x.rego": self.POLICY, "x_test.rego": self.rego_test(2)})
         self.assertFalse(r["ok"])
         self.assertEqual(r["errors"][0]["path"], "opa test")
+
+    def test_build_wasm(self) -> None:
+        import base64 as b64
+        import urllib.request
+        files = {
+            "liquid/gateway/g.rego": "package liquid.gateway\nimport rego.v1\ndecision := {\"allow\": input.a == 1, \"reason\": \"x\", \"obligations\": []}\n",
+            "liquid/object/o.rego": "package liquid.object\nimport rego.v1\ndecision := {\"allow\": true, \"reason\": \"x\", \"obligations\": []}\n",
+            "liquid/object/o_test.rego": "package liquid.object_test\nbroken {",
+        }
+        r = self.call_path("/build-wasm", files)
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(b64.b64decode(r["wasm"])[:4], b"\x00asm")
 
     def test_path_traversal_is_rejected(self) -> None:
         self.assertEqual(self.call({"a/../../x.rego": "package x"}), {"status": 400})

@@ -394,7 +394,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
 export function internalRouter(d: ExtensionDeps): Router {
   const r = Router();
   r.use(signalsInternalRouter({ config: d.config, signals: d.signals, registry: d.registry }));
-  if (d.liquidPolicy) r.use(liquidInternalRouter(d.extensions, d.liquidPolicy));
+  if (d.liquidPolicy) r.use(liquidInternalRouter(d.extensions, d.liquidPolicy, d.config.GATEWAY_TOKEN));
   if (d.liquidConfig) r.use(liquidConfigInternalRouter(d.extensions, d.liquidConfig.repo, d.audit));
   if (d.liquidPlaybooks) r.use(playbooksInternalRouter(d.extensions, d.liquidPlaybooks));
   r.get('/gateway-config', (req, res) => {

@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import express, { Router, type Request, type RequestHandler } from 'express';
+import { Router, type Request, type RequestHandler } from 'express';
 import { HttpError } from '../agents.js';
 import { requireExtension } from './api.js';
 import { LIQUID_ID, ontologyCall } from './liquid.js';
@@ -51,6 +51,8 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   r.get('/liquid/ontology', pass('GET', () => '/internal/ontology'));
   /** Ontology versions applied to the ontology server (M8) and the SDK generated from the version in force. */
   r.get('/liquid/ontology/versions', pass('GET', () => '/internal/ontology/versions'));
+  /** Audit is a query over the event log (ADR-0049): filter by type, actor, object, text. */
+  r.get('/liquid/events', pass('GET', (req) => `/internal/events/query?${new URLSearchParams(Object.entries(req.query).filter(([, v]) => typeof v === 'string') as Array<[string, string]>).toString()}`));
   r.get('/liquid/ontology/sdk', async (_req, res, next) => {
     try {
       const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/sdk.ts`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
@@ -120,7 +122,7 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
 
   // Policy as code (ADR-0044): bundle state, overlays, OPA's recent decisions
   if (policy) {
-    r.get('/liquid/policy', (_req, res) => res.json(policy.status()));
+    r.get('/liquid/policy', async (_req, res, next) => policy.status().then((x) => res.json(x), next));
     r.post('/liquid/policy/overlays', async (req, res, next) => {
       try {
         const o = await policy.addOverlay(req.body ?? {}, by(req));
@@ -151,37 +153,29 @@ const safeEqual = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
-/** Machine-to-machine routes for OPA (bearer = the extension's opa_bundle_token): bundle and decision logs. */
-export function liquidInternalRouter(ext: ExtensionService, policy: LiquidPolicyService): Router {
+/**
+ * The policy package (ADR-0049) for the MCP gateway (bearer = gateway token) and the enterprise core (bearer = the
+ * extension's policy_token). ETag = revision.
+ */
+export function liquidInternalRouter(ext: ExtensionService, policy: LiquidPolicyService, gatewayToken: string): Router {
   const r = Router();
-  const auth: RequestHandler = (req, res, next) => {
-    const token = ext.secret(LIQUID_ID, 'opa_bundle_token');
-    const got = (req.header('authorization') ?? '').replace(/^Bearer\s+/i, '');
-    if (!token || !ext.isInstalled(LIQUID_ID) || !safeEqual(got, token)) return void res.status(401).json({ error: 'unauthorized' });
-    next();
-  };
-  r.get('/liquid/opa/bundle.tar.gz', auth, async (req, res, next) => {
+  r.get('/liquid/policy', async (req, res, next) => {
     try {
-      const { revision, body } = await policy.bundle();
-      const etag = '"' + revision + '"';
+      const got = (req.header('authorization') ?? '').replace(/^Bearer\s+/i, '');
+      const core = ext.secret(LIQUID_ID, 'policy_token');
+      const consumer = gatewayToken && safeEqual(got, gatewayToken) ? 'gateway' : core && safeEqual(got, core) ? 'core' : undefined;
+      if (!consumer) return void res.status(401).json({ error: 'unauthorized' });
+      if (!ext.isInstalled(LIQUID_ID)) return void res.status(404).json({ error: 'Liquid Enterprise is not installed' });
+      const pkg = await policy.package();
+      const etag = `"${pkg.revision}"`;
       const notModified = req.header('if-none-match') === etag;
-      policy.recordFetch(revision, notModified);
+      policy.recordFetch(consumer, pkg.revision, notModified);
       res.setHeader('ETag', etag);
       if (notModified) return void res.status(304).end();
-      res.type('application/gzip').send(body);
+      res.json(pkg);
     } catch (err) {
       next(err);
     }
-  });
-  r.post('/liquid/opa/logs', auth, express.raw({ type: () => true, limit: '10mb' }), (req, res) => {
-    try {
-      // body-parser already inflates Content-Encoding: gzip; detect a still-compressed body by its magic bytes
-      const body = req.body as Buffer;
-      policy.recordDecisions(body, body.length > 2 && body[0] === 0x1f && body[1] === 0x8b);
-    } catch {
-      /* malformed log batch: ignore, OPA retries */
-    }
-    res.status(204).end();
   });
   return r;
 }

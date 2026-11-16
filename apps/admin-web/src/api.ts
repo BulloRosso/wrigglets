@@ -42,6 +42,21 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+export interface LiquidEvent {
+  seq: number;
+  event_id: string;
+  type: string;
+  object_type: string;
+  object_id: string;
+  action: string | null;
+  actor_agent: string | null;
+  actor_user: string | null;
+  task_id: string | null;
+  workflow_id: string | null;
+  occurred_at: string;
+  ontology_version: string;
+  payload: Record<string, unknown>;
+}
 export interface PlaybookStepResult {
   id: string;
   type: string;
@@ -370,6 +385,7 @@ export const api = {
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
+  liquidEvents: (params: Record<string, string>) => apiFetch<{ events: LiquidEvent[]; types: Array<{ type: string; n: number }> }>(`/api/liquid/events?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   liquidPlaybooks: () => apiFetch<PlaybookList>('/api/liquid/playbooks'),
   liquidPlaybookRuns: () => apiFetch<PlaybookRunView[]>('/api/liquid/playbooks/runs'),
   decidePlaybookStep: (runId: string, stepId: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<unknown>(`/api/liquid/playbooks/runs/${id(runId)}/steps/${id(stepId)}/decide`, { method: 'POST', json: { decision, comment } }),

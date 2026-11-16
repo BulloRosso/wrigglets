@@ -1,0 +1,13 @@
+{
+  "name": "@cw/policy-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise policy as code, embedded (ADR-0049): the Rego policies compiled to WebAssembly, evaluated in-process by the MCP gateway and the enterprise core. Fail closed.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "vitest run" },
+  "dependencies": { "@open-policy-agent/opa-wasm": "1.10.0" },
+  "devDependencies": { "vitest": "5.0.5" }
+}

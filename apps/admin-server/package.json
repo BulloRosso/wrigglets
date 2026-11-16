@@ -19,6 +19,7 @@
     "@cw/extensions": "workspace:*",
     "@cw/ontology-ir": "workspace:*",
     "@cw/playbooks": "workspace:*",
+    "@cw/policy-wasm": "workspace:*",
     "@cw/secrets": "workspace:*",
     "@cw/shared": "workspace:*",
     "@temporalio/client": "1.24.0",

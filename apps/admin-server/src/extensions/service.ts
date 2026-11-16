@@ -432,6 +432,13 @@ export class ExtensionService {
       await this.waitRunning(id, svc.name);
       return;
     }
+    if (step.id === 'retired') {
+      // e.g. OPA and the business worker after ADR-0049: their containers go, their volumes stay (purge on uninstall)
+      if (!this.runtime) return;
+      const keep = new Set(m.services.map((s) => s.name));
+      for (const c of await this.runtime.list(id)) if (!keep.has(c.service)) await this.runtime.remove(id, c.service);
+      return;
+    }
     if (step.id.startsWith('bootstrap:')) {
       const handler = handlers[step.id.slice('bootstrap:'.length)];
       if (!handler) throw new Error(`no handler for ${step.id}`);

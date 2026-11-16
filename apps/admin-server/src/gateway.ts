@@ -100,8 +100,8 @@ export class GatewayConfigService {
     void this.push();
   }
 
-  /** OPA endpoint for upstreams with policy `opa` (set while Liquid Enterprise is installed, ADR-0044). */
-  opaProvider?: () => GatewayConfig['opa'];
+  /** Policy package for upstreams with policy `opa` (set while Liquid Enterprise is installed, ADR-0049). */
+  policyProvider?: () => GatewayConfig['policyPackage'];
 
   build(): GatewayConfig {
     return {
@@ -119,7 +119,7 @@ export class GatewayConfigService {
       })),
       upstreams: this.data.upstreams,
       limits: this.data.limits,
-      opa: this.opaProvider?.(),
+      policyPackage: this.policyProvider?.(),
     };
   }
 

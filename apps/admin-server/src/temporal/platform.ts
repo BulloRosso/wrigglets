@@ -11,6 +11,7 @@ const INDEXED_TYPE: Record<string, number> = { Text: 1, Keyword: 2, Int: 3, Doub
 /** Temporal access of the control plane: health, namespace bootstrap, per-agent views. */
 export class TemporalPlatform {
   client?: Client;
+  private readonly nsClients = new Map<string, Client>();
   readonly codec: AesGcmCodec;
   version?: string;
 
@@ -53,6 +54,38 @@ export class TemporalPlatform {
       await conn.operatorService.addSearchAttributes({ namespace, searchAttributes: Object.fromEntries(missing.map(([n, t]) => [n, INDEXED_TYPE[t]!])) });
       logger.info({ added: missing.map(([n]) => n) }, 'search attributes registered');
     }
+  }
+
+  /** Idempotently registers another namespace with its search attributes (Liquid Enterprise: `business`, ADR-0045). */
+  async ensureNamespace(namespace: string, attributes: Array<[string, string]>): Promise<void> {
+    const conn = this.client!.connection;
+    const retention = msToTs(this.config.TEMPORAL_RETENTION_DAYS * 86_400_000);
+    try {
+      await conn.workflowService.describeNamespace({ namespace });
+    } catch {
+      await conn.workflowService.registerNamespace({ namespace, workflowExecutionRetentionPeriod: retention });
+      logger.info({ namespace }, 'namespace registered');
+    }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const existing = await conn.operatorService.listSearchAttributes({ namespace });
+        const known = new Set(Object.keys(existing.customAttributes ?? {}));
+        const missing = attributes.filter(([name]) => !known.has(name));
+        if (missing.length) await conn.operatorService.addSearchAttributes({ namespace, searchAttributes: Object.fromEntries(missing.map(([n, t]) => [n, INDEXED_TYPE[t]!])) });
+        return;
+      } catch (err) {
+        // a freshly registered namespace needs a moment before its search attributes can be changed
+        if (attempt >= 10) throw err;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  /** A client for another namespace on the same connection (no payload codec: business payloads carry ids and inputs). */
+  namespaceClient(namespace: string): Client {
+    const c = this.nsClients.get(namespace) ?? new Client({ connection: this.client!.connection, namespace });
+    this.nsClients.set(namespace, c);
+    return c;
   }
 
   async healthy(): Promise<boolean> {

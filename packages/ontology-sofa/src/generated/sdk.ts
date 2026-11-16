@@ -1,6 +1,6 @@
-// GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs
+// GENERATED from ontology sofa@0.1.0 (d3b7090b2597) — do not edit; run node scripts/liquid/ontology-build.mjs
 
-import type { Factory, Machine, Worker, Absence, OvertimeShift, TempWorkerAssignment, Material, Bom, Supplier, InventoryItem, PurchaseOrder, ProductionOrder, MaintenanceTicket, Incident, Customer, SalesOrder, CustomerNotice, Campaign, DemandSignal, GetOverviewInput, GetKpiInput, SimulateChangeInput, ListMachinesInput, ListWorkersInput, GetCapacityInput, ListProductionOrdersInput, GetInventoryInput, GetMaterialProjectionInput, ListPurchaseOrdersInput, ListSuppliersInput, GetBomInput, ListMaintenanceTicketsInput, CreatePurchaseOrderInput, CancelPurchaseOrderInput, CreateMaintenanceTicketInput, UpdateProductionOrderInput, CreateProductionOrderInput, RequestOvertimeInput, RequestTempWorkersInput, WriteOffStockInput, ReleaseStockInput, FileIncidentReportInput, ListCustomersInput, ListOrdersInput, GetOrderInput, ListCampaignsInput, GetDemandTrendInput, SendCustomerNoticeInput, UpdateDeliveryDateInput, UpdateCampaignInput } from './types.js';
+import type { Factory, Machine, Worker, Absence, OvertimeShift, TempWorkerAssignment, Material, Bom, Supplier, InventoryItem, PurchaseOrder, ProductionOrder, MaintenanceTicket, Incident, Customer, SalesOrder, CustomerNotice, Campaign, DemandSignal, GetOverviewInput, GetKpiInput, SimulateChangeInput, ListMachinesInput, ListWorkersInput, GetCapacityInput, ListProductionOrdersInput, GetInventoryInput, GetMaterialProjectionInput, ListPurchaseOrdersInput, ListSuppliersInput, GetBomInput, ListMaintenanceTicketsInput, CreatePurchaseOrderInput, CancelPurchaseOrderInput, ReleasePurchaseOrderInput, CreateMaintenanceTicketInput, UpdateProductionOrderInput, CreateProductionOrderInput, RequestOvertimeInput, RequestTempWorkersInput, WriteOffStockInput, ReleaseStockInput, FileIncidentReportInput, ListCustomersInput, ListOrdersInput, GetOrderInput, ListCampaignsInput, GetDemandTrendInput, SendCustomerNoticeInput, UpdateDeliveryDateInput, UpdateCampaignInput } from './types.js';
 
 export interface ClientOptions {
   /** Base URL of the ontology server REST API, e.g. https://onto.example/api */
@@ -29,7 +29,7 @@ export function createClient(o: ClientOptions) {
     get: (id: string) => call<T>('GET', `/objects/${cls}/${encodeURIComponent(id)}`),
   });
   return {
-    ontology: {"name":"sofa","version":"0.1.0","hash":"0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7"},
+    ontology: {"name":"sofa","version":"0.1.0","hash":"d3b7090b259718870fb447e9df4a257f75fa81860297a44da3d15a0b9bbe6f90"},
     objects: {
       factory: objects<Factory>("Factory"),
       machine: objects<Machine>("Machine"),
@@ -82,6 +82,8 @@ export function createClient(o: ClientOptions) {
       createPurchaseOrder: (input: CreatePurchaseOrderInput) => call<unknown>('POST', '/actions/create_purchase_order', input),
       /** WRITE. Cancel an open or delayed purchase order. */
       cancelPurchaseOrder: (input: CancelPurchaseOrderInput) => call<unknown>('POST', '/actions/cancel_purchase_order', input),
+      /** WRITE. Release an open purchase order to the supplier (step of the PurchaseOrderRelease workflow). Records the release date. */
+      releasePurchaseOrder: (input: ReleasePurchaseOrderInput) => call<unknown>('POST', '/actions/release_purchase_order', input),
       /** WRITE. Open a maintenance ticket for a machine and book the external technician. The repair starts when the required spare part has been delivered (a purchase o… */
       createMaintenanceTicket: (input: CreateMaintenanceTicketInput) => call<unknown>('POST', '/actions/create_maintenance_ticket', input),
       /** WRITE. Move a production order to the other factory and/or change its priority (1 = most urgent … 9). The simulation re-sequences both factory queues. */

@@ -6,6 +6,8 @@
 # implemented in the domain package, M3), emits (event types, see `events`).
 # Input field: range (string | integer | float | boolean | date | json | <Enum> | <Class> = id of an object), required,
 # multivalued, description, enum (fixed values for the tool schema; parity with the mock only).
+# starts_workflow: business workflow (namespace business, M5) started when the action's event is committed;
+# signals_workflow: { workflow, signal } sent to the running workflow of the action's object.
 # For the parity phase (M3) names, flags, fields and descriptions equal the tools of scripts/sofa-company/mock-mcp.mjs.
 ontology: sofa
 
@@ -13,6 +15,7 @@ events:
   - { name: PurchaseOrderCreated, object_type: PurchaseOrder, description: A purchase order was placed with a supplier }
   - { name: PurchaseOrderCancelled, object_type: PurchaseOrder, description: An open or delayed purchase order was cancelled }
   - { name: PurchaseOrderDelayed, object_type: PurchaseOrder, description: The supplier moved the ETA of a purchase order }
+  - { name: PurchaseOrderReleased, object_type: PurchaseOrder, description: A purchase order was released to the supplier }
   - { name: MaintenanceTicketOpened, object_type: MaintenanceTicket, description: A repair was ordered for a machine }
   - { name: ProductionOrderCreated, object_type: ProductionOrder, description: A production order was put into a factory queue }
   - { name: ProductionOrderUpdated, object_type: ProductionOrder, description: A production order moved factory or changed priority }
@@ -147,6 +150,7 @@ actions:
       note: { range: string, description: Reason / reference }
     preconditions: [supplier_can_deliver, supplier_supplies_sku, quantity_within_supplier_limits, express_offered_if_requested]
     emits: [PurchaseOrderCreated]
+    starts_workflow: PurchaseOrderRelease
   - name: cancel_purchase_order
     target: PurchaseOrder
     kind: update
@@ -158,6 +162,15 @@ actions:
       reason: { range: string, required: true, description: Reason }
     preconditions: [purchase_order_open_or_delayed]
     emits: [PurchaseOrderCancelled]
+    signals_workflow: { workflow: PurchaseOrderRelease, signal: cancel }
+  - name: release_purchase_order
+    target: PurchaseOrder
+    kind: update
+    description: WRITE. Release an open purchase order to the supplier (step of the PurchaseOrderRelease workflow). Records the release date.
+    input:
+      poId: { range: PurchaseOrder, required: true, description: Purchase order id }
+    preconditions: [purchase_order_open_not_released]
+    emits: [PurchaseOrderReleased]
   - name: create_maintenance_ticket
     target: MaintenanceTicket
     kind: create

@@ -116,7 +116,7 @@ function readEnv() {
 }
 
 /** Compose services of the Liquid Enterprise images built locally (grows per milestone). */
-const LIQUID_BUILD_SERVICES = ['ontology-server'];
+const LIQUID_BUILD_SERVICES = ['ontology-server', 'business-worker'];
 
 function build() {
   ensureEnv();

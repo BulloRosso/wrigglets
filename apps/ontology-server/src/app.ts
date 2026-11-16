@@ -141,6 +141,15 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/ontology', (_req, res) => res.json(d.svc.ir));
+  /** Events after a seq, for the business worker's dispatcher (M5): start/signal workflows from committed events. */
+  internal.get(
+    '/events',
+    wrap(async (req, res) => {
+      const after = Math.max(0, Number(req.query.after ?? 0) || 0);
+      const limit = Math.min(500, Math.max(1, Number(req.query.limit ?? 200) || 200));
+      res.json({ events: await d.store.readAfter(after, limit), stats: await d.store.stats() });
+    }),
+  );
   /** Generated OPA data (data.liquid.ontology) for the policy bundle the control plane builds (ADR-0044). */
   internal.get('/opa/data', (_req, res) => res.json(opaData()));
 

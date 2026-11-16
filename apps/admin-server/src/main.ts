@@ -25,6 +25,8 @@ import { DockerRuntime } from './runtime/docker.js';
 import type { AgentRuntime } from './runtime/types.js';
 import { TemporalDevServer } from './temporal/devServer.js';
 import { TemporalPlatform } from './temporal/platform.js';
+import { BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES } from '@cw/business-workflows';
+import { LiquidProcesses } from './extensions/liquidProcesses.js';
 
 /**
  * Control plane process of the "temporal" container:
@@ -111,8 +113,11 @@ async function main() {
   await signals.load();
   // Optional extensions installed from the admin console (ADR-0039)
   const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
-  extensions.register(liquidManifest, liquidBootstrap, liquidOverlay(config));
+  // business workflows (ADR-0045): the namespace step needs the Temporal connection of this process
+  extensions.register(liquidManifest, { ...liquidBootstrap, 'business-namespace': async (ctx) => { await temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES); ctx.log(`Temporal namespace ${BUSINESS_NAMESPACE} ready`); } }, liquidOverlay(config));
   await extensions.load();
+  // overlay mode runs no bootstrap steps: the business namespace is ensured here (idempotent)
+  if (config.LIQUID_OVERLAY) void temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES).catch((err) => logger.warn({ err: String(err) }, 'could not ensure the business namespace'));
   // Liquid Enterprise policy as code (ADR-0044): overlays + OPA bundle; the gateway gets OPA's address while installed
   const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
   const liquidPolicy = new LiquidPolicyService(
@@ -140,7 +145,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidProcesses: new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined)), mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

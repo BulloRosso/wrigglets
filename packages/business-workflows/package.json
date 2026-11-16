@@ -1,0 +1,31 @@
+{
+  "name": "@cw/business-workflows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise business workflows (ADR-0045): holdable helper, PurchaseOrderRelease, ApprovalWorkflow, lake flush. Deterministic: no Node APIs, no I/O.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@temporalio/common": "1.24.0",
+    "@temporalio/workflow": "1.24.0"
+  },
+  "devDependencies": {
+    "@temporalio/activity": "1.24.0",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/testing": "1.24.0",
+    "@temporalio/worker": "1.24.0",
+    "vitest": "5.0.5"
+  }
+}

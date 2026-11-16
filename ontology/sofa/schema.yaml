@@ -191,6 +191,7 @@ classes:
       status: { range: PurchaseOrderStatus, required: true }
       express: { range: boolean }
       note: {}
+      released_at: { range: date, description: Day the order was released to the supplier (PurchaseOrderRelease workflow) }
 
   ProductionOrder:
     description: An order to produce the sofas of a sales order in a factory.

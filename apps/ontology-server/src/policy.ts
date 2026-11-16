@@ -37,7 +37,7 @@ export function touchedObjects(ir: OntologyIr, action: string, args: Record<stri
 
 export function opaPolicy(ir: OntologyIr, opa: { url: string; token: string; timeoutMs?: number }, fetchImpl: typeof fetch = fetch): PolicyHook {
   return async ({ action, caller, args, company }) => {
-    const input = { action, caller: { agent: caller.agent ?? null, user: caller.user ?? null, task: { id: caller.task ?? null, step: caller.step ?? null } }, objects: touchedObjects(ir, action, args, company) };
+    const input = { action, caller: { agent: caller.agent ?? null, user: caller.user ?? null, approved_by: caller.approvedBy ?? null, workflow: caller.workflow ?? null, task: { id: caller.task ?? null, step: caller.step ?? null } }, objects: touchedObjects(ir, action, args, company) };
     try {
       const res = await fetchImpl(`${opa.url.replace(/\/$/, '')}/v1/data/liquid/object/decision`, {
         method: 'POST',

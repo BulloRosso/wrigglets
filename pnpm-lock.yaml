@@ -20,6 +20,9 @@ importers:
       '@cw/auth-rp':
         specifier: workspace:*
         version: link:../../packages/auth-rp
+      '@cw/business-workflows':
+        specifier: workspace:*
+        version: link:../../packages/business-workflows
       '@cw/codec':
         specifier: workspace:*
         version: link:../../packages/codec
@@ -304,6 +307,31 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
+  apps/business-worker:
+    dependencies:
+      '@cw/business-workflows':
+        specifier: workspace:*
+        version: link:../../packages/business-workflows
+      '@temporalio/client':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/common':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/worker':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)
+      pino:
+        specifier: 10.4.0
+        version: 10.4.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/mcp-demo:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -555,6 +583,31 @@ importers:
       express:
         specifier: 5.3.0
         version: 5.3.0
+
+  packages/business-workflows:
+    dependencies:
+      '@temporalio/common':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/workflow':
+        specifier: 1.24.0
+        version: 1.24.0
+    devDependencies:
+      '@temporalio/activity':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/client':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/testing':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)
+      '@temporalio/worker':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/codec:
     dependencies:

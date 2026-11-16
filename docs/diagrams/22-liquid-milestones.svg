@@ -80,12 +80,12 @@
   <text x="624" y="163" class="d">OPA at gateway and</text>
   <text x="624" y="179" class="d">ontology server</text>
   <!-- M5 -->
-  <rect x="610" y="260" width="150" height="76" rx="10" class="wip"/>
+  <rect x="610" y="260" width="150" height="76" rx="10" class="done"/>
   <text x="624" y="283" class="id">M5</text><text x="658" y="283" class="h">Business flows</text>
   <text x="624" y="303" class="d">holdable Temporal</text>
   <text x="624" y="319" class="d">workflows, approvals</text>
   <!-- M6 -->
-  <rect x="800" y="120" width="150" height="76" rx="10" class="plan"/>
+  <rect x="800" y="120" width="150" height="76" rx="10" class="wip"/>
   <text x="814" y="143" class="id">M6</text><text x="848" y="143" class="h">Config repo</text>
   <text x="814" y="163" class="d">desired state in Git,</text>
   <text x="814" y="179" class="d">proposals, reconciler</text>

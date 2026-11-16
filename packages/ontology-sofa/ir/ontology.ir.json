@@ -349,6 +349,7 @@
         "express_offered_if_requested"
       ],
       "readOnly": false,
+      "startsWorkflow": "PurchaseOrderRelease",
       "target": "PurchaseOrder"
     },
     {
@@ -380,6 +381,34 @@
       "name": "cancel_purchase_order",
       "preconditions": [
         "purchase_order_open_or_delayed"
+      ],
+      "readOnly": false,
+      "signalsWorkflow": {
+        "signal": "cancel",
+        "workflow": "PurchaseOrderRelease"
+      },
+      "target": "PurchaseOrder"
+    },
+    {
+      "description": "WRITE. Release an open purchase order to the supplier (step of the PurchaseOrderRelease workflow). Records the release date.",
+      "destructive": false,
+      "emits": [
+        "PurchaseOrderReleased"
+      ],
+      "input": [
+        {
+          "description": "Purchase order id",
+          "multivalued": false,
+          "name": "poId",
+          "range": "PurchaseOrder",
+          "rangeKind": "class",
+          "required": true
+        }
+      ],
+      "kind": "update",
+      "name": "release_purchase_order",
+      "preconditions": [
+        "purchase_order_open_not_released"
       ],
       "readOnly": false,
       "target": "PurchaseOrder"
@@ -1091,6 +1120,7 @@
         "note": "note",
         "original_eta": "original_eta",
         "qty": "qty",
+        "released_at": "released_at",
         "sku": "sku",
         "status": "status",
         "supplier": "supplier_id",
@@ -1850,6 +1880,15 @@
           "range": "string",
           "rangeKind": "type",
           "required": false
+        },
+        {
+          "description": "Day the order was released to the supplier (PurchaseOrderRelease workflow)",
+          "identifier": false,
+          "multivalued": false,
+          "name": "released_at",
+          "range": "date",
+          "rangeKind": "type",
+          "required": false
         }
       ],
       "description": "An order to a supplier; commits money.",
@@ -2586,6 +2625,11 @@
       "objectType": "PurchaseOrder"
     },
     {
+      "description": "A purchase order was released to the supplier",
+      "name": "PurchaseOrderReleased",
+      "objectType": "PurchaseOrder"
+    },
+    {
       "description": "A repair was ordered for a machine",
       "name": "MaintenanceTicketOpened",
       "objectType": "MaintenanceTicket"
@@ -2666,7 +2710,7 @@
       "objectType": "InventoryItem"
     }
   ],
-  "hash": "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7",
+  "hash": "d3b7090b259718870fb447e9df4a257f75fa81860297a44da3d15a0b9bbe6f90",
   "irVersion": 1,
   "links": [
     {
@@ -2820,11 +2864,11 @@
   "name": "sofa",
   "source": {
     "files": {
-      "actions.yaml": "6833d6fe00c4e8332f74728c52be74dc305c1b68d456ec21a62820d205194d23",
+      "actions.yaml": "bfbaa459d97dc6ec5ccea45d0e0e1e9a91c732938298a7d621db0c1c002f3454",
       "bindings.yaml": "82298c939f57aa45825c18242e5ca663ccf030ab3efe4d96d05e2f8e22b0389d",
-      "schema.yaml": "df1221bd04614b55076f01d2b3ba028e3abf5691ec24a569ef43219953cc79e9"
+      "schema.yaml": "354df9e3c8774e8cfd01f462ba885ebab9a683c902127f70b42280a19eb0f1d6"
     },
-    "hash": "773b78c23c6b61b5567f2e31f5074d40cc6538aeb60b41f719fbfce8593c73da"
+    "hash": "91d571167175a1329027205824df9ed9fcc9aaea16b9568037f7810081e92c5f"
   },
   "title": "Sofa company",
   "version": "0.1.0"

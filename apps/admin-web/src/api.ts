@@ -41,6 +41,35 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+export interface LiquidHoldState {
+  held: boolean;
+  holds: Array<{ ref: string; reason: string; since: string }>;
+  state: string;
+}
+export interface LiquidApprovalState {
+  state: 'pending' | 'reminded' | 'approved' | 'executed' | 'execution_failed' | 'rejected' | 'expired';
+  request: { requestSeq: number; action: string; args: Record<string, unknown>; caller: { agent?: string; user?: string; task?: string }; target?: string; reason?: string; objects: string[] };
+  decision?: { decision: 'approve' | 'reject'; by: string; comment?: string };
+  result?: string;
+}
+export interface LiquidProcess {
+  workflowId: string;
+  type: string;
+  status: string;
+  startTime: string;
+  closeTime: string | null;
+  objects: string[];
+  state: string | null;
+  hold?: LiquidHoldState;
+  approval?: LiquidApprovalState;
+}
+export interface LiquidProcesses {
+  running: LiquidProcess[];
+  recent: LiquidProcess[];
+  held: number;
+  pendingApprovals: number;
+}
+
 export interface LiquidOverlay {
   id: string;
   effect: 'deny' | 'require_four_eyes' | 'require_step_up';
@@ -253,6 +282,10 @@ export const api = {
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
   liquidPolicy: () => apiFetch<LiquidPolicyStatus>('/api/liquid/policy'),
   addLiquidOverlay: (o: Pick<LiquidOverlay, 'effect' | 'reason' | 'match' | 'expires_at'>) => apiFetch<LiquidOverlay>('/api/liquid/policy/overlays', { method: 'POST', json: o }),
+  liquidProcesses: () => apiFetch<LiquidProcesses>('/api/liquid/processes'),
+  holdLiquidProcesses: (objects: string[], reason: string) => apiFetch<{ ref: string; workflows: string[] }>('/api/liquid/processes/hold', { method: 'POST', json: { objects, reason } }),
+  releaseLiquidHold: (ref: string) => apiFetch<{ ref: string; workflows: string[] }>('/api/liquid/processes/release', { method: 'POST', json: { ref } }),
+  decideLiquidApproval: (workflowId: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<LiquidApprovalState>(`/api/liquid/approvals/${id(workflowId)}/decide`, { method: 'POST', json: { decision, comment } }),
   removeLiquidOverlay: (overlayId: string) => apiFetch<void>(`/api/liquid/policy/overlays/${id(overlayId)}`, { method: 'DELETE' }),
   extensionLogs: (extId: string, service: string) =>
     fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {

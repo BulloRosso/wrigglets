@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@cw/auth-rp": "workspace:*",
+    "@cw/business-workflows": "workspace:*",
     "@cw/codec": "workspace:*",
     "@cw/extensions": "workspace:*",
     "@cw/secrets": "workspace:*",

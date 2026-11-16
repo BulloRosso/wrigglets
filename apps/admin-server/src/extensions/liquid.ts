@@ -84,19 +84,40 @@ export const liquidManifest: ExtensionManifestInput = {
         OPA_URL: '{{svc:opa.url}}',
         OPA_TOKEN: '{{secret:opa_query_token}}',
         LAKE_DATA_PATH: '/lake/',
+        // the lake flush runs as the Temporal schedule `lake-flush` of the business worker (ADR-0045)
+        FLUSH_INTERVAL_SEC: '0',
       },
       volumes: [{ name: 'lake-data', target: '/lake' }],
       healthcheck: { test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:7710/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], intervalSec: 5, timeoutSec: 4, retries: 30, startPeriodSec: 10 },
       memoryMb: 1024,
     },
+    {
+      name: 'business-worker',
+      description: 'Business workflows (Temporal namespace business): holdable processes started by ontology events, approvals, the lake-flush schedule',
+      image: 'coworking/business-worker:local',
+      local: true,
+      dependsOn: ['ontology-server'],
+      env: {
+        TEMPORAL_ADDRESS: 'temporal:7233',
+        ONTOLOGY_URL: '{{svc:ontology-server.url}}',
+        INTERNAL_TOKEN: '{{secret:ontology_internal_token}}',
+      },
+      volumes: [{ name: 'business-worker-data', target: '/data' }],
+      memoryMb: 512,
+    },
   ],
-  bootstrap: [{ id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true }],
+  bootstrap: [
+    // before the worker starts: namespace + search attributes (the handler is injected by main.ts, it needs Temporal)
+    { id: 'business-namespace', description: 'Temporal namespace business with search attributes OntologyObjects, BusinessState' },
+    { id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true },
+  ],
   // New ontology tools for agents; the parity groups erp/crm are re-pointed by scripts/liquid/setup.mjs (not owned).
   upstreams: [{ name: 'onto', description: 'Ontology actions of the sofa company (Liquid Enterprise): the only write path for business data', service: 'ontology-server', path: '/onto/mcp', tokenSecret: 'ontology_mcp_token', policy: 'opa' }],
   uiRoutes: [
     { label: 'Overview', path: '/liquid' },
     { label: 'Ontology', path: '/liquid/ontology' },
     { label: 'Policies', path: '/liquid/policies' },
+    { label: 'Business processes', path: '/liquid/processes' },
   ],
 };
 

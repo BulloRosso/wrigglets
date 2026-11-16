@@ -68,6 +68,10 @@ export const irAction = z.object({
   input: z.array(irInput),
   preconditions: z.array(snake),
   emits: z.array(pascal),
+  /** Business workflow started when the action's event is committed (M5). */
+  startsWorkflow: pascal.optional(),
+  /** Signal sent to the running workflow of the action's object (M5). */
+  signalsWorkflow: z.object({ workflow: pascal, signal: snake }).optional(),
 });
 
 export const irBinding = z.object({

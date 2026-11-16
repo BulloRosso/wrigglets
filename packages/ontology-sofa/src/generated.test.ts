@@ -27,7 +27,8 @@ describe('generated files are up to date (stale check)', () => {
 describe('MCP tools match the mock one to one (M2 exit criterion)', () => {
   const mockTools = Object.entries(mock.SERVERS).flatMap(([group, s]) => s.tools.map((t) => ({ ...t, group })));
   it('same names in the same groups', () => {
-    expect(MCP_TOOLS.map((t) => `${t.group}/${t.name}`).sort()).toEqual(mockTools.map((t) => `${t.group}/${t.name}`).sort());
+    // tools without a group (e.g. release_purchase_order, M5) are served on /onto only and are not part of the parity
+    expect(MCP_TOOLS.filter((t) => t.group).map((t) => `${t.group}/${t.name}`).sort()).toEqual(mockTools.map((t) => `${t.group}/${t.name}`).sort());
   });
   it.each(mockTools.map((t) => [t.name, t] as const))('%s: flags, fields, types, required, enums, descriptions', (name, m) => {
     const g = MCP_TOOLS.find((t) => t.name === name)!;

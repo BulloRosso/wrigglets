@@ -42,7 +42,7 @@ describe('graph view', () => {
     expect(g.edges.find((e) => e.id === 'Supplier.skus')).toMatchObject({ source: 'Supplier', target: 'Material', multivalued: true, label: 'skus [*]' });
   });
   it('puts targeted actions on their class and the rest in globalActions', () => {
-    expect(g.nodes.find((n) => n.id === 'PurchaseOrder')!.actions.map((a) => a.name)).toEqual(['list_purchase_orders', 'create_purchase_order', 'cancel_purchase_order']);
+    expect(g.nodes.find((n) => n.id === 'PurchaseOrder')!.actions.map((a) => a.name)).toEqual(['list_purchase_orders', 'create_purchase_order', 'cancel_purchase_order', 'release_purchase_order']);
     expect(g.globalActions.map((a) => a.name)).toEqual(['get_overview', 'get_kpi', 'simulate_change']);
   });
   it('lists only scalar/enum attributes as fields and marks bound classes', () => {

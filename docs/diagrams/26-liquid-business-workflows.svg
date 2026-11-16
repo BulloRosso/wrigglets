@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Business workflows: events start holdable processes</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.6; }
+    .lnw { fill: none; stroke: #e65100; stroke-width: 1.8; stroke-dasharray: 5 4; }
+    .lnb { fill: none; stroke: #1f5fad; stroke-width: 2; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .wf { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .db { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .step { fill: #ffffff; stroke: #e65100; stroke-width: 1.2; }
+    .held { fill: #fdecea; stroke: #c62828; stroke-width: 1.2; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e65100"/></marker>
+  </defs>
+  <rect width="1200" height="660" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Business workflows (M5): committed events start holdable processes</text>
+  <text x="40" y="68" class="st">Workflows never write the database: every step is an ontology action. Hold by object pauses exactly the processes that touch it.</text>
+
+  <!-- caller -->
+  <rect x="40" y="110" width="190" height="90" rx="10" class="ag"/>
+  <text x="58" y="138" class="h">Agent or person</text>
+  <text x="58" y="160" class="mono">create_purchase_order</text>
+  <text x="58" y="178" class="lbl">supplier S-NORDHOLZ, 3000</text>
+
+  <!-- ontology server -->
+  <rect x="280" y="96" width="290" height="190" rx="12" class="cp"/>
+  <text x="300" y="124" class="h">Ontology server</text>
+  <circle cx="310" cy="150" r="10" class="bd"/><text x="310" y="154" class="num">1</text>
+  <text x="328" y="154" class="d">validate, OPA, run, one transaction:</text>
+  <text x="328" y="172" class="mono">event PurchaseOrderCreated</text>
+  <text x="328" y="188" class="lbl">+ projection row PO-4430</text>
+  <text x="300" y="220" class="lbl">ontology: create_purchase_order</text>
+  <text x="300" y="236" class="mono">starts_workflow: PurchaseOrderRelease</text>
+  <text x="300" y="256" class="lbl">four eyes → ActionApprovalRequested</text>
+
+  <rect x="320" y="320" width="210" height="70" rx="10" class="db"/>
+  <text x="338" y="348" class="h2">Event log (Postgres)</text>
+  <text x="338" y="368" class="mono">seq 3012, 3013, …</text>
+
+  <!-- worker -->
+  <rect x="620" y="96" width="250" height="190" rx="12" class="wf"/>
+  <text x="640" y="124" class="h">business-worker</text>
+  <circle cx="650" cy="150" r="10" class="bd"/><text x="650" y="154" class="num">2</text>
+  <text x="668" y="154" class="d">dispatcher reads events</text>
+  <text x="668" y="170" class="lbl">in seq order, cursor on disk</text>
+  <circle cx="650" cy="196" r="10" class="bd"/><text x="650" y="200" class="num">3</text>
+  <text x="668" y="200" class="d">start workflow, id from event:</text>
+  <text x="668" y="216" class="mono">PurchaseOrderRelease-&lt;eventId&gt;</text>
+  <text x="640" y="248" class="lbl">same event twice → same id → one start</text>
+  <text x="640" y="266" class="lbl">also owns schedule lake-flush (1 min)</text>
+
+  <!-- Temporal -->
+  <rect x="920" y="96" width="240" height="190" rx="12" class="db"/>
+  <text x="940" y="124" class="h">Temporal, namespace business</text>
+  <text x="940" y="150" class="d">search attributes</text>
+  <text x="940" y="170" class="mono">OntologyObjects =</text>
+  <text x="952" y="186" class="mono">PurchaseOrder:PO-4430</text>
+  <text x="952" y="202" class="mono">Supplier:S-NORDHOLZ</text>
+  <text x="952" y="218" class="mono">Material:BEAM-PINE-80</text>
+  <text x="940" y="244" class="mono">BusinessState = held</text>
+  <text x="940" y="266" class="lbl">durable: restarts lose nothing</text>
+
+  <path d="M230,155 L276,155" class="ln" marker-end="url(#a)"/>
+  <path d="M425,286 L425,316" class="ln" marker-end="url(#a)"/>
+  <path d="M530,355 L600,355 L600,160 L616,160" class="ln" marker-end="url(#a)"/>
+  <path d="M870,190 L916,190" class="ln" marker-end="url(#a)"/>
+
+  <!-- workflow lane -->
+  <rect x="40" y="430" width="1120" height="200" rx="12" fill="#fffaf3" stroke="#e65100" stroke-width="1.2"/>
+  <text x="60" y="458" class="h">PurchaseOrderRelease (one per order)</text>
+  <rect x="60" y="480" width="170" height="60" rx="8" class="step"/>
+  <text x="74" y="504" class="h2">release window</text>
+  <text x="74" y="524" class="lbl">timer (30 s in the demo)</text>
+  <rect x="270" y="480" width="170" height="60" rx="8" class="held"/>
+  <text x="284" y="504" class="h2">wait while held</text>
+  <text x="284" y="524" class="lbl">holds stack, by ref</text>
+  <rect x="480" y="480" width="190" height="60" rx="8" class="step"/>
+  <text x="494" y="504" class="h2">release_purchase_order</text>
+  <text x="494" y="524" class="lbl">ontology action (REST)</text>
+  <rect x="710" y="480" width="190" height="60" rx="8" class="step"/>
+  <text x="724" y="504" class="h2">awaiting delivery</text>
+  <text x="724" y="524" class="lbl">timer until ETA (sim days)</text>
+  <rect x="940" y="480" width="200" height="60" rx="8" class="step"/>
+  <text x="954" y="504" class="h2">received | late | cancelled</text>
+  <text x="954" y="524" class="lbl">late → notification event</text>
+  <path d="M230,510 L266,510" class="ln" marker-end="url(#a)"/>
+  <path d="M440,510 L476,510" class="ln" marker-end="url(#a)"/>
+  <path d="M670,510 L706,510" class="ln" marker-end="url(#a)"/>
+  <path d="M900,510 L936,510" class="ln" marker-end="url(#a)"/>
+  <path d="M575,480 L575,300 L425,300 L425,290" class="lnb" marker-end="url(#b)"/>
+  <text x="582" y="420" class="lbl" fill="#1f5fad">every write goes back through the ontology server</text>
+
+  <!-- person -->
+  <rect x="60" y="560" width="520" height="56" rx="8" class="usr"/>
+  <text x="76" y="584" class="h2">Admin console → Business processes</text>
+  <text x="76" y="602" class="lbl">Hold by object Supplier:S-NORDHOLZ · Release · Approve / reject four-eyes requests (ApprovalWorkflow)</text>
+  <path d="M330,560 L340,544" class="lnw" marker-end="url(#o)"/>
+  <rect x="620" y="560" width="520" height="56" rx="8" class="usr"/>
+  <text x="636" y="584" class="h2">ApprovalWorkflow</text>
+  <text x="636" y="602" class="lbl">update decide (one decision, not the requester) → runs the action with approvedBy</text>
+</svg>

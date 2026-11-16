@@ -1,0 +1,25 @@
+{
+  "name": "@cw/business-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise business worker (ADR-0045): Temporal worker for the business namespace, dispatcher that starts/signals workflows from committed events, lake-flush schedule. All writes go through the ontology server's actions.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/bundle-workflows.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cw/business-workflows": "workspace:*",
+    "@temporalio/client": "1.24.0",
+    "@temporalio/common": "1.24.0",
+    "@temporalio/worker": "1.24.0",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

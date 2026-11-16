@@ -242,7 +242,7 @@ export class SofaCompany {
     this.touch();
   }
 
-  readonly writeTools = new Set(['create_purchase_order', 'cancel_purchase_order', 'create_maintenance_ticket', 'update_production_order', 'create_production_order', 'request_overtime', 'request_temp_workers', 'write_off_stock', 'release_stock', 'file_incident_report', 'send_customer_notice', 'update_delivery_date', 'update_campaign']);
+  readonly writeTools = new Set(['release_purchase_order', 'create_purchase_order', 'cancel_purchase_order', 'create_maintenance_ticket', 'update_production_order', 'create_production_order', 'request_overtime', 'request_temp_workers', 'write_off_stock', 'release_stock', 'file_incident_report', 'send_customer_notice', 'update_delivery_date', 'update_campaign']);
   private readonly erpWrites = ['create_purchase_order', 'cancel_purchase_order', 'create_maintenance_ticket', 'update_production_order', 'create_production_order', 'request_overtime', 'request_temp_workers', 'write_off_stock', 'release_stock', 'file_incident_report'];
 
   /** Runs a tool by name, exactly like the mock's tools/call (errors as isError results, never throws for bad input). */
@@ -362,6 +362,17 @@ export class SofaCompany {
       this.W.costEur += q * unit;
       this.record('erp.create_purchase_order', a, po.id);
       return text({ ...po, totalEur: Math.round(q * unit) });
+    },
+
+    /** Not in the mock: step of the PurchaseOrderRelease business workflow (M5). Served on /onto only. */
+    release_purchase_order: (a: Args): ToolResult => {
+      const p = this.W.purchaseOrders.find((x) => x.id === a.poId);
+      if (!p) return err(`Unknown purchase order ${a.poId}`);
+      if (p.status !== 'open' && p.status !== 'delayed') return err(`${p.id} is ${p.status}; only open or delayed orders can be released`);
+      if (p.releasedAt) return err(`${p.id} was already released on ${p.releasedAt}`);
+      p.releasedAt = TODAY;
+      this.record('erp.release_purchase_order', a, p.id);
+      return text(p);
     },
 
     cancel_purchase_order: (a: Args): ToolResult => {

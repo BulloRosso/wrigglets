@@ -21,6 +21,8 @@ export interface Caller {
   workflow?: string;
   /** Task step (plan | run | fix) as the gateway knows it; run/fix = a person approved the plan. */
   step?: string;
+  /** Person who approved a four-eyes request (ApprovalWorkflow). Accepted only from trusted callers (REST + internal token), never from MCP. */
+  approvedBy?: string;
 }
 
 export type PolicyHook = (input: { action: string; target?: string; readOnly: boolean; destructive: boolean; caller: Caller; args: Args; company: SofaCompany }) => Promise<{ allow: boolean; reason?: string; obligations?: string[] }>;
@@ -97,6 +99,8 @@ export class OntologyService {
       else if (k === '_task') caller.task = String(v);
       else if (k === '_requestedBy') caller.user = String(v);
       else if (k === '_step') caller.step = String(v);
+      else if (k === '_workflow') caller.workflow = String(v);
+      else if (k === '_approvedBy') caller.approvedBy = String(v);
       else rest[k] = v;
     }
     return { args: rest, caller };
@@ -143,7 +147,7 @@ export class OntologyService {
    */
   private async requestApproval(action: string, target: string | undefined, args: Args, caller: Caller, reason?: string): Promise<ActionOutcome> {
     const [r] = await new EventStore(this.pool).append([
-      { type: 'ActionApprovalRequested', objectType: target ?? 'Company', objectId: '-', action, actorAgent: caller.agent, actorUser: caller.user, taskId: caller.task, payload: { input: args, obligation: 'require_four_eyes', reason: reason ?? null, step: caller.step ?? null }, ontologyVersion: this.ir.version },
+      { type: 'ActionApprovalRequested', objectType: target ?? 'Company', objectId: '-', action, actorAgent: caller.agent, actorUser: caller.user, taskId: caller.task, workflowId: caller.workflow, payload: { input: args, obligation: 'require_four_eyes', reason: reason ?? null, step: caller.step ?? null }, ontologyVersion: this.ir.version },
     ]);
     return { text: `Pending approval (four eyes): ${action} needs a person's approval before it runs (approval request ${r!.seq}). Nothing was changed yet.`, isError: true, denied: true, seq: r!.seq };
   }
@@ -161,7 +165,7 @@ export class OntologyService {
           actorUser: e.caller.user,
           taskId: e.caller.task,
           workflowId: e.caller.workflow,
-          payload: { ...e.payload, changes, meta },
+          payload: { ...e.payload, ...(e.caller.approvedBy ? { approvedBy: e.caller.approvedBy } : {}), changes, meta },
           ontologyVersion: this.ir.version,
         },
       ]);

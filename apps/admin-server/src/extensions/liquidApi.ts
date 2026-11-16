@@ -5,6 +5,7 @@ import { requireExtension } from './api.js';
 import { LIQUID_ID, ontologyCall } from './liquid.js';
 import type { ExtensionService } from './service.js';
 import type { LiquidPolicyService } from './liquidPolicy.js';
+import type { LiquidProcesses } from './liquidProcesses.js';
 
 /* Admin console routes of Liquid Enterprise (Platform.Admin); 404 while the extension is not available. */
 
@@ -12,7 +13,7 @@ interface Audit {
   write(e: { by: string; action: string; target: string; details?: Record<string, unknown> }): Promise<void>;
 }
 
-export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req: Request) => string = () => 'admin', policy?: LiquidPolicyService): Router {
+export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req: Request) => string = () => 'admin', policy?: LiquidPolicyService, processes?: LiquidProcesses): Router {
   const r = Router();
   const ctx = {
     url: (service: string) => ext.url(LIQUID_ID, service),
@@ -58,6 +59,53 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   // Projection maintenance
   r.post('/liquid/projection/rebuild', pass('POST', (req) => `/internal/projection/rebuild${req.query.dryRun === 'true' ? '?dryRun=true' : ''}`, 'liquid.projection.rebuild'));
   r.get('/liquid/projection/dq', pass('GET', () => '/internal/projection/dq'));
+
+  // Business workflows (ADR-0045): list, hold/release by ontology object, decide approvals (four eyes)
+  if (processes) {
+    const str = (v: unknown, max = 500) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    r.get('/liquid/processes', async (_req, res, next) => {
+      try {
+        res.json(await processes.list());
+      } catch (err) {
+        next(err);
+      }
+    });
+    r.post('/liquid/processes/hold', async (req, res, next) => {
+      try {
+        const objects = Array.isArray(req.body?.objects) ? (req.body.objects as unknown[]).map(String) : [];
+        const reason = str(req.body?.reason) ?? 'held from the admin console';
+        const ref = `console-${Date.now().toString(36)}`;
+        const out = await processes.hold(objects, `${reason} (${by(req)})`, ref);
+        await audit?.write({ by: by(req), action: 'liquid.process.hold', target: objects.join(','), details: { ref, reason, workflows: out.workflows.length } });
+        res.json(out);
+      } catch (err) {
+        next(err);
+      }
+    });
+    r.post('/liquid/processes/release', async (req, res, next) => {
+      try {
+        const ref = str(req.body?.ref, 120);
+        if (!ref) throw new HttpError(400, 'ref is required');
+        const out = await processes.release(ref);
+        await audit?.write({ by: by(req), action: 'liquid.process.release', target: ref, details: { workflows: out.workflows.length } });
+        res.json(out);
+      } catch (err) {
+        next(err);
+      }
+    });
+    r.post('/liquid/approvals/:workflowId/decide', async (req, res, next) => {
+      try {
+        const decision = req.body?.decision;
+        if (decision !== 'approve' && decision !== 'reject') throw new HttpError(400, 'decision must be approve or reject');
+        const workflowId = String(req.params.workflowId);
+        const out = await processes.decide(workflowId, decision, by(req), str(req.body?.comment));
+        await audit?.write({ by: by(req), action: `liquid.approval.${decision}`, target: workflowId, details: { comment: str(req.body?.comment) } });
+        res.json(out);
+      } catch (err) {
+        next(err);
+      }
+    });
+  }
 
   // Policy as code (ADR-0044): bundle state, overlays, OPA's recent decisions
   if (policy) {

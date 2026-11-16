@@ -26,10 +26,32 @@ test_create_of_payment_critical_class_without_plan_needs_four_eyes if {
 	d.obligations == ["require_four_eyes"]
 }
 
+test_approval_by_another_person_satisfies_four_eyes if {
+	d := object.decision with input as {"action": "cancel_purchase_order", "caller": {"agent": "sofa-lara", "user": "stefan@x", "approved_by": "ben@x", "task": {"step": ""}}, "objects": [po]}
+	d.obligations == []
+}
+
+test_self_approval_does_not_count if {
+	d := object.decision with input as {"action": "cancel_purchase_order", "caller": {"agent": "sofa-lara", "user": "stefan@x", "approved_by": "stefan@x", "task": {"step": ""}}, "objects": [po]}
+	d.obligations == ["require_four_eyes"]
+}
+
 test_person_write_needs_no_four_eyes if {
 	d := object.decision with input as {"action": "cancel_purchase_order", "caller": {"user": "stefan@x"}, "objects": [po]}
 	d.allow
 	d.obligations == []
+}
+
+# The ontology server sends absent caller fields as null (null is truthy in Rego): regression tests for both directions.
+test_null_agent_is_not_an_agent if {
+	d := object.decision with input as {"action": "cancel_purchase_order", "caller": {"agent": null, "user": "stefan@x", "approved_by": null, "workflow": "wf-1", "task": {"id": null, "step": null}}, "objects": [po]}
+	d.allow
+	d.obligations == []
+}
+
+test_null_approved_by_is_no_approval if {
+	d := object.decision with input as {"action": "cancel_purchase_order", "caller": {"agent": "sofa-lara", "user": "stefan@x", "approved_by": null, "workflow": null, "task": {"id": null, "step": null}}, "objects": [po]}
+	d.obligations == ["require_four_eyes"]
 }
 
 test_reads_have_no_obligations if {

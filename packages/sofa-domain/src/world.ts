@@ -71,7 +71,7 @@ export interface Supplier {
   expressLeadWorkdays: number | null; expressSurchargePerUnit: number; rating: string; status: string; notice: string | null;
 }
 export interface Lot { id: string; sku: string; qty: number; location: string; status: string; note: string }
-export interface PurchaseOrder { id: string; supplierId: string; sku: string; qty: number; unitPrice: number; eta: string; originalEta: string; status: string; express: boolean; note: string }
+export interface PurchaseOrder { id: string; supplierId: string; sku: string; qty: number; unitPrice: number; eta: string; originalEta: string; status: string; express: boolean; note: string; releasedAt?: string }
 export interface Customer { id: string; name: string; tier: string; penaltyPctPerWeekLate: number; contact: string }
 export interface SalesOrder { id: string; customerId: string; product: ProductId; qty: number; fabric: string; promisedDelivery: string; communicatedDelivery: string | null; status: string }
 export interface ProductionOrder { id: string; salesOrderId: string; factory: FactoryId; product: ProductId; fabric: string; qty: number; priority: number; dueDate: string; status: string }

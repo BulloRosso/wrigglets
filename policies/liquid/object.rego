@@ -28,17 +28,33 @@ deny contains sprintf("overlay %v: %v", [o.id, o.reason]) if {
 # the plan is that second pair; anything else (chat, interactive calls) needs an explicit approval.
 obligations contains "require_four_eyes" if {
 	not action.read_only
-	input.caller.agent
+	is_agent
 	some o in input.objects
 	o.criticality == "payment_critical"
 	not common.approved_plan(input.caller.task)
+	not approved_by_other_person
 }
 
 obligations contains "require_four_eyes" if {
 	not action.read_only
-	input.caller.agent
+	is_agent
 	action.criticality == "payment_critical"
 	not common.approved_plan(input.caller.task)
+	not approved_by_other_person
+}
+
+# Caller fields are null when absent (the ontology server sends every key); null is truthy in Rego, so test for strings.
+is_agent if {
+	is_string(input.caller.agent)
+	input.caller.agent != ""
+}
+
+# An explicit approval (ApprovalWorkflow, M5) by a person who is neither the agent nor the requesting user.
+approved_by_other_person if {
+	is_string(input.caller.approved_by)
+	input.caller.approved_by != ""
+	input.caller.approved_by != input.caller.agent
+	input.caller.approved_by != object.get(input.caller, "user", null)
 }
 
 obligations contains o.effect if {

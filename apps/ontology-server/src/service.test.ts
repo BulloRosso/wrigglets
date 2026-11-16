@@ -166,8 +166,9 @@ describe('projection rebuild, reset, write log', () => {
 });
 
 describe('MCP', () => {
-  it('groups: erp + crm = onto; caller fields are declared for the gateway', () => {
-    expect(toolsFor('erp').length + toolsFor('crm').length).toBe(toolsFor('onto').length);
+  it('groups: erp + crm + ungrouped (onto only) = onto; caller fields are declared for the gateway', () => {
+    expect(toolsFor('erp').length + toolsFor('crm').length + 1).toBe(toolsFor('onto').length);
+    expect(toolsFor('onto').map((t) => t.name)).toContain('release_purchase_order');
     expect(Object.keys(toolsFor('erp')[0]!.inputSchema.properties)).toEqual(expect.arrayContaining(['_agent', '_task', '_requestedBy']));
   });
   it('tools/call through JSON-RPC records the caller the gateway injected', async () => {
@@ -178,6 +179,17 @@ describe('MCP', () => {
     expect(e).toMatchObject({ actor_agent: 'sofa-horst', task_id: 't-9', actor_user: 'sabine@x' });
     expect(e.payload.input).toEqual({ orderId: 'SO-2105', newDate: '2026-11-06', reason: 'x' });
   });
+  it('an approval cannot come from an agent: _approvedBy in an MCP call is dropped', async () => {
+    let seen: unknown;
+    const s2 = new OntologyService(poolOf(db), loadIr(), async ({ caller }) => {
+      seen = caller;
+      return { allow: true };
+    });
+    await s2.init();
+    await rpc(s2, 'erp', { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'get_kpi', arguments: { _agent: 'sofa-lara', _approvedBy: 'ben@x', _workflow: 'fake' } } });
+    expect(seen).toEqual({ agent: 'sofa-lara' });
+  });
+
   it('a tool of another group is unknown in this group', async () => {
     const out = (await rpc(svc, 'erp', { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list_customers', arguments: {} } })) as { result: { content: Array<{ text: string }>; isError: boolean } };
     expect(out.result).toMatchObject({ isError: true, content: [{ text: 'Unknown tool list_customers' }] });

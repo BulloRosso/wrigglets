@@ -80,6 +80,7 @@ services:
       OPA_URL: http://opa:8181
       OPA_TOKEN: ${LIQUID_OPA_QUERY_TOKEN:?}
       LAKE_DATA_PATH: /lake/
+      FLUSH_INTERVAL_SEC: "0"
     depends_on:
       ontology-db: { condition: service_healthy }
       opa: { condition: service_started }
@@ -90,6 +91,25 @@ services:
       retries: 30
     networks: [coworking]
 
+  # Business workflows (ADR-0045): Temporal namespace `business`, event dispatcher, lake-flush schedule.
+  # The namespace is created by the control plane (bootstrap step business-namespace); the worker waits for it.
+  business-worker:
+    build: { context: ., dockerfile: infra/docker/Dockerfile, target: business-worker }
+    image: coworking/business-worker:local
+    container_name: cw-liquid-business-worker
+    hostname: business-worker
+    restart: unless-stopped
+    volumes:
+      - liquid-business-worker-data:/data
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      ONTOLOGY_URL: http://ontology-server:7710
+      INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?}
+    depends_on:
+      ontology-server: { condition: service_healthy }
+    networks: [coworking]
+
 volumes:
   liquid-ontology-db-data:
   liquid-lake-data:
+  liquid-business-worker-data:

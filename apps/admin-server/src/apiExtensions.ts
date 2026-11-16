@@ -34,6 +34,7 @@ import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 import { extensionsAdminRouter } from './extensions/api.js';
 import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
+import type { LiquidProcesses } from './extensions/liquidProcesses.js';
 import type { ExtensionService } from './extensions/service.js';
 
 export interface ExtensionDeps {
@@ -58,6 +59,7 @@ export interface ExtensionDeps {
   extensions: ExtensionService;
   /** Liquid Enterprise policy as code: overlays, OPA bundle, decisions (ADR-0044). */
   liquidPolicy?: LiquidPolicyService;
+  liquidProcesses?: LiquidProcesses;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -358,7 +360,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
   r.use(extensionsAdminRouter(d.extensions, by));
-  r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy));
+  r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy, d.liquidProcesses));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

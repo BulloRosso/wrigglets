@@ -51,6 +51,9 @@ export async function rpc(svc: OntologyService, group: Group, msg: RpcMessage) {
       if (!toolsFor(group).some((t) => t.name === name)) return { jsonrpc: '2.0', id, result: text(`Unknown tool ${name}`, true) };
       try {
         const { args, caller } = OntologyService.splitCaller(params?.arguments ?? {});
+        // approvals and workflow identity never come from an agent's tool call
+        delete caller.approvedBy;
+        delete caller.workflow;
         const out = await svc.execute(name, args, caller);
         return { jsonrpc: '2.0', id, result: text(out.text, out.isError) };
       } catch (e) {

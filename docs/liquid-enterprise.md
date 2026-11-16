@@ -287,7 +287,7 @@ enforced by OPA, a service of the extension, at two points:
 Both fail closed: OPA not configured, not reachable, wrong token, no bundle loaded or no decision all mean **denied**.
 
 **Obligations:** `require_four_eyes` — the action is not run; an `ActionApprovalRequested` event is recorded and the agent is
-told that a person must approve (the approval workflow follows in M5). `require_step_up` — denied in the prototype.
+told that a person must approve; the request becomes an approval workflow (see [Business workflows](#business-workflows)). `require_step_up` — denied in the prototype.
 
 **Overlays** tighten without code changes: Liquid enterprise → **Policies** → *Add overlay* (effect deny / four eyes /
 step-up, matching actions, classes, upstreams or agents, optional expiry). OPA picks it up within about 10 seconds.
@@ -302,7 +302,50 @@ automatically.
 
 ## Business workflows
 
-*(planned, M5)*
+Decision record: [ADR-0045](adr/0045-business-workflows-temporal.md).
+
+<img src="diagrams/26-liquid-business-workflows.svg" alt="Business workflows: events start holdable processes" width="100%">
+
+Long-running business processes run as Temporal workflows in their own namespace **`business`** on the platform's
+Temporal, executed by the extension service **business-worker**. They are started by committed events, not by code
+calling code: the ontology declares it.
+
+```yaml
+# ontology/sofa/actions.yaml
+create_purchase_order:
+  starts_workflow: PurchaseOrderRelease
+cancel_purchase_order:
+  signals_workflow: { workflow: PurchaseOrderRelease, signal: cancel }
+```
+
+| Workflow | Started by | Steps |
+|---|---|---|
+| `PurchaseOrderRelease` | `PurchaseOrderCreated` | release window → wait while held → `release_purchase_order` → wait until the ETA → received / late (notification) / cancelled |
+| `ApprovalWorkflow` | `ActionApprovalRequested` (four eyes, ADR-0044) | wait for a decision (reminder, expiry) → on approval run the action with `approvedBy` |
+| `lakeFlush` | schedule `lake-flush`, every minute | flush the event log into the lake (replaces the ontology server's own timer) |
+
+**Every step that changes data is an ontology action** through the ontology server: validated, policy-checked, an
+event. A refused action is a result of the workflow (e.g. the order was cancelled meanwhile), not a crash.
+
+**Hold by object.** Each workflow carries the objects it touches in the search attribute `OntologyObjects`
+(`PurchaseOrder:PO-4430`, `Supplier:S-NORDHOLZ`, `Material:BEAM-PINE-80`). Liquid enterprise → **Business processes** →
+*Hold by object* signals `hold` to every running workflow with that object; they pause before their next step and show
+`BusinessState = held`. *Release* lifts that hold (by its ref) everywhere; several holds can stack. Holding is
+tightening and needs no approval; it never skips or runs a step. From M7 playbooks hold by object automatically.
+
+**Approvals.** Pending four-eyes requests appear as cards with the action, its input and the touched objects.
+*Approve and run* executes the action with the signed-in person as `approvedBy`; OPA accepts that as the second pair of
+eyes only if it is neither the agent nor the requesting user. One decision per request; it expires after 7 days.
+
+**Durability.** The dispatcher reads the event log in order and remembers its position (`/data/dispatch-cursor.json`
+in the volume `business-worker-data`). Workflow ids are derived from event ids, so a restart never starts a process
+twice; holds and timers live in Temporal and survive worker restarts. Temporal UI → namespace `business` shows the
+histories.
+
+**Demo timing** (env of business-worker): `SIM_TODAY` (2026-10-05), `MS_PER_SIM_DAY` (20 s per simulated day),
+`RELEASE_AFTER_MS` (30 s), `APPROVAL_REMINDER_MS` (4 h), `APPROVAL_EXPIRE_MS` (7 d), `LAKE_FLUSH_EVERY` (1m).
+
+![Business processes page: a hold on Supplier:S-NORDHOLZ, a pending approval, running processes](images/liquid/liquid-processes.png)
 
 ## Config repository and proposals
 
@@ -340,6 +383,9 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
 - **Rebuild the projection:** `POST /api/liquid/projection/rebuild?dryRun=true` (verify: `identical` must be true), then
   without `dryRun` to swap. **Data quality:** `GET /api/liquid/projection/dq`.
 - **Switch the sofa agents' backend:** `node scripts/liquid/setup.mjs` (ontology server) / `--restore` (mock).
+- **Business workflows:** histories in Temporal UI → namespace `business`; worker logs
+  `docker logs cw-ext-liquid-business-worker`. The dispatcher position is in `/data/dispatch-cursor.json` of the worker
+  (deleting it makes the worker start at the current end of the log; earlier events are not dispatched again).
 - *(planned)* Replaying a window, restoring after a playbook run, rotating the ontology DB credentials.
 
 ## Results D1–D3
@@ -429,8 +475,7 @@ Open
 
 Deviations
 - None from the plan. The pino logger already redacts any `env` field; the masked environment is logged anyway.
-- Found and fixed on the way: `infra/docker/Dockerfile` (from commit `79ac9c6`, Signals) had a literal `
-` instead of a
+- Found and fixed on the way: `infra/docker/Dockerfile` (from commit `79ac9c6`, Signals) had a literal `\n` instead of a
   line continuation in the `pnpm deploy` step, so no image could be built from that commit (`/bin/sh: n: not found`).
 - The control plane was rebuilt with `docker compose build temporal` + `up -d --no-deps temporal`, not `stack.mjs up`,
   because `up --remove-orphans` would remove services of other overlays (e.g. the running `mcp-sofa`).
@@ -587,6 +632,40 @@ Verified
 Open
 - The sofa scenarios with real agents and `policy: opa` (part of the D1 runs).
 - Executing an approved four-eyes request: M5 (ApprovalWorkflow).
+
+### M5 — Business workflows (2026-11-16)
+
+Done
+- Temporal namespace `business` with search attributes `OntologyObjects`, `BusinessState` (bootstrap step
+  `business-namespace`; ensured at startup in overlay mode). [ADR-0045](adr/0045-business-workflows-temporal.md).
+- `packages/business-workflows`: `holdable()` (hold/release signals, holdState query, stacked holds),
+  `PurchaseOrderRelease`, `ApprovalWorkflow` (update `decide` with validator, reminder, expiry), `lakeFlush`.
+- Ontology: `starts_workflow` / `signals_workflow` on actions (compiler + IR), new action `release_purchase_order`
+  (served on `/onto` only), `PurchaseOrder.released_at`, event `PurchaseOrderReleased`.
+- `apps/business-worker` (extension service + overlay service): worker, dispatcher (outbox pattern, cursor on disk, ids
+  from event ids), schedule `lake-flush`; the ontology server's flush timer is off when it is installed. Ontology
+  server: `GET /internal/events?after=`, caller fields `_workflow`, `_approvedBy`.
+- Control plane: processes API (list, hold by object, release, decide), audited; admin console page **Business
+  processes**.
+
+Verified
+- Workflow tests with the Temporal test server: 11/11 (release, hold by supplier via visibility query, stacked holds,
+  cancel, late delivery, approval approve/reject/expire/requester refused, worker restart) and replay of recorded
+  histories. Worker: dispatcher and activities 7/7. `opa test` 31/31.
+- **End to end** (`node scripts/liquid/e2e-processes.mjs`, `scripts/liquid/results/e2e-processes.json`): 19/19 — repair
+  installs the worker and runs the namespace step; three orders start three `PurchaseOrderRelease`; **hold on
+  Supplier:S-NORDHOLZ reaches exactly its two workflows**, the Baltic order is released on time, the held ones are not;
+  **after `docker restart` of the worker the holds are in place, nothing was started twice**, and an order created after
+  the restart is dispatched; Lara's four-eyes request becomes an `ApprovalWorkflow`, **approval in the console runs the
+  action with `approvedBy`** and that order starts its own process; a second decision is refused; **release resumes**
+  the held workflows (orders released); the `lake-flush` schedule flushes the lake.
+- Found on the way: the ontology server sends absent caller fields as `null`, and `null` is truthy in Rego. REST and
+  workflow calls were treated as agent calls (four eyes), and an agent call with a requesting user but without approval
+  would have passed as approved by another person. Fixed with `is_string` checks; regression tests added.
+
+Open
+- Notifications are events (`BusinessNotification`); delivery by mail later.
+- The sofa scenarios with real agents (D1 runs) still need the go-ahead for model cost.
 
 ### Later
 

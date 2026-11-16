@@ -1,10 +1,10 @@
 {
-  "$generated": "GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs",
+  "$generated": "GENERATED from ontology sofa@0.1.0 (d3b7090b2597) — do not edit; run node scripts/liquid/ontology-build.mjs",
   "liquid": {
     "ontology": {
       "name": "sofa",
       "version": "0.1.0",
-      "hash": "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7",
+      "hash": "d3b7090b259718870fb447e9df4a257f75fa81860297a44da3d15a0b9bbe6f90",
       "classes": {
         "Factory": {
           "identifier": "id",
@@ -308,6 +308,19 @@
           "owner": "head-of-logistics",
           "emits": [
             "PurchaseOrderCancelled"
+          ]
+        },
+        "release_purchase_order": {
+          "target": "PurchaseOrder",
+          "kind": "update",
+          "read_only": false,
+          "destructive": false,
+          "mcp_group": null,
+          "criticality": "payment_critical",
+          "data_class": "confidential",
+          "owner": "head-of-logistics",
+          "emits": [
+            "PurchaseOrderReleased"
           ]
         },
         "create_maintenance_ticket": {

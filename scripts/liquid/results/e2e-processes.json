@@ -1,0 +1,145 @@
+{
+  "startedAt": "2026-11-16T18:40:59.513Z",
+  "checks": [
+    {
+      "name": "repair installed the business worker; all services running",
+      "ok": true,
+      "detail": [
+        "opa=running",
+        "ontology-db=running",
+        "ontology-server=running",
+        "business-worker=running"
+      ]
+    },
+    {
+      "name": "bootstrap step business-namespace ran",
+      "ok": true
+    },
+    {
+      "name": "processes API answers (namespace business reachable)",
+      "ok": true,
+      "detail": "0 running"
+    },
+    {
+      "name": "create_purchase_order starts one PurchaseOrderRelease per order",
+      "ok": true,
+      "detail": [
+        "PurchaseOrderRelease-69ce5ac4-a326-4c07-b680-96e5c422c4e7",
+        "PurchaseOrderRelease-c51aa37b-c8dc-45e1-9758-ee288642be34",
+        "PurchaseOrderRelease-18f02ef9-539f-4d30-b8f8-4fedb8e25c79"
+      ]
+    },
+    {
+      "name": "hold on Supplier:S-NORDHOLZ reaches exactly its workflows",
+      "ok": true,
+      "detail": [
+        "PurchaseOrderRelease-69ce5ac4-a326-4c07-b680-96e5c422c4e7",
+        "PurchaseOrderRelease-c51aa37b-c8dc-45e1-9758-ee288642be34"
+      ]
+    },
+    {
+      "name": "the other supplier's order is released on time; the held ones are not",
+      "ok": true,
+      "detail": {
+        "PO-4432": "2026-10-05",
+        "PO-4430": null,
+        "PO-4431": null
+      }
+    },
+    {
+      "name": "held workflows report BusinessState held",
+      "ok": true,
+      "detail": [
+        "held",
+        "held"
+      ]
+    },
+    {
+      "name": "erp/crm point at the ontology server with policy: opa",
+      "ok": true,
+      "detail": "19:41:46 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
+    },
+    {
+      "name": "payment-critical write outside an approved task waits for four eyes",
+      "ok": true,
+      "detail": "Pending approval (four eyes): create_purchase_order needs a person's approval before it runs (approv"
+    },
+    {
+      "name": "the request became an ApprovalWorkflow",
+      "ok": true,
+      "detail": {
+        "workflowId": "ApprovalWorkflow-fe192267-de88-4a85-9428-e980c6cd3e99",
+        "objects": [
+          "Supplier:S-BALTIC",
+          "Material:BEAM-PINE-80"
+        ]
+      }
+    },
+    {
+      "name": "after a worker restart the holds are still in place and no workflow was started twice",
+      "ok": true,
+      "detail": {
+        "before": 3,
+        "after": 3
+      }
+    },
+    {
+      "name": "events after the restart are dispatched",
+      "ok": true,
+      "detail": "PurchaseOrderRelease-2b0b82bb-2412-4f22-9650-5bb4d23190fa"
+    },
+    {
+      "name": "approval accepted (decided by the signed-in person)",
+      "ok": true,
+      "detail": {
+        "decision": "approve",
+        "by": "admin@example.local",
+        "comment": "e2e"
+      }
+    },
+    {
+      "name": "the approved action ran with approvedBy (event committed)",
+      "ok": true,
+      "detail": "PO-4434|admin@example.local"
+    },
+    {
+      "name": "the approved purchase order started its own PurchaseOrderRelease",
+      "ok": true,
+      "detail": "PO-4434"
+    },
+    {
+      "name": "a second decision is refused",
+      "ok": true
+    },
+    {
+      "name": "release reaches the held workflows",
+      "ok": true,
+      "detail": [
+        "PurchaseOrderRelease-69ce5ac4-a326-4c07-b680-96e5c422c4e7",
+        "PurchaseOrderRelease-c51aa37b-c8dc-45e1-9758-ee288642be34"
+      ]
+    },
+    {
+      "name": "released workflows resume: the orders get released",
+      "ok": true,
+      "detail": {
+        "PO-4430": "2026-10-05",
+        "PO-4431": "2026-10-05"
+      }
+    },
+    {
+      "name": "lake-flush schedule flushes the event log into the lake",
+      "ok": true,
+      "detail": {
+        "at": "2026-11-16T18:42:00.257Z",
+        "result": {
+          "flushed": 6,
+          "hwm": 3017,
+          "waiting": 0
+        }
+      }
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T18:42:08.917Z"
+}

@@ -168,7 +168,7 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
     # ------------------------------------------------------------------ actions
     actions = []
     action_names = set()
-    allowed_action = {"name", "description", "target", "kind", "read_only", "destructive", "mcp_group", "input", "preconditions", "emits"}
+    allowed_action = {"name", "description", "target", "kind", "read_only", "destructive", "mcp_group", "input", "preconditions", "emits", "starts_workflow", "signals_workflow"}
     for i, a in enumerate(actions_doc.get("actions") or []):
         name = a.get("name") if isinstance(a, dict) else None
         path = f"actions.yaml#{name or f'actions[{i}]'}"
@@ -227,6 +227,15 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
             err(f"{path}.emits", "a write action must emit at least one event")
         if read_only and emits:
             err(f"{path}.emits", "a read-only action emits no events")
+        starts = a.get("starts_workflow")
+        if starts is not None and (not isinstance(starts, str) or not NAME.match(starts)):
+            err(f"{path}.starts_workflow", "a PascalCase workflow name")
+        if starts is not None and read_only:
+            err(f"{path}.starts_workflow", "a read-only action cannot start a workflow")
+        signals = a.get("signals_workflow")
+        if signals is not None:
+            if not isinstance(signals, dict) or set(signals) != {"workflow", "signal"} or not NAME.match(str(signals.get("workflow"))) or not ACTION.match(str(signals.get("signal"))):
+                err(f"{path}.signals_workflow", "{ workflow: PascalCase, signal: snake_case }")
         pre = list(a.get("preconditions") or [])
         for p in pre:
             if not ACTION.match(str(p)):
@@ -242,6 +251,8 @@ def compile_sources(schema_path: Path, texts: dict[str, str]) -> dict[str, Any]:
             "input": inputs,
             "preconditions": pre,
             "emits": emits,
+            "startsWorkflow": starts,
+            "signalsWorkflow": signals,
         }))
 
     # ------------------------------------------------------------------ bindings

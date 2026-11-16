@@ -1,8 +1,8 @@
-// GENERATED from ontology sofa@0.1.0 (0d44abb6df1c) — do not edit; run node scripts/liquid/ontology-build.mjs
+// GENERATED from ontology sofa@0.1.0 (d3b7090b2597) — do not edit; run node scripts/liquid/ontology-build.mjs
 
 import { z } from 'zod';
 
-export const ONTOLOGY = { name: "sofa", version: "0.1.0", hash: "0d44abb6df1cac5d3466736d0307cd2aa77b0b89381bae727e9b60cbc5b9b9d7" } as const;
+export const ONTOLOGY = { name: "sofa", version: "0.1.0", hash: "d3b7090b259718870fb447e9df4a257f75fa81860297a44da3d15a0b9bbe6f90" } as const;
 
 export const MachineStatus = z.enum(["running","down"]);
 export type MachineStatus = z.infer<typeof MachineStatus>;
@@ -155,6 +155,7 @@ export const PurchaseOrder = z.object({
   status: PurchaseOrderStatus,
   express: z.boolean().nullish(),
   note: z.string().nullish(),
+  released_at: z.iso.date().describe("Day the order was released to the supplier (PurchaseOrderRelease workflow)").nullish(),
 });
 export type PurchaseOrder = z.infer<typeof PurchaseOrder>;
 
@@ -353,6 +354,12 @@ export const CancelPurchaseOrderInput = z.object({
 });
 export type CancelPurchaseOrderInput = z.infer<typeof CancelPurchaseOrderInput>;
 
+/** Input of release_purchase_order (update) */
+export const ReleasePurchaseOrderInput = z.object({
+  poId: z.string().min(1).describe("Purchase order id"),
+});
+export type ReleasePurchaseOrderInput = z.infer<typeof ReleasePurchaseOrderInput>;
+
 /** Input of create_maintenance_ticket (create) */
 export const CreateMaintenanceTicketInput = z.object({
   machineId: z.string().min(1).describe("Machine id, e.g. N-CUT-1"),
@@ -488,6 +495,7 @@ export const ACTION_INPUTS = {
   list_maintenance_tickets: ListMaintenanceTicketsInput,
   create_purchase_order: CreatePurchaseOrderInput,
   cancel_purchase_order: CancelPurchaseOrderInput,
+  release_purchase_order: ReleasePurchaseOrderInput,
   create_maintenance_ticket: CreateMaintenanceTicketInput,
   update_production_order: UpdateProductionOrderInput,
   create_production_order: CreateProductionOrderInput,

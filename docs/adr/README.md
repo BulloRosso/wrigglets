@@ -42,3 +42,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0035](0035-company-wiki.md) | A central company wiki that people govern | Accepted |
 | [0036](0036-ordered-delegation.md) | Ordered delegation: the platform keeps the order of dependent work | Accepted |
 | [0037](0037-optional-signals.md) | Optional Signals: proactive follow-up on observations and deadlines | Accepted |
+| [0038](0038-liquid-enterprise-extension.md) | Liquid Enterprise as an optional, installable extension | Accepted |

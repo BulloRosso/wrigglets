@@ -36,7 +36,7 @@ tighten automatically and loosen only with a human decision.
 
 | Layer | Role | Implemented by |
 |---|---|---|
-| Data lake and event log | raw, immutable data in open table formats; append-only events | MinIO + Apache Iceberg + Postgres event outbox; DuckDB for queries |
+| Data lake and event log | raw, immutable data in open table formats; append-only events | SeaweedFS (S3) + Apache Iceberg + Postgres event outbox; DuckDB for queries |
 | Ontology and actions | object types, links, typed actions; the **only write path** | LinkML schema + `actions.yaml` + `bindings.yaml` → compiler → ontology server |
 | Policy | who may run which action on which object | OPA at the MCP gateway and the ontology server |
 | Orchestration | long-running business processes, playbook runs, replays | Temporal, namespace `business` |
@@ -63,6 +63,10 @@ Decision record: [ADR-0039](adr/0039-extension-manager.md).
 3. It runs the bootstrap steps (with *Seed the sofa-company demo data*, also the demo seed) and registers the gateway
    upstreams the extension owns.
 
+| Installing | Installed |
+|---|---|
+| ![Install in progress: steps and service state](images/liquid/extensions-installing.png) | ![Installed: services, steps, Repair and Uninstall; the Liquid enterprise nav group appears](images/liquid/extensions-installed.png) |
+
 Every step is shown with its state; a failed step shows its error and **Retry install** continues from there. An install
 interrupted by a restart of the control plane resumes by itself. While installed and healthy, the navigation shows a
 **Liquid enterprise** group. **Repair** re-creates missing or changed containers and starts stopped ones (data and
@@ -87,6 +91,10 @@ node scripts/stack.mjs liquid up      # = docker compose -f docker-compose.yml -
 node scripts/stack.mjs liquid down    # removes the liquid services, restarts the control plane without the overlay
 node scripts/stack.mjs liquid reset   # also deletes the overlay's volumes
 ```
+
+The **Overview** page (Liquid enterprise → Overview) shows the installation and which layers are live:
+
+![Liquid enterprise overview](images/liquid/liquid-overview.png)
 
 In overlay mode the Extensions page shows Liquid read-only. Use one mode at a time: `liquid up` refuses to start while a
 console install exists. `node scripts/stack.mjs reset` removes both.
@@ -207,13 +215,22 @@ Verified
   re-creating healthy services, resume after restart, repair, uninstall only touches own resources, purge, overlay mode,
   Docker status parsing, manifest ↔ overlay service parity).
 
+- **End to end** (`node scripts/liquid/e2e-extension.mjs`, result `scripts/liquid/results/m0b-extension-e2e.json`):
+  15/15 checks on the running stack. The control plane was restarted while `service:ontology-db` was running; the
+  install resumed and finished by itself. Container labelled and healthy, volume created, `psql` answers, install
+  audited, nav route offered, repair keeps the healthy container, uninstall with purge leaves no container, volume or
+  owned upstream. Screenshots in `docs/images/liquid/`.
+
 Open
-- **End-to-end exit check not run yet:** Docker Desktop was not running. To do: fresh stack → Install (with demo seed)
-  → services healthy → Liquid nav visible → restart the control plane during an install → Uninstall → no `cw-ext-*`
-  container, no owned upstream. Playwright screenshots of the Extensions page.
+- Nothing for M0b.
 
 Deviations
 - None from the plan. The pino logger already redacts any `env` field; the masked environment is logged anyway.
+- Found and fixed on the way: `infra/docker/Dockerfile` (from commit `79ac9c6`, Signals) had a literal `
+` instead of a
+  line continuation in the `pnpm deploy` step, so no image could be built from that commit (`/bin/sh: n: not found`).
+- The control plane was rebuilt with `docker compose build temporal` + `up -d --no-deps temporal`, not `stack.mjs up`,
+  because `up --remove-orphans` would remove services of other overlays (e.g. the running `mcp-sofa`).
 
 ### Later
 

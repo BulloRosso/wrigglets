@@ -58,7 +58,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/mcp-gateway deploy --legacy --prod /out/mcp-gateway && \
     pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo && \
     pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web && \
-    pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki && \n    pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub
+    pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki && \
+    pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway

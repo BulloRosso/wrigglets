@@ -1,0 +1,100 @@
+{
+  "startedAt": "2026-11-16T14:58:31.974Z",
+  "checks": [
+    {
+      "name": "starts not installed and not available",
+      "ok": true
+    },
+    {
+      "name": "no liquid containers before install",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "install interrupted by a restart resumed and finished",
+      "ok": true,
+      "detail": {
+        "interrupted": true
+      }
+    },
+    {
+      "name": "every step done",
+      "ok": true,
+      "detail": [
+        "preflight",
+        "secrets",
+        "volumes",
+        "service:ontology-db"
+      ]
+    },
+    {
+      "name": "available after install",
+      "ok": true
+    },
+    {
+      "name": "ontology-db container is labelled and healthy",
+      "ok": true,
+      "detail": [
+        "cw-ext-liquid-ontology-db Up 6 seconds (healthy)"
+      ]
+    },
+    {
+      "name": "data volume created",
+      "ok": true,
+      "detail": "cw-ext-liquid-ontology-db-data"
+    },
+    {
+      "name": "ontology-db answers queries",
+      "ok": true
+    },
+    {
+      "name": "install audited",
+      "ok": true,
+      "detail": [
+        "extension.install.done",
+        "extension.install"
+      ]
+    },
+    {
+      "name": "Liquid pages offered to the nav",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Overview",
+          "path": "/liquid"
+        }
+      ]
+    },
+    {
+      "name": "repair keeps an unchanged, healthy container",
+      "ok": true
+    },
+    {
+      "name": "uninstalled and not available",
+      "ok": true
+    },
+    {
+      "name": "no liquid containers left",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "no liquid volumes left (purge)",
+      "ok": true
+    },
+    {
+      "name": "no upstream owned by liquid left",
+      "ok": true,
+      "detail": [
+        "crm",
+        "demo",
+        "erp",
+        "redteam",
+        "web",
+        "wiki"
+      ]
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T14:58:54.583Z"
+}

@@ -32,6 +32,8 @@ export interface NavItem {
   selected: boolean;
   onClick: () => void;
   badge?: ReactNode;
+  /** Items with the same group are shown under a subheader with that name (e.g. an installed extension). */
+  group?: string;
 }
 
 export interface AppShellProps {
@@ -91,7 +93,12 @@ export function AppShell({ product, context, nav, navTitle, user, actions, child
       </Toolbar>
       <Divider />
       <List subheader={navTitle ? <ListSubheader sx={{ bgcolor: 'transparent' }}>{navTitle}</ListSubheader> : undefined} sx={{ px: 1 }}>
-        {nav.map((item) => (
+        {nav.map((item, i) => [
+          item.group && item.group !== nav[i - 1]?.group ? (
+            <ListSubheader key={`group-${item.group}`} sx={{ bgcolor: 'transparent', lineHeight: '32px', mt: 1 }}>
+              {item.group}
+            </ListSubheader>
+          ) : null,
           <ListItemButton
             key={item.label}
             selected={item.selected}
@@ -104,8 +111,8 @@ export function AppShell({ product, context, nav, navTitle, user, actions, child
             <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} />
             {item.badge}
-          </ListItemButton>
-        ))}
+          </ListItemButton>,
+        ])}
       </List>
     </Box>
   );

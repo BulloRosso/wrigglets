@@ -31,6 +31,8 @@ import type { SafetyRuleEngine } from './safety.js';
 import type { SecurityGuardService } from './security.js';
 import type { SignalsControlService } from './signals.js';
 import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
+import { extensionsAdminRouter } from './extensions/api.js';
+import type { ExtensionService } from './extensions/service.js';
 
 export interface ExtensionDeps {
   config: Config;
@@ -50,6 +52,8 @@ export interface ExtensionDeps {
   oauth: Pick<OAuthAdmin, 'users'>;
   /** Signals (optional module, ADR-0037). */
   signals: SignalsControlService;
+  /** Optional extensions installed from the admin console (ADR-0039). */
+  extensions: ExtensionService;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -349,6 +353,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
 
   /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
+  r.use(extensionsAdminRouter(d.extensions, by));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

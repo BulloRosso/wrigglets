@@ -48,22 +48,44 @@ closed; tighten automatically, loosen only with approval; desired state in Git.
 
 ## Activation
 
-*(planned, M0b)* Admin console → **Extensions** → *Liquid Enterprise* → **Install**. The control plane starts the
-extension's containers, generates their secrets, registers the gateway upstreams it owns and, if chosen, seeds the sofa
-company demo data. **Uninstall** removes the containers and everything the extension registered; *purge data* also
-removes its volumes.
+Decision record: [ADR-0039](adr/0039-extension-manager.md).
 
-The images are built locally once:
+**Install from the admin console** (Platform.Admin): **Extensions** → *Liquid Enterprise* → **Install**.
+
+1. The control plane checks Docker and the images (public images are pulled, the extension's own images must be built
+   once with `node scripts/stack.mjs build --liquid`; the card says when they are missing).
+2. It generates the extension's secrets, creates its data volumes and starts its services in dependency order, waiting
+   for each to be healthy.
+3. It runs the bootstrap steps (with *Seed the sofa-company demo data*, also the demo seed) and registers the gateway
+   upstreams the extension owns.
+
+Every step is shown with its state; a failed step shows its error and **Retry install** continues from there. An install
+interrupted by a restart of the control plane resumes by itself. While installed and healthy, the navigation shows a
+**Liquid enterprise** group. **Repair** re-creates missing or changed containers and starts stopped ones (data and
+secrets are kept). **Uninstall** removes the upstreams it registered and its containers; *also delete its data volumes
+and secrets* removes everything.
+
+What gets created:
+
+| Resource | Name | Notes |
+|---|---|---|
+| containers | `cw-ext-liquid-<service>` | labels `cw.role=extension`, `cw.extension=liquid`; network `coworking`, host name = service name; no host ports |
+| volumes | `cw-ext-liquid-<volume>` | label `cw.role=extension-data` |
+| secrets | `DATA_DIR/admin/extensions-secrets.json` (0600) | upstream credentials also in Key Vault as `ext-liquid-<secret>` |
+| state | `DATA_DIR/admin/extensions.json` | phase, steps of the last operation, owned upstreams |
+
+Services so far: `ontology-db` (Postgres 17.6: event log and projection). The list grows with each milestone.
+
+**Compose overlay** (development and CI): the same services under the same names, secrets from `.env`.
 
 ```bash
-node scripts/stack.mjs build --liquid
+node scripts/stack.mjs liquid up      # = docker compose -f docker-compose.yml -f docker-compose.liquid.yml up -d
+node scripts/stack.mjs liquid down    # removes the liquid services, restarts the control plane without the overlay
+node scripts/stack.mjs liquid reset   # also deletes the overlay's volumes
 ```
 
-For development and CI the same services can run as a compose overlay:
-
-```bash
-node scripts/stack.mjs liquid up      # docker compose -f docker-compose.yml -f docker-compose.liquid.yml up -d
-```
+In overlay mode the Extensions page shows Liquid read-only. Use one mode at a time: `liquid up` refuses to start while a
+console install exists. `node scripts/stack.mjs reset` removes both.
 
 ## Architecture
 
@@ -159,6 +181,35 @@ Open
 
 Deviations
 - Exit criterion "baseline with spread" is only partly met (n = 1); see Open.
+
+### M0b — Extension manager and install UI (2026-11-16)
+
+Done
+- `packages/extensions`: manifest schema with reference checks, dependency order, environment rendering and masking,
+  install/uninstall steps, fingerprint, plan diff, API types.
+- `apps/admin-server/src/extensions/`: Docker runtime for labelled extension containers, `ExtensionService` (persisted
+  state machine, idempotent steps, resume on start, repair, owned upstreams, secrets 0600 + Key Vault refs, runtime
+  availability), API router, `requireExtension` middleware, liquid manifest (`ontology-db`).
+- Admin console: Extensions page (install / retry / repair / uninstall with purge option, step progress, services,
+  logs; Signals read-only), Liquid overview page, nav groups in `AppShell` (`NavItem.group`).
+- `docker-compose.liquid.yml`, `stack.mjs` (`build --liquid`, `liquid up|down|reset`, `reset` removes extension
+  resources, `LIQUID_ONTOLOGY_DB_PASSWORD` in `.env`), Dockerfile includes the new package. [ADR-0039](adr/0039-extension-manager.md).
+
+Verified
+- `check.mjs` green: build, typecheck, tests. New tests: 16 in `packages/extensions` (validation table, order,
+  rendering, masking, steps, fingerprint, diff), 22 in `admin-server` with a fake Docker (install order, demo-only steps,
+  secrets not in state file, Key Vault reference vs. plain header, missing local image → build hint, third-party pull,
+  upstream name collision, health wait and timeout, concurrent operation refused, retry from failed step without
+  re-creating healthy services, resume after restart, repair, uninstall only touches own resources, purge, overlay mode,
+  Docker status parsing, manifest ↔ overlay service parity).
+
+Open
+- **End-to-end exit check not run yet:** Docker Desktop was not running. To do: fresh stack → Install (with demo seed)
+  → services healthy → Liquid nav visible → restart the control plane during an install → Uninstall → no `cw-ext-*`
+  container, no owned upstream. Playwright screenshots of the Extensions page.
+
+Deviations
+- None from the plan. The pino logger already redacts any `env` field; the masked environment is logged anyway.
 
 ### Later
 

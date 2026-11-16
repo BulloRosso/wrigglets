@@ -95,6 +95,13 @@ const schema = z.object({
   SIGNALS_HUB_URL: z.string().url().optional().or(z.literal('')),
   SIGNALS_HUB_TOKEN: z.string().optional(),
   MCP_SIGNALS_TOKEN: z.string().optional(),
+  /*
+   * Liquid Enterprise (optional extension, ADR-0038/0039). Normally installed from the admin console (Extensions page).
+   * LIQUID_OVERLAY=true means its services were started with docker-compose.liquid.yml instead; secrets then come
+   * from the environment.
+   */
+  LIQUID_OVERLAY: bool('false'),
+  LIQUID_ONTOLOGY_DB_PASSWORD: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

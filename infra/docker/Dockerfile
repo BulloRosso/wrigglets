@@ -45,6 +45,7 @@ COPY packages/harness-config/package.json packages/harness-config/
 COPY packages/auth-rp/package.json packages/auth-rp/
 COPY packages/ui/package.json packages/ui/
 COPY packages/secrets/package.json packages/secrets/
+COPY packages/extensions/package.json packages/extensions/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY apps apps
 COPY packages packages

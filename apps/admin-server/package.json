@@ -15,6 +15,7 @@
   "dependencies": {
     "@cw/auth-rp": "workspace:*",
     "@cw/codec": "workspace:*",
+    "@cw/extensions": "workspace:*",
     "@cw/secrets": "workspace:*",
     "@cw/shared": "workspace:*",
     "@temporalio/client": "1.24.0",
@@ -31,6 +32,7 @@
     "@types/dockerode": "4.0.2",
     "@types/express": "5.0.6",
     "tsx": "4.23.15",
+    "yaml": "2.9.1",
     "vitest": "5.0.5"
   }
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@cw/ui';
+import type { ExtensionStatus } from '@cw/extensions';
 import type {
   AdminAuditEntry,
   AgentEntra,
@@ -36,6 +37,7 @@ import type {
   ToolCallAuditEntry,
   UpstreamServer,
 } from '@cw/shared';
+export type { ExtensionStatus } from '@cw/extensions';
 
 export interface AdminMe {
   user: Principal;
@@ -210,6 +212,17 @@ export const api = {
   agentSignals: (agentId: string) => apiFetch<{ available: boolean; config: SignalsAgentConfig }>(`/api/agents/${id(agentId)}/signals`),
   setAgentSignals: (agentId: string, config: SignalsAgentConfig) => apiFetch<SignalsAgentConfig>(`/api/agents/${id(agentId)}/signals`, { method: 'PUT', json: config }),
   sendObservation: (agentId: string, o: ObservationInput) => apiFetch<{ observationId: string; duplicate: boolean }>(`/api/agents/${id(agentId)}/signals/observations`, { method: 'POST', json: o }),
+  /* Optional extensions installed from the console (ADR-0039) */
+  extensions: () => apiFetch<ExtensionStatus[]>('/api/extensions'),
+  extension: (extId: string) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}`),
+  installExtension: (extId: string, seedDemo: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/install`, { method: 'POST', json: { seedDemo } }),
+  repairExtension: (extId: string) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/repair`, { method: 'POST', json: {} }),
+  uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
+  extensionLogs: (extId: string, service: string) =>
+    fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {
+      if (!r.ok) throw new Error(`logs: HTTP ${r.status}`);
+      return r.text();
+    }),
   audit: (target?: string) => apiFetch<AdminAuditEntry[]>(`/api/audit${target ? `?target=${id(target)}` : ''}`),
 };
 

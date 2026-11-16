@@ -4,6 +4,9 @@
 //   node scripts/stack.mjs build   build all images (incl. the agent image)
 //   node scripts/stack.mjs down    stop the stack (agent containers keep running unless --agents)
 //   node scripts/stack.mjs reset   stop everything and delete all data volumes (asks no questions!)
+//   node scripts/stack.mjs build --liquid   also build the images of the Liquid Enterprise extension (ADR-0039)
+//   node scripts/stack.mjs liquid up|down|reset   Liquid Enterprise as compose overlay (development/CI; the normal
+//                                  way is admin console → Extensions → Install)
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -36,6 +39,8 @@ const laterSecrets = () => ({
   // Signals (optional overlay docker-compose.signals.yml, ADR-0037)
   SIGNALS_HUB_TOKEN: secret(32),
   MCP_SIGNALS_TOKEN: secret(24),
+  // Liquid Enterprise as compose overlay (docker-compose.liquid.yml); console installs generate their own secrets
+  LIQUID_ONTOLOGY_DB_PASSWORD: secret(24),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
   CW_LITELLM_SALT_KEY: `sk-${secret(32)}`,
@@ -106,9 +111,28 @@ function readEnv() {
   );
 }
 
+/** Compose targets of the Liquid Enterprise images (grows per milestone; empty while it only uses public images). */
+const LIQUID_BUILD_SERVICES = [];
+
 function build() {
   ensureEnv();
   run('docker', ['compose', '--profile', 'build', 'build']);
+  if (flags.has('--liquid') && LIQUID_BUILD_SERVICES.length) run('docker', ['compose', ...LIQUID_FILES, 'build', ...LIQUID_BUILD_SERVICES]);
+}
+
+const LIQUID_FILES = ['-f', 'docker-compose.yml', '-f', 'docker-compose.liquid.yml'];
+const LIQUID_SERVICES = () =>
+  readFileSync(path.join(root, 'docker-compose.liquid.yml'), 'utf8')
+    .split(/\r?\n/)
+    .map((l) => /^  ([a-z][a-z0-9-]*):\s*$/.exec(l)?.[1])
+    .filter((n) => n && n !== 'temporal');
+
+/** Containers and volumes the control plane created for extensions installed from the console. */
+function removeExtensionResources() {
+  const ids = capture('docker', ['ps', '-aq', '--filter', 'label=cw.role=extension']).split(/\s+/).filter(Boolean);
+  if (ids.length) run('docker', ['rm', '-f', ...ids]);
+  const vols = capture('docker', ['volume', 'ls', '-q', '--filter', 'label=cw.role=extension-data']).split(/\s+/).filter(Boolean);
+  if (vols.length) run('docker', ['volume', 'rm', ...vols]);
 }
 
 function waitHealthy(url, label, timeoutMs = 180_000) {
@@ -186,11 +210,37 @@ switch (cmd) {
     if (ids.length) run('docker', ['rm', '-f', ...ids]);
     const vols = capture('docker', ['volume', 'ls', '-q', '--filter', 'label=cw.role=agent-home']).split(/\s+/).filter(Boolean);
     if (vols.length) run('docker', ['volume', 'rm', ...vols]);
-    run('docker', ['compose', 'down', '-v']);
+    removeExtensionResources();
+    if (existsSync(envFile)) ensureEnv(); // the overlay file needs its secrets to be interpolated, even for "down"
+    run('docker', ['compose', ...(existsSync(path.join(root, 'docker-compose.liquid.yml')) ? LIQUID_FILES : []), 'down', '-v']);
     if (flags.has('--env') && existsSync(envFile)) {
       writeFileSync(envFile + '.bak', readFileSync(envFile));
       spawnSync(process.execPath, ['-e', `require('fs').unlinkSync(${JSON.stringify(envFile)})`]);
       console.log('Removed .env (backup in .env.bak).');
+    }
+    break;
+  }
+  case 'liquid': {
+    const sub = process.argv[3] ?? 'up';
+    ensureEnv();
+    if (sub === 'up') {
+      if (capture('docker', ['ps', '-aq', '--filter', 'label=cw.extension=liquid'])) {
+        console.error('Liquid Enterprise is installed from the admin console. Uninstall it there first (Extensions page).');
+        process.exit(1);
+      }
+      if (LIQUID_BUILD_SERVICES.length) run('docker', ['compose', ...LIQUID_FILES, 'build', ...LIQUID_BUILD_SERVICES]);
+      run('docker', ['compose', ...LIQUID_FILES, 'up', '-d']);
+    } else if (sub === 'down' || sub === 'reset') {
+      run('docker', ['compose', ...LIQUID_FILES, 'rm', '-sf', ...LIQUID_SERVICES()]);
+      if (sub === 'reset') {
+        const vols = capture('docker', ['volume', 'ls', '-q', '--filter', 'name=coworking_liquid-']).split(/\s+/).filter(Boolean);
+        if (vols.length) run('docker', ['volume', 'rm', ...vols]);
+      }
+      // restart the control plane without LIQUID_OVERLAY
+      run('docker', ['compose', 'up', '-d', 'temporal']);
+    } else {
+      console.error(`Unknown liquid command "${sub}". Use liquid up | down | reset.`);
+      process.exit(1);
     }
     break;
   }
@@ -199,6 +249,6 @@ switch (cmd) {
     ensureEnv();
     break;
   default:
-    console.error(`Unknown command "${cmd}". Use up | build | env | down [--agents] | reset [--env].`);
+    console.error(`Unknown command "${cmd}". Use up | build [--liquid] | env | down [--agents] | reset [--env] | liquid up|down|reset.`);
     process.exit(1);
 }

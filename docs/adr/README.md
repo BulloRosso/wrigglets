@@ -43,3 +43,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0036](0036-ordered-delegation.md) | Ordered delegation: the platform keeps the order of dependent work | Accepted |
 | [0037](0037-optional-signals.md) | Optional Signals: proactive follow-up on observations and deadlines | Accepted |
 | [0038](0038-liquid-enterprise-extension.md) | Liquid Enterprise as an optional, installable extension | Accepted |
+| [0039](0039-extension-manager.md) | Extension manager: optional modules installed from the admin console | Accepted |

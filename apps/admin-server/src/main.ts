@@ -8,6 +8,9 @@ import { KillSwitchService } from './killswitch.js';
 import { SafetyRuleEngine } from './safety.js';
 import { SecurityGuardService } from './security.js';
 import { SignalsControlService } from './signals.js';
+import { liquidBootstrap, liquidManifest, liquidOverlay } from './extensions/liquid.js';
+import { DockerExtensionRuntime } from './extensions/runtime.js';
+import { ExtensionService } from './extensions/service.js';
 import { createAdminApp } from './api.js';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
@@ -102,6 +105,10 @@ async function main() {
   agents.extraAiModels = () => (guard.getConfig().model ? [guard.getConfig().model] : []);
   const signals = new SignalsControlService(config.DATA_DIR, registry, runtime, killSwitch, audit);
   await signals.load();
+  // Optional extensions installed from the admin console (ADR-0039)
+  const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
+  extensions.register(liquidManifest, liquidBootstrap, liquidOverlay(config));
+  await extensions.load();
   const avatars = new AvatarService({
     dataDir: config.DATA_DIR,
     defaultReference: config.AVATAR_DEFAULT_REFERENCE,
@@ -114,7 +121,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

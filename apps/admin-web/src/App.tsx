@@ -9,6 +9,8 @@ import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
 import MailOutlined from '@mui/icons-material/MailOutlined';
 import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
 import SensorsOutlined from '@mui/icons-material/SensorsOutlined';
+import ExtensionOutlined from '@mui/icons-material/ExtensionOutlined';
+import WaterDropOutlined from '@mui/icons-material/WaterDropOutlined';
 import { useQuery } from '@tanstack/react-query';
 import { AppShell, ErrorAlert, Loading } from '@cw/ui';
 import { api, useMe } from './api';
@@ -21,6 +23,8 @@ import { SafetyPage } from './pages/SafetyPage';
 import { MailPage } from './pages/MailPage';
 import { UsersPage } from './pages/UsersPage';
 import { SignalsPage } from './pages/SignalsPage';
+import { ExtensionsPage } from './pages/ExtensionsPage';
+import { LiquidOverviewPage } from './pages/LiquidOverviewPage';
 import { WikiPage } from './pages/WikiPage';
 
 export function App() {
@@ -29,6 +33,10 @@ export function App() {
   const { pathname } = useLocation();
   // Signals is optional (ADR-0037): shown only when the control plane has the module configured
   const signals = useQuery({ queryKey: ['signals-available'], queryFn: api.signalsAvailable, enabled: !!me.data, staleTime: 60_000 });
+  // Installed extensions (ADR-0039) add their pages under their own nav group while they are available
+  const extensions = useQuery({ queryKey: ['extensions'], queryFn: api.extensions, enabled: !!me.data, staleTime: 15_000 });
+  const liquid = extensions.data?.find((e) => e.id === 'liquid');
+  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined /> };
   const nav = [
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
@@ -38,7 +46,9 @@ export function App() {
     { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail' },
     { label: 'Users & access', icon: <GroupOutlined />, to: '/users' },
     { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit' },
-  ].map((n) => ({ ...n, selected: pathname === n.to || pathname.startsWith(`${n.to}/`), onClick: () => navigate(n.to) }));
+    { label: 'Extensions', icon: <ExtensionOutlined />, to: '/extensions' },
+    ...(liquid?.available ? liquid.uiRoutes.map((r) => ({ label: r.label, icon: LIQUID_ICONS[r.path] ?? <WaterDropOutlined />, to: r.path, group: 'Liquid enterprise' })) : []),
+  ].map((n) => ({ ...n, selected: pathname === n.to || (n.to !== '/liquid' && pathname.startsWith(`${n.to}/`)), onClick: () => navigate(n.to) }));
 
   return (
     <AppShell
@@ -72,6 +82,8 @@ export function App() {
           <Route path="/mail" element={<MailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/extensions" element={<ExtensionsPage />} />
+          <Route path="/liquid" element={<LiquidOverviewPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       )}

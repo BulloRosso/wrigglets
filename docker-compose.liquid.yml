@@ -1,0 +1,37 @@
+# Liquid Enterprise (optional extension, ADR-0038/0039, docs/liquid-enterprise.md) as a compose overlay — for
+# development and CI. The normal way is the admin console: Extensions → Liquid Enterprise → Install, which creates the
+# same services as containers managed by the control plane. Do not use both at the same time.
+#
+#   node scripts/stack.mjs env           # adds LIQUID_* secrets to .env if missing
+#   node scripts/stack.mjs liquid up     # = docker compose -f docker-compose.yml -f docker-compose.liquid.yml up -d
+#   node scripts/stack.mjs liquid down   # removes the liquid services, restarts the control plane without the overlay
+#
+# Service names must match apps/admin-server/src/extensions/liquid.ts (checked by a test): the service name is the host
+# name other services use, in both modes.
+
+services:
+  temporal:
+    environment:
+      LIQUID_OVERLAY: "true"
+      LIQUID_ONTOLOGY_DB_PASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?run scripts/stack.mjs env to add LIQUID_ONTOLOGY_DB_PASSWORD}
+
+  ontology-db:
+    image: postgres:17.6-alpine
+    container_name: cw-liquid-ontology-db
+    hostname: ontology-db
+    restart: unless-stopped
+    volumes:
+      - liquid-ontology-db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: onto
+      POSTGRES_PASSWORD: ${LIQUID_ONTOLOGY_DB_PASSWORD:?}
+      POSTGRES_DB: onto
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onto -d onto"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [coworking]
+
+volumes:
+  liquid-ontology-db-data:

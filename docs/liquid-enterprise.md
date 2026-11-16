@@ -10,6 +10,7 @@ tighten automatically and loosen only with a human decision.
 
 - Decision record: [ADR-0038](adr/0038-liquid-enterprise-extension.md) (and ADR-0039 … ADR-0049, one per milestone).
 - Implementation plan: [liquid-enterprise-extension.md](liquid-enterprise-extension.md).
+- Why LinkML, and how a requirement travels from data to ontology to logic and UI: [link-ml.md](link-ml.md).
 
 > **Status:** under construction. Sections marked *(planned)* describe what the named milestone delivers; the
 > [implementation log](#appendix-implementation-log) says what exists today.
@@ -158,6 +159,8 @@ The Overview page shows the event log, the flush state and every raw table:
 ![Liquid overview with event log and lake](images/liquid/liquid-overview-lake.png)
 
 ## Ontology and IR contract
+
+Why LinkML is the bridge between LLM proposals and generated code, with a worked example: [link-ml.md](link-ml.md).
 
 *(planned, M2)* The ontology source, the annotations the compiler reads (`criticality`, `data_class`, `owner`,
 `mcp_group`), the IR schema, the generator outputs and the versioning rules.

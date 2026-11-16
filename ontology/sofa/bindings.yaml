@@ -1,0 +1,55 @@
+# Bindings: which raw-zone table (lake.raw.*, written in M1) holds the source data of a class, and which column holds
+# each attribute. Attributes not listed map to a column of the same name. Classes without a binding exist only through
+# actions (their objects are created by events, e.g. CustomerNotice).
+# transform (optional): a named conversion implemented by the projection builder (M3), e.g. json_array for a JSON list.
+ontology: sofa
+
+bindings:
+  - { class: Factory, table: erp_factories, key: id }
+  - class: Machine
+    table: erp_machines
+    key: id
+    columns: { factory: factory_id }
+  - class: Worker
+    table: erp_workers
+    key: id
+    columns: { factory: factory_id }
+  - class: Absence
+    table: erp_absences
+    key: [worker_id, date_from]
+    columns: { worker: worker_id }
+    id_template: '{worker_id}:{date_from}'
+  - { class: Material, table: erp_materials, key: sku }
+  - { class: Bom, table: erp_bom, key: product }
+  - class: Supplier
+    table: erp_suppliers
+    key: id
+    transforms: { skus: json_array }
+  - class: InventoryItem
+    table: erp_inventory
+    key: lot_id
+  - class: PurchaseOrder
+    table: erp_purchase_orders
+    key: id
+    columns: { supplier: supplier_id }
+  - class: ProductionOrder
+    table: erp_production_orders
+    key: id
+    columns: { sales_order: sales_order_id, factory: factory_id }
+  - class: MaintenanceTicket
+    table: erp_maintenance_tickets
+    key: id
+    columns: { machine: machine_id, description: details }
+    transforms: { description: json_field_description }
+  - { class: Customer, table: crm_customers, key: id }
+  - class: SalesOrder
+    table: crm_orders
+    key: id
+    columns: { customer: customer_id }
+  - class: Campaign
+    table: crm_campaigns
+    key: id
+  - class: DemandSignal
+    table: crm_demand
+    key: sales_order_id
+    columns: { customer: customer_id }

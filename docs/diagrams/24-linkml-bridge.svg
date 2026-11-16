@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>LinkML as the bridge between LLMs and generated code: the liquid balance</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .band { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; letter-spacing: 0.5px; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.6; }
+    .lnp { fill: none; stroke: #6a3fb4; stroke-width: 2; stroke-dasharray: 6 4; }
+    .lnd { fill: none; stroke: #1f5fad; stroke-width: 2; }
+    .lng { fill: none; stroke: #00796b; stroke-width: 2; }
+    .fluid { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .core { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.8; }
+    .gen { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .data { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .gate { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6a3fb4"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00796b"/></marker>
+  </defs>
+  <rect width="1200" height="720" fill="#ffffff"/>
+  <text x="40" y="44" class="t">The liquid balance: probabilistic proposals, one reviewed contract, deterministic code</text>
+  <text x="40" y="68" class="st">LLMs propose changes in the language of meaning (LinkML). People approve the contract. Compilers turn it into every layer — the same way, every time.</text>
+
+  <!-- bands -->
+  <rect x="40" y="92" width="300" height="26" rx="13" fill="#6a3fb4"/><text x="190" y="110" class="band">PROBABILISTIC · FLUID</text>
+  <rect x="450" y="92" width="300" height="26" rx="13" fill="#1f5fad"/><text x="600" y="110" class="band">THE CONTRACT · STABLE CORE</text>
+  <rect x="860" y="92" width="300" height="26" rx="13" fill="#00796b"/><text x="1010" y="110" class="band">DETERMINISTIC · GENERATED</text>
+
+  <!-- 1 data -->
+  <rect x="40" y="140" width="300" height="118" rx="10" class="data"/>
+  <circle cx="62" cy="164" r="11" class="bd"/><text x="62" y="168" class="num">1</text>
+  <text x="82" y="168" class="h">Data shows a change</text>
+  <text x="62" y="192" class="d">events in the lake: 4 of 7 timber suppliers</text>
+  <text x="62" y="210" class="d">reported "cannot deliver" this quarter, all</text>
+  <text x="62" y="228" class="d">from high-risk regions; customers ask for</text>
+  <text x="62" y="246" class="d">proof of deforestation-free supply</text>
+
+  <!-- 2 LLM -->
+  <rect x="40" y="290" width="300" height="150" rx="10" class="fluid"/>
+  <circle cx="62" cy="314" r="11" class="bd"/><text x="62" y="318" class="num">2</text>
+  <text x="82" y="318" class="h">LLM agent proposes meaning</text>
+  <text x="62" y="342" class="d">modelling agent reads the ontology, writes</text>
+  <text x="62" y="360" class="d">a small LinkML diff — not code:</text>
+  <text x="62" y="384" class="mono">+ DueDiligenceStatement (class)</text>
+  <text x="62" y="400" class="mono">+ Material.commodity_risk (enum)</text>
+  <text x="62" y="416" class="mono">+ precondition on create_purchase_order</text>
+  <text x="62" y="432" class="lbl">and explains why, with the data as evidence</text>
+
+  <!-- gate -->
+  <rect x="40" y="472" width="300" height="104" rx="10" class="gate"/>
+  <circle cx="62" cy="496" r="11" class="bd"/><text x="62" y="500" class="num">3</text>
+  <text x="82" y="500" class="h">Guardrails</text>
+  <text x="62" y="524" class="d">compiler validates · compatibility: additive</text>
+  <text x="62" y="542" class="d">(minor) · shadow replay: 23 % of last month's</text>
+  <text x="62" y="560" class="d">POs would have waited · owner approves</text>
+
+  <!-- core -->
+  <rect x="450" y="140" width="300" height="436" rx="12" class="core"/>
+  <circle cx="472" cy="164" r="11" class="bd"/><text x="472" y="168" class="num">4</text>
+  <text x="492" y="168" class="h">LinkML ontology (Git)</text>
+  <text x="472" y="194" class="mono">ontology/sofa/schema.yaml</text>
+  <text x="472" y="210" class="mono">ontology/sofa/actions.yaml</text>
+  <text x="472" y="226" class="mono">ontology/sofa/bindings.yaml</text>
+  <text x="472" y="254" class="d">readable by people AND by LLMs:</text>
+  <text x="472" y="272" class="d">YAML, descriptions, enums, links,</text>
+  <text x="472" y="290" class="d">annotations (owner, criticality)</text>
+  <line x1="472" y1="312" x2="728" y2="312" stroke="#1f5fad" stroke-width="1" stroke-dasharray="4 3"/>
+  <circle cx="472" cy="338" r="11" class="bd"/><text x="472" y="342" class="num">5</text>
+  <text x="492" y="342" class="h">Compiler → IR</text>
+  <text x="472" y="366" class="d">LinkML SchemaView + actions + bindings</text>
+  <text x="472" y="384" class="d">→ ontology.ir.json: normalised, versioned</text>
+  <text x="472" y="402" class="d">(semver), content-hashed</text>
+  <text x="472" y="430" class="mono">sofa@0.2.0  hash 9f3c…</text>
+  <line x1="472" y1="452" x2="728" y2="452" stroke="#1f5fad" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="472" y="478" class="h2">Why it stays stable</text>
+  <text x="472" y="498" class="d">one source; generated files never edited;</text>
+  <text x="472" y="516" class="d">breaking changes need a migration and a</text>
+  <text x="472" y="534" class="d">deprecation window; every version replayable</text>
+  <text x="472" y="552" class="d">against the event log</text>
+
+  <!-- generated -->
+  <rect x="860" y="140" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="164" class="h2">Types and validation</text>
+  <text x="880" y="183" class="mono">DueDiligenceStatement zod + TS</text>
+  <rect x="860" y="204" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="228" class="h2">Storage</text>
+  <text x="880" y="247" class="mono">CREATE TABLE due_diligence_statement …</text>
+  <rect x="860" y="268" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="292" class="h2">Agent tools (MCP)</text>
+  <text x="880" y="311" class="mono">onto__submit_due_diligence_statement</text>
+  <rect x="860" y="332" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="356" class="h2">Policy data (OPA) and data quality</text>
+  <text x="880" y="375" class="mono">confidential · owner: head-of-logistics</text>
+  <rect x="860" y="396" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="420" class="h2">Business logic hook</text>
+  <text x="880" y="439" class="mono">precondition due_diligence_valid()</text>
+  <rect x="860" y="460" width="300" height="56" rx="8" class="gen"/>
+  <text x="880" y="484" class="h2">SDK and UI</text>
+  <text x="880" y="503" class="mono">sdk.dueDiligenceStatements.submit()</text>
+  <rect x="860" y="524" width="300" height="52" rx="8" class="gen"/>
+  <text x="880" y="548" class="h2">Ontology editor</text>
+  <text x="880" y="566" class="d">new node appears in the graph</text>
+
+  <!-- arrows -->
+  <path d="M190,258 L190,288" class="ln" marker-end="url(#a)"/>
+  <path d="M190,440 L190,470" class="lnp" marker-end="url(#p)"/>
+  <path d="M342,524 L448,360" class="lnp" marker-end="url(#p)"/>
+  <text x="352" y="430" class="lbl">approved proposal</text>
+  <text x="352" y="446" class="lbl">= a Git commit</text>
+  <path d="M752,360 L800,360 L800,168 L858,168" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,232 L858,232" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,296 L858,296" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,360 L858,360" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,360 L800,550 L858,550" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,424 L858,424" class="lnd" marker-end="url(#b)"/>
+  <path d="M800,488 L858,488" class="lnd" marker-end="url(#b)"/>
+  <text x="760" y="352" class="lbl">generators</text>
+
+  <!-- loop back -->
+  <path d="M1010,578 L1010,640 L22,640 L22,200 L38,200" class="lng" marker-end="url(#g)"/>
+  <text x="430" y="632" class="lbl">running system produces new events → the next change is again driven by data</text>
+
+  <rect x="40" y="664" width="1120" height="40" rx="8" fill="#f4f6fa" stroke="#5b6777"/>
+  <text x="60" y="689" class="d">Hand-written stays small and reviewed: the body of a new precondition (one domain function) and, if needed, a workflow step. Everything else in the right column is regenerated.</text>
+</svg>

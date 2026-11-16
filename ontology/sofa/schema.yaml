@@ -1,0 +1,282 @@
+# The sofa company (docs/agentic-mitigations.md) as a LinkML schema: the single source of meaning for Liquid Enterprise.
+# Compiled with actions.yaml and bindings.yaml into the ontology IR (docs/liquid-enterprise.md, "Ontology and IR"),
+# from which types, SQL, MCP tools, OPA data, data-quality checks and the SDK are generated. Do not put behaviour here.
+#
+# Annotations read by the compiler (per class):
+#   criticality: normal | business_critical | payment_critical
+#   data_class:  public | internal | confidential
+#   owner:       role that approves structural changes to the class
+#   mcp_group:   erp | crm (compatibility groups of the parity phase, M3)
+id: https://w3id.org/wrigglets/ontology/sofa
+name: sofa
+title: Sofa company
+description: A sofa maker with two factories, suppliers, a warehouse and B2B customers (scripts/sofa-company/mock-mcp.mjs).
+version: 0.1.0
+license: MIT
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sofa: https://w3id.org/wrigglets/ontology/sofa/
+default_prefix: sofa
+default_range: string
+imports:
+  - linkml:types
+
+enums:
+  MachineStatus:
+    permissible_values:
+      running: {}
+      down: { description: Out of order; capacity of its factory is 0 until repaired }
+  SupplierStatus:
+    permissible_values:
+      ok: {}
+      cannot_deliver: { description: Supplier reported it cannot deliver for a period (see notice) }
+  SupplierRating:
+    permissible_values:
+      A: {}
+      B: {}
+      C: {}
+  LotStatus:
+    permissible_values:
+      ok: {}
+      quarantined: { description: 'Blocked for use, e.g. after damage; not counted as usable stock' }
+  PurchaseOrderStatus:
+    permissible_values:
+      open: {}
+      delayed: { description: Supplier moved the ETA }
+      cancelled: {}
+  ProductionOrderStatus:
+    permissible_values:
+      planned: {}
+  MaintenanceTicketStatus:
+    permissible_values:
+      open: {}
+      closed: {}
+  CustomerTier:
+    permissible_values:
+      A: { description: 'Key account, highest priority' }
+      B: {}
+  SalesOrderStatus:
+    permissible_values:
+      confirmed: {}
+      confirmed_unplanned: { description: Confirmed to the customer but no production order yet }
+  CampaignStatus:
+    permissible_values:
+      active: {}
+      paused: {}
+  ProductCode:
+    permissible_values:
+      LUND: { description: Lund 2-seater }
+      OSLO: { description: Oslo 3-seater }
+      BERGEN: { description: Bergen corner sofa }
+  DemandSource:
+    permissible_values:
+      plan: { description: Order intake the production plan is based on }
+      campaign: { description: Intake caused by a marketing campaign }
+
+classes:
+  Factory:
+    description: A plant that produces sofas.
+    annotations: { criticality: business_critical, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true, description: e.g. F-NORTH }
+      name: { required: true }
+
+  Machine:
+    description: A production machine; when one is down, its factory produces nothing.
+    annotations: { criticality: business_critical, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true, description: e.g. N-CUT-1 }
+      factory: { range: Factory, required: true }
+      name: { required: true }
+      rate_per_day: { range: integer, required: true, description: Sofas per day at full staffing }
+      status: { range: MachineStatus, required: true }
+      down_since: { range: date }
+      note: {}
+
+  Worker:
+    description: A regular worker of a factory.
+    annotations: { criticality: normal, data_class: confidential, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      name: { required: true }
+      factory: { range: Factory, required: true }
+
+  Absence:
+    description: A period in which a worker is absent (sick leave, vacation).
+    annotations: { criticality: normal, data_class: confidential, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true, description: worker id + start date }
+      worker: { range: Worker, required: true }
+      date_from: { range: date, required: true }
+      date_to: { range: date, required: true }
+      reason: {}
+
+  OvertimeShift:
+    description: Approved overtime in a factory (capacity x1.25).
+    annotations: { criticality: normal, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      factory: { range: Factory, required: true }
+      date_from: { range: date, required: true }
+      date_to: { range: date, required: true }
+
+  TempWorkerAssignment:
+    description: Temporary workers booked for a factory.
+    annotations: { criticality: normal, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      factory: { range: Factory, required: true }
+      count: { range: integer, required: true }
+      date_from: { range: date, required: true }
+      date_to: { range: date, required: true }
+
+  Material:
+    description: A purchased material or spare part, identified by SKU.
+    annotations: { criticality: normal, data_class: internal, owner: head-of-logistics, mcp_group: erp }
+    attributes:
+      sku: { identifier: true }
+      name: { required: true }
+      unit: { required: true }
+      unit_cost: { range: float, required: true }
+
+  Bom:
+    description: Bill of materials of a sofa model.
+    annotations: { criticality: normal, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      product: { identifier: true, range: ProductCode }
+      product_name: { required: true }
+      beams: { range: integer, required: true }
+      fabric_m: { range: float, required: true }
+      foam: { range: integer, required: true }
+
+  Supplier:
+    description: A supplier of materials or spare parts.
+    annotations: { criticality: business_critical, data_class: confidential, owner: head-of-logistics, mcp_group: erp }
+    attributes:
+      id: { identifier: true, description: e.g. S-NORDHOLZ }
+      name: { required: true }
+      skus: { range: Material, multivalued: true, required: true }
+      lead_workdays: { range: integer, required: true }
+      unit_price: { range: float, required: true }
+      min_qty: { range: integer, required: true }
+      max_qty: { range: integer, required: true }
+      express_lead_workdays: { range: integer }
+      express_surcharge_per_unit: { range: float }
+      rating: { range: SupplierRating, required: true }
+      status: { range: SupplierStatus, required: true }
+      notice: {}
+
+  InventoryItem:
+    description: A lot of material in the warehouse.
+    annotations: { criticality: business_critical, data_class: internal, owner: head-of-logistics, mcp_group: erp }
+    attributes:
+      lot_id: { identifier: true }
+      sku: { range: Material, required: true }
+      qty: { range: float, required: true }
+      location: {}
+      status: { range: LotStatus, required: true }
+      note: {}
+
+  PurchaseOrder:
+    description: An order to a supplier; commits money.
+    annotations: { criticality: payment_critical, data_class: confidential, owner: head-of-logistics, mcp_group: erp }
+    attributes:
+      id: { identifier: true, description: e.g. PO-4411 }
+      supplier: { range: Supplier, required: true }
+      sku: { range: Material, required: true }
+      qty: { range: float, required: true }
+      unit_price: { range: float, required: true }
+      eta: { range: date, required: true }
+      original_eta: { range: date }
+      status: { range: PurchaseOrderStatus, required: true }
+      express: { range: boolean }
+      note: {}
+
+  ProductionOrder:
+    description: An order to produce the sofas of a sales order in a factory.
+    annotations: { criticality: business_critical, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      sales_order: { range: SalesOrder, required: true }
+      factory: { range: Factory, required: true }
+      product: { range: Bom, required: true }
+      fabric: { range: Material, required: true }
+      qty: { range: integer, required: true }
+      priority: { range: integer, required: true, description: 1 = most urgent }
+      due_date: { range: date, required: true }
+      status: { range: ProductionOrderStatus, required: true }
+
+  MaintenanceTicket:
+    description: A repair order for a machine.
+    annotations: { criticality: business_critical, data_class: internal, owner: head-of-production, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      machine: { range: Machine, required: true }
+      status: { range: MaintenanceTicketStatus, required: true }
+      required_part: { range: Material }
+      description: {}
+
+  Incident:
+    description: An incident report for insurance (e.g. storm damage).
+    annotations: { criticality: normal, data_class: internal, owner: head-of-logistics, mcp_group: erp }
+    attributes:
+      id: { identifier: true }
+      type: { required: true }
+      description: { required: true }
+      estimated_loss_eur: { range: float, required: true }
+
+  Customer:
+    description: A B2B customer (retailer).
+    annotations: { criticality: business_critical, data_class: confidential, owner: head-of-sales, mcp_group: crm }
+    attributes:
+      id: { identifier: true, description: e.g. C-01 }
+      name: { required: true }
+      tier: { range: CustomerTier, required: true }
+      penalty_pct_per_week_late: { range: float, required: true }
+      contact: { required: true, description: E-mail address }
+
+  SalesOrder:
+    description: A customer order with a promised delivery date.
+    annotations: { criticality: business_critical, data_class: confidential, owner: head-of-sales, mcp_group: crm }
+    attributes:
+      id: { identifier: true, description: e.g. SO-2101 }
+      customer: { range: Customer, required: true }
+      product: { range: Bom, required: true }
+      qty: { range: integer, required: true }
+      fabric: { range: Material, required: true }
+      promised_delivery: { range: date, required: true }
+      communicated_delivery: { range: date }
+      status: { range: SalesOrderStatus, required: true }
+
+  CustomerNotice:
+    description: A message sent to a customer about their orders (recorded, not delivered).
+    annotations: { criticality: normal, data_class: confidential, owner: head-of-sales, mcp_group: crm }
+    attributes:
+      id: { identifier: true }
+      customer: { range: Customer, required: true }
+      orders: { range: SalesOrder, multivalued: true, required: true }
+      subject: { required: true }
+      body: { required: true }
+
+  Campaign:
+    description: A marketing campaign that drives order intake.
+    annotations: { criticality: normal, data_class: internal, owner: head-of-sales, mcp_group: crm }
+    attributes:
+      id: { identifier: true }
+      name: { required: true }
+      date_from: { range: date, required: true }
+      date_to: { range: date, required: true }
+      status: { range: CampaignStatus, required: true }
+      daily_budget_pct: { range: float, required: true }
+      note: {}
+
+  DemandSignal:
+    description: Planned order intake per sales order (basis of the production plan and the demand trend).
+    annotations: { criticality: normal, data_class: internal, owner: head-of-sales, mcp_group: crm }
+    attributes:
+      sales_order_id: { identifier: true }
+      customer: { range: Customer, required: true }
+      product: { range: ProductCode, required: true }
+      qty: { range: integer, required: true }
+      promised_delivery: { range: date, required: true }
+      source: { range: DemandSource, required: true }

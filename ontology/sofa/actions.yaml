@@ -1,0 +1,320 @@
+# Typed actions of the sofa company: the ONLY way to read or change business data through the ontology (plan §1.3).
+# LinkML has no action concept; this companion file is validated by the compiler and by the IR schema (packages/ontology-ir).
+#
+# Per action: description, target (class; omitted for company-wide queries), kind (query | create | update | delete |
+# command), read_only, destructive, mcp_group (parity groups erp/crm, M3), input (fields), preconditions (named checks
+# implemented in the domain package, M3), emits (event types, see `events`).
+# Input field: range (string | integer | float | boolean | date | json | <Enum> | <Class> = id of an object), required,
+# multivalued, description, enum (fixed values for the tool schema; parity with the mock only).
+# For the parity phase (M3) names, flags, fields and descriptions equal the tools of scripts/sofa-company/mock-mcp.mjs.
+ontology: sofa
+
+events:
+  - { name: PurchaseOrderCreated, object_type: PurchaseOrder, description: A purchase order was placed with a supplier }
+  - { name: PurchaseOrderCancelled, object_type: PurchaseOrder, description: An open or delayed purchase order was cancelled }
+  - { name: PurchaseOrderDelayed, object_type: PurchaseOrder, description: The supplier moved the ETA of a purchase order }
+  - { name: MaintenanceTicketOpened, object_type: MaintenanceTicket, description: A repair was ordered for a machine }
+  - { name: ProductionOrderCreated, object_type: ProductionOrder, description: A production order was put into a factory queue }
+  - { name: ProductionOrderUpdated, object_type: ProductionOrder, description: A production order moved factory or changed priority }
+  - { name: OvertimeBooked, object_type: OvertimeShift, description: Overtime was booked for a factory }
+  - { name: TempWorkersBooked, object_type: TempWorkerAssignment, description: Temporary workers were booked for a factory }
+  - { name: StockWrittenOff, object_type: InventoryItem, description: A quantity of a lot was written off }
+  - { name: StockReleased, object_type: InventoryItem, description: A quarantined quantity was released for production }
+  - { name: IncidentReported, object_type: Incident, description: An incident report was filed with the insurance }
+  - { name: CustomerNoticeSent, object_type: CustomerNotice, description: A notice was sent to a customer }
+  - { name: DeliveryDateUpdated, object_type: SalesOrder, description: A new delivery date was communicated to the customer }
+  - { name: CampaignUpdated, object_type: Campaign, description: The budget or status of a campaign changed }
+  # Disruptions of the scenarios (written by POST /scenario/:id/start, M3)
+  - { name: SupplierCannotDeliver, object_type: Supplier, description: A supplier reported it cannot deliver for a period }
+  - { name: MachineBrokeDown, object_type: Machine, description: A machine went out of order }
+  - { name: SalesOrderReceived, object_type: SalesOrder, description: A new confirmed sales order arrived (e.g. campaign demand) }
+  - { name: AbsenceReported, object_type: Absence, description: A worker reported an absence }
+  - { name: LotQuarantined, object_type: InventoryItem, description: 'A lot was blocked, e.g. after damage' }
+
+actions:
+  # ------------------------------------------------------------------ ERP: queries
+  - name: get_overview
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: 'ERP dashboard as of the simulation date: factories (capacity, machines, staff), alerts from the shop floor and warehouse, and business KPIs (late orders, material shortages). Start here.'
+  - name: get_kpi
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: 'Business KPI of the plan right now: orders expected late, sofas late, unplanned orders, orders late without customer notice, material shortages, cost of measures. This is the measure of success.'
+  - name: simulate_change
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: 'WHAT-IF, read-only. Applies one change, or a SEQUENCE of changes (parameter "changes", applied in order), of the ERP change tools (create_purchase_order, update_production_order, create_production_order, request_overtime, request_temp_workers, write_off_stock, release_stock ...) to a COPY of the company state and returns what each would answer plus the KPI before and after. Nothing is changed. Single options often are not enough: test COMBINATIONS (for example two purchase orders plus overtime) and compare them. Apply the chosen changes only in the execute step.'
+    input:
+      tool: { range: string, description: Name of an ERP change tool (single change) }
+      arguments: { range: json, description: Arguments of that tool (single change) }
+      changes: { range: json, multivalued: true, description: A sequence of changes to apply together }
+  - name: list_machines
+    target: Machine
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Machines per factory with status, notes and the open maintenance ticket.
+    input:
+      factory: { range: Factory, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+  - name: list_workers
+    target: Worker
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Production workers per factory with planned absences.
+    input:
+      factory: { range: Factory, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+  - name: get_capacity
+    target: Factory
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Daily production capacity (sofas/day) of a factory for the next workdays, with the reason.
+    input:
+      factory: { range: Factory, required: true, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      days: { range: float, description: 'Number of workdays, default 15' }
+  - name: list_production_orders
+    target: ProductionOrder
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Production orders with factory, priority, quantity, due date and the simulated completion date. Filter by factory or show only orders that will miss their delivery promise.
+    input:
+      factory: { range: Factory, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      lateOnly: { range: boolean, description: Only orders expected to deliver after the promised date }
+  - name: get_inventory
+    target: InventoryItem
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Warehouse stock by lot (status ok, quarantined or written_off) with the total usable quantity per SKU.
+    input:
+      sku: { range: Material, description: 'Optional SKU filter, e.g. BEAM-PINE-80' }
+  - name: get_material_projection
+    target: Material
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Projected stock of a SKU over the coming workdays (consumption by the production plan, arrival of open purchase orders) and the first day production is held back by a shortage.
+    input:
+      sku: { range: Material, required: true, description: 'SKU, e.g. BEAM-PINE-80 or FAB-OAT-01' }
+  - name: list_purchase_orders
+    target: PurchaseOrder
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Purchase orders with supplier, quantity, delivery date and status (open, delayed, cancelled).
+    input:
+      sku: { range: Material, description: Optional SKU filter }
+  - name: list_suppliers
+    target: Supplier
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Suppliers with the SKUs they supply, lead time, price, order size limits, express option and current status/notice.
+    input:
+      sku: { range: Material, description: Optional SKU filter }
+  - name: get_bom
+    target: Bom
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Bill of materials of a sofa model (beams, fabric metres, foam blocks per sofa).
+    input:
+      product: { range: string, description: 'LUND, OSLO or BERGEN' }
+  - name: list_maintenance_tickets
+    target: MaintenanceTicket
+    kind: query
+    read_only: true
+    mcp_group: erp
+    description: Maintenance tickets with status and planned repair date.
+
+  # ------------------------------------------------------------------ ERP: changes
+  - name: create_purchase_order
+    target: PurchaseOrder
+    kind: create
+    mcp_group: erp
+    description: WRITE. Place a purchase order with a supplier. Returns the delivery date. Fails if the supplier cannot deliver or the quantity is outside its limits.
+    input:
+      supplierId: { range: Supplier, required: true, description: 'Supplier id, e.g. S-BALTIC' }
+      sku: { range: Material, required: true, description: SKU }
+      quantity: { range: float, required: true, description: Quantity }
+      express: { range: boolean, description: Express delivery if the supplier offers it (surcharge per unit) }
+      note: { range: string, description: Reason / reference }
+    preconditions: [supplier_can_deliver, supplier_supplies_sku, quantity_within_supplier_limits, express_offered_if_requested]
+    emits: [PurchaseOrderCreated]
+  - name: cancel_purchase_order
+    target: PurchaseOrder
+    kind: update
+    destructive: true
+    mcp_group: erp
+    description: WRITE. Cancel an open or delayed purchase order.
+    input:
+      poId: { range: PurchaseOrder, required: true, description: Purchase order id }
+      reason: { range: string, required: true, description: Reason }
+    preconditions: [purchase_order_open_or_delayed]
+    emits: [PurchaseOrderCancelled]
+  - name: create_maintenance_ticket
+    target: MaintenanceTicket
+    kind: create
+    mcp_group: erp
+    description: WRITE. Open a maintenance ticket for a machine and book the external technician. The repair starts when the required spare part has been delivered (a purchase order for it must exist) and takes 2 workdays.
+    input:
+      machineId: { range: Machine, required: true, description: 'Machine id, e.g. N-CUT-1' }
+      description: { range: string, required: true, description: Fault description }
+      requiredPart: { range: Material, description: 'SKU of the spare part, if known' }
+    preconditions: [no_open_ticket_for_machine]
+    emits: [MaintenanceTicketOpened]
+  - name: update_production_order
+    target: ProductionOrder
+    kind: update
+    mcp_group: erp
+    description: WRITE. Move a production order to the other factory and/or change its priority (1 = most urgent … 9). The simulation re-sequences both factory queues.
+    input:
+      orderId: { range: ProductionOrder, required: true, description: 'Production order id, e.g. PRD-4204' }
+      factory: { range: Factory, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      priority: { range: float, description: 1-9 }
+    preconditions: [priority_in_range]
+    emits: [ProductionOrderUpdated]
+  - name: create_production_order
+    target: ProductionOrder
+    kind: create
+    mcp_group: erp
+    description: WRITE. Create the production order for a confirmed, unplanned sales order and put it into a factory queue.
+    input:
+      salesOrderId: { range: SalesOrder, required: true, description: 'Sales order id, e.g. SO-2301' }
+      factory: { range: Factory, required: true, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      priority: { range: float, description: '1-9, default 5' }
+    preconditions: [sales_order_unplanned, priority_in_range]
+    emits: [ProductionOrderCreated]
+  - name: request_overtime
+    target: OvertimeShift
+    kind: create
+    mcp_group: erp
+    description: 'WRITE. Book overtime in a factory for a date range: +25% output of the available staff (max 48 sofas/day). Costs EUR 1,400 per factory and day.'
+    input:
+      factory: { range: Factory, required: true, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      from: { range: date, required: true, description: 'First day, YYYY-MM-DD' }
+      to: { range: date, required: true, description: 'Last day, YYYY-MM-DD' }
+    preconditions: [date_range_valid]
+    emits: [OvertimeBooked]
+  - name: request_temp_workers
+    target: TempWorkerAssignment
+    kind: create
+    mcp_group: erp
+    description: WRITE. Book temporary workers from the agency for a factory and date range. Each delivers 15 sofas/day. They start 3 workdays after the request. Costs EUR 260 per worker and day.
+    input:
+      factory: { range: Factory, required: true, enum: [F-NORTH, F-SOUTH], description: 'Factory id: F-NORTH or F-SOUTH' }
+      count: { range: float, required: true, description: Number of workers (1-4) }
+      from: { range: date, required: true, description: 'First day, YYYY-MM-DD' }
+      to: { range: date, required: true, description: 'Last day, YYYY-MM-DD' }
+    preconditions: [date_range_valid, temp_worker_count_in_range]
+    emits: [TempWorkersBooked]
+  - name: write_off_stock
+    target: InventoryItem
+    kind: update
+    destructive: true
+    mcp_group: erp
+    description: WRITE. Write off a quantity of a warehouse lot (damaged goods). Cannot be undone.
+    input:
+      lotId: { range: InventoryItem, required: true, description: 'Lot id, e.g. L-OAT-231' }
+      quantity: { range: float, required: true, description: Quantity to write off }
+      reason: { range: string, required: true, description: Reason }
+    preconditions: [quantity_available_in_lot]
+    emits: [StockWrittenOff]
+  - name: release_stock
+    target: InventoryItem
+    kind: update
+    mcp_group: erp
+    description: WRITE. Release a quarantined lot (or part of it) for production after inspection.
+    input:
+      lotId: { range: InventoryItem, required: true, description: Lot id }
+      quantity: { range: float, required: true, description: Quantity to release }
+      note: { range: string, description: Inspection reference }
+    preconditions: [lot_quarantined, quantity_available_in_lot]
+    emits: [StockReleased]
+  - name: file_incident_report
+    target: Incident
+    kind: create
+    mcp_group: erp
+    description: WRITE. File an incident report for the insurance (storm, fire, theft …). Returns the claim number.
+    input:
+      type: { range: string, required: true, description: 'Incident type, e.g. storm_damage' }
+      description: { range: string, required: true, description: What happened }
+      estimatedLossEur: { range: float, required: true, description: Estimated loss in EUR }
+    emits: [IncidentReported]
+
+  # ------------------------------------------------------------------ CRM
+  - name: list_customers
+    target: Customer
+    kind: query
+    read_only: true
+    mcp_group: crm
+    description: Customers with tier, late-delivery penalty and contact address.
+  - name: list_orders
+    target: SalesOrder
+    kind: query
+    read_only: true
+    mcp_group: crm
+    description: Sales orders with promised delivery date, simulated expected delivery date and days late. Filter by customer or show only orders that are expected late or not yet planned.
+    input:
+      customerId: { range: Customer, description: 'Customer id, e.g. C-01' }
+      riskOnly: { range: boolean, description: 'Only orders expected late, or not yet planned for production' }
+  - name: get_order
+    target: SalesOrder
+    kind: query
+    read_only: true
+    mcp_group: crm
+    description: One sales order in detail, including its production order.
+    input:
+      orderId: { range: SalesOrder, required: true, description: Sales order id }
+  - name: list_campaigns
+    target: Campaign
+    kind: query
+    read_only: true
+    mcp_group: crm
+    description: Marketing campaigns with period, status, budget level and observed effect on order intake.
+  - name: get_demand_trend
+    target: DemandSignal
+    kind: query
+    read_only: true
+    mcp_group: crm
+    description: Weekly sofas ordered versus the plan (order intake trend), including orders that are not planned for production yet.
+  - name: send_customer_notice
+    target: CustomerNotice
+    kind: create
+    mcp_group: crm
+    description: WRITE. Send a notice (e-mail) to a customer about their orders, for example a delivery delay. The mail is recorded, not delivered.
+    input:
+      customerId: { range: Customer, required: true, description: Customer id }
+      orderIds: { range: SalesOrder, required: true, multivalued: true, description: Sales orders concerned }
+      subject: { range: string, required: true, description: Subject }
+      body: { range: string, required: true, description: Message text }
+    preconditions: [orders_belong_to_customer]
+    emits: [CustomerNoticeSent]
+  - name: update_delivery_date
+    target: SalesOrder
+    kind: update
+    mcp_group: crm
+    description: WRITE. Record a new delivery date that was communicated to the customer for a sales order.
+    input:
+      orderId: { range: SalesOrder, required: true, description: Sales order id }
+      newDate: { range: date, required: true, description: YYYY-MM-DD }
+      reason: { range: string, required: true, description: Reason given to the customer }
+    emits: [DeliveryDateUpdated]
+  - name: update_campaign
+    target: Campaign
+    kind: update
+    mcp_group: crm
+    description: 'WRITE. Change a campaign: throttle the daily ad budget (percent of the normal budget, 0-100) or pause/resume it. Lower budget reduces new order intake after a few days.'
+    input:
+      campaignId: { range: Campaign, required: true, description: Campaign id }
+      dailyBudgetPct: { range: float, description: 0-100 }
+      status: { range: CampaignStatus, description: active or paused }
+      reason: { range: string, description: Reason }
+    preconditions: [budget_in_range]
+    emits: [CampaignUpdated]

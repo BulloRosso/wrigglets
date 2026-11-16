@@ -849,7 +849,7 @@ td.n{text-align:center;width:28px;font-size:11px;border:1px solid #fff;padding:4
 }
 
 // Importable without side effects (Liquid Enterprise seed and parity tests import freshWorld and the constants).
-export { freshWorld, TODAY, PRODUCTS, SKU, SALES, CAMPAIGN_SALES, SHIPPING_DAYS };
+export { freshWorld, TODAY, PRODUCTS, SKU, SALES, CAMPAIGN_SALES, SHIPPING_DAYS, SERVERS };
 
 const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) createServer(async (req, res) => {

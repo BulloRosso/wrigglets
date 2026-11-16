@@ -32,6 +32,8 @@ tighten automatically and loosen only with a human decision.
 
 ## Overview
 
+<img src="diagrams/20-liquid-layers.svg" alt="Liquid Enterprise layers: what is owned, what is replaceable" width="100%">
+
 | Layer | Role | Implemented by |
 |---|---|---|
 | Data lake and event log | raw, immutable data in open table formats; append-only events | MinIO + Apache Iceberg + Postgres event outbox; DuckDB for queries |
@@ -49,6 +51,8 @@ closed; tighten automatically, loosen only with approval; desired state in Git.
 ## Activation
 
 Decision record: [ADR-0039](adr/0039-extension-manager.md).
+
+<img src="diagrams/21-extension-install.svg" alt="Installing an extension from the admin console" width="100%">
 
 **Install from the admin console** (Platform.Admin): **Extensions** → *Liquid Enterprise* → **Install**.
 

@@ -16,14 +16,20 @@ const steps = [];
 if (!args.has('--no-build')) steps.push(['build', ...pnpm('--workspace-concurrency=4', 'run', 'build')]);
 steps.push(['typecheck', ...pnpm('run', 'typecheck')]);
 steps.push(['test', ...pnpm('--workspace-concurrency=1', 'run', 'test')]);
-if (existsSync(path.join(root, 'policies', 'liquid'))) steps.push(['opa test', 'opa', ['test', 'policies/liquid', '-v']]);
+// OPA policies (ADR-0044) with the generated ontology data, in the pinned OPA image (no local opa binary needed)
+export const OPA_IMAGE = 'openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3';
+if (existsSync(path.join(root, 'policies', 'liquid'))) {
+  const docker = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], { encoding: 'utf8' }).stdout?.trim();
+  if (docker) steps.push(['opa test', 'docker', ['run', '--rm', '-v', `${root.split(path.sep).join('/')}:/w:ro`, '-w', '/w', OPA_IMAGE, 'test', 'policies', 'packages/ontology-sofa/generated/opa']]);
+  else console.log('note: Docker is not running, skipping opa test');
+}
 if (existsSync(path.join(root, 'scripts', 'liquid', 'check-generated.mjs'))) steps.push(['generated files up to date', 'node', ['scripts/liquid/check-generated.mjs']]);
 
 const results = [];
 for (const [name, cmd, cmdArgs] of steps) {
   console.log(`\n=== ${name}: ${cmd} ${cmdArgs.join(' ')}`);
   const t = Date.now();
-  const r = spawnSync(cmd, cmdArgs, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, cmdArgs, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' && cmd !== 'docker', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
   const ok = r.status === 0;
   results.push({ name, ok, seconds: Math.round((Date.now() - t) / 1000), error: r.error?.message });
   if (!ok) break;

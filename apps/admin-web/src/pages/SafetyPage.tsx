@@ -236,11 +236,11 @@ function Rules() {
   );
 }
 
-const emptyUpstream: UpstreamServer = { name: '', url: '', headers: {}, enabled: true, auth: 'static', oboFallback: 'deny' };
+const emptyUpstream: UpstreamServer = { name: '', url: '', headers: {}, enabled: true, auth: 'static', oboFallback: 'deny', policy: 'none' };
 
 function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose: () => void }) {
   const qc = useQueryClient();
-  const [u, setU] = useState(initial);
+  const [u, setU] = useState<UpstreamServer>({ ...initial, policy: initial.policy ?? 'none' });
   const [headers, setHeaders] = useState(
     Object.entries(initial.headers).map(([k, v]) => ({ name: k, value: typeof v === 'string' ? v : v.secretRef, secret: typeof v !== 'string' })),
   );
@@ -297,6 +297,16 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
               </TextField>
             </>
           )}
+          <TextField
+            select
+            label="Policy"
+            value={u.policy ?? 'none'}
+            onChange={(e) => setU({ ...u, policy: e.target.value as UpstreamServer['policy'] })}
+            helperText="OPA: after the allow-list, every call is also decided by the Liquid Enterprise policies (fail closed when OPA does not answer)."
+          >
+            <MenuItem value="none">Gateway checks only</MenuItem>
+            <MenuItem value="opa">Policy as code (OPA)</MenuItem>
+          </TextField>
           {!obo && <Typography variant="subtitle2">Headers</Typography>}
           {!obo && headers.map((h, i) => (
             <Stack key={i} direction="row" spacing={1} sx={{ alignItems: 'center' }}>

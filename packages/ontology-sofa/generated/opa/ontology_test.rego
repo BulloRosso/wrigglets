@@ -5,11 +5,15 @@ import rego.v1
 
 # Every action has a kind and a known target (or none for company-wide queries).
 test_actions_complete if {
-	every name, a in data.liquid.ontology.actions {
+	every _, a in data.liquid.ontology.actions {
 		a.kind in {"query", "create", "update", "delete", "command"}
-		a.target == null or data.liquid.ontology.classes[a.target]
+		target_known(a)
 	}
 }
+
+target_known(a) if a.target == null
+
+target_known(a) if data.liquid.ontology.classes[a.target]
 
 # Read-only actions are never destructive.
 test_read_only_not_destructive if {

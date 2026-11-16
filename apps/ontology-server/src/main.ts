@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { EventStore, Lake } from '@cw/lake';
 import { loadIr } from '@cw/ontology-sofa';
 import { createApp } from './app.js';
-import { OntologyService } from './service.js';
+import { opaPolicy } from './policy.js';
+import { allowAll, OntologyService } from './service.js';
 
 /*
  * Ontology server (Liquid Enterprise). M1: owns the append-only event log in the ontology DB and flushes it into the
@@ -27,6 +28,10 @@ const env = z
     FLUSH_INTERVAL_SEC: z.coerce.number().int().min(0).default(60),
     FLUSH_GRACE_SEC: z.coerce.number().int().min(0).default(60),
     LOG_LEVEL: z.string().default('info'),
+    /** Object-level policy (ADR-0044): `opa` asks OPA for every action (fail closed); `off` allows (before M4 / tests). */
+    POLICY_MODE: z.enum(['off', 'opa']).default('off'),
+    OPA_URL: z.string().url().optional(),
+    OPA_TOKEN: z.string().optional(),
   })
   .parse(process.env);
 
@@ -55,7 +60,10 @@ const lake = await Lake.open({
 });
 log.info({ dataPath, hwm: await lake.hwm() }, 'event log and lake ready');
 
-const svc = new OntologyService(pool, loadIr());
+if (env.POLICY_MODE === 'opa' && (!env.OPA_URL || !env.OPA_TOKEN)) throw new Error('POLICY_MODE=opa needs OPA_URL and OPA_TOKEN');
+const ir = loadIr();
+const svc = new OntologyService(pool, ir, env.POLICY_MODE === 'opa' ? opaPolicy(ir, { url: env.OPA_URL!, token: env.OPA_TOKEN! }) : allowAll);
+log.info({ policy: env.POLICY_MODE }, 'object-level policy');
 await svc.init();
 log.info({ ontology: `${svc.ir.name}@${svc.ir.version}`, hash: svc.ir.hash.slice(0, 12), kpi: svc.company.kpi().lateOrders }, 'projection loaded, action pipeline ready');
 

@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Policy as code: two enforcement points, one bundle</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.6; }
+    .lnr { fill: none; stroke: #c62828; stroke-width: 1.6; stroke-dasharray: 5 4; }
+    .lnb { fill: none; stroke: #1f5fad; stroke-width: 2; }
+    .ag { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .opa { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .db { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c62828"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+  </defs>
+  <rect width="1200" height="640" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Policy as code (M4): two enforcement points, one bundle, fail closed</text>
+  <text x="40" y="68" class="st">The gateway decides with the call (agent, role, step); the ontology server decides with the objects (criticality, data class, owner, status).</text>
+
+  <!-- agent -->
+  <rect x="40" y="110" width="180" height="96" rx="10" class="ag"/>
+  <text x="58" y="138" class="h">Agent</text>
+  <text x="58" y="160" class="d">e.g. sofa-lara</text>
+  <text x="58" y="178" class="d">tool erp__create_</text>
+  <text x="58" y="194" class="d">purchase_order</text>
+
+  <!-- gateway -->
+  <rect x="270" y="96" width="300" height="250" rx="12" class="gw"/>
+  <text x="290" y="124" class="h">MCP gateway</text>
+  <circle cx="300" cy="150" r="10" class="bd"/><text x="300" y="154" class="num">1</text>
+  <text x="318" y="154" class="d">allow-list, kill switch, limits (as before)</text>
+  <circle cx="300" cy="180" r="10" class="bd"/><text x="300" y="184" class="num">2</text>
+  <text x="318" y="184" class="d">upstream has policy: opa →</text>
+  <text x="318" y="200" class="mono">liquid.gateway.decision</text>
+  <text x="318" y="220" class="lbl">role may write? read-only in plan step?</text>
+  <text x="318" y="236" class="lbl">destructive only with approved plan?</text>
+  <text x="318" y="252" class="lbl">overlay deny? kill switch?</text>
+  <circle cx="300" cy="278" r="10" class="bd"/><text x="300" y="282" class="num">3</text>
+  <text x="318" y="282" class="d">plan-step rule, then the call with</text>
+  <text x="318" y="298" class="mono">_agent _task _requestedBy _step</text>
+  <text x="290" y="330" class="lbl">deny or OPA unreachable → "Denied by policy"</text>
+
+  <!-- ontology server -->
+  <rect x="270" y="380" width="300" height="220" rx="12" class="cp"/>
+  <text x="290" y="408" class="h">Ontology server (action pipeline)</text>
+  <circle cx="300" cy="434" r="10" class="bd"/><text x="300" y="438" class="num">4</text>
+  <text x="318" y="438" class="d">validate input, resolve touched objects</text>
+  <circle cx="300" cy="464" r="10" class="bd"/><text x="300" y="468" class="num">5</text>
+  <text x="318" y="468" class="mono">liquid.object.decision</text>
+  <text x="318" y="486" class="lbl">payment-critical + agent + no approved plan</text>
+  <text x="318" y="502" class="lbl">→ require_four_eyes; overlays per class</text>
+  <circle cx="300" cy="528" r="10" class="bd"/><text x="300" y="532" class="num">6</text>
+  <text x="318" y="532" class="d">four eyes → approval request event,</text>
+  <text x="318" y="548" class="d">nothing changed; step-up → denied;</text>
+  <text x="318" y="564" class="d">allow → handler + one transaction</text>
+  <text x="290" y="588" class="lbl">no decision → denied (fail closed)</text>
+
+  <path d="M222,158 L268,158" class="ln" marker-end="url(#a)"/>
+  <path d="M420,346 L420,378" class="ln" marker-end="url(#a)"/>
+  <text x="430" y="368" class="lbl">erp/crm/onto upstream</text>
+
+  <!-- OPA -->
+  <rect x="640" y="250" width="240" height="190" rx="12" class="opa"/>
+  <text x="660" y="278" class="h">OPA 1.22 (extension)</text>
+  <text x="660" y="300" class="d">authentication: token</text>
+  <text x="660" y="318" class="d">authorization: only the two</text>
+  <text x="660" y="334" class="d">decision paths + health</text>
+  <text x="660" y="358" class="d">no bundle → no authz policy</text>
+  <text x="660" y="374" class="d">→ everything denied</text>
+  <text x="660" y="400" class="lbl">polls every 5–10 s (ETag)</text>
+  <text x="660" y="416" class="lbl">reports decisions every 5–10 s</text>
+  <path d="M572,200 L638,300" class="lnr" marker-end="url(#r)"/>
+  <path d="M572,470 L638,390" class="lnr" marker-end="url(#r)"/>
+  <text x="586" y="236" class="lbl">query</text>
+  <text x="586" y="456" class="lbl">query</text>
+
+  <!-- control plane -->
+  <rect x="940" y="96" width="220" height="300" rx="12" class="db"/>
+  <text x="958" y="124" class="h">Control plane</text>
+  <text x="958" y="146" class="h2">bundle.tar.gz</text>
+  <text x="958" y="166" class="mono">liquid/*.rego</text>
+  <text x="958" y="182" class="mono">system/authz.rego</text>
+  <text x="958" y="198" class="mono">data.json:</text>
+  <text x="970" y="214" class="mono">liquid.ontology (generated)</text>
+  <text x="970" y="230" class="mono">liquid.roles (roles.json)</text>
+  <text x="970" y="246" class="mono">liquid.overlays</text>
+  <text x="970" y="262" class="mono">system.authz.query_token</text>
+  <text x="958" y="290" class="h2">decision log sink</text>
+  <text x="958" y="308" class="d">→ Policies page</text>
+  <text x="958" y="334" class="h2">gateway config</text>
+  <text x="958" y="352" class="d">opa url + token ref</text>
+  <text x="958" y="368" class="d">(Key Vault)</text>
+  <path d="M938,300 L882,330" class="lnb" marker-end="url(#b)"/>
+  <path d="M882,410 L938,360" class="ln" marker-end="url(#a)"/>
+
+  <!-- people / sources -->
+  <rect x="940" y="430" width="220" height="170" rx="12" class="usr"/>
+  <text x="958" y="458" class="h">Sources of policy</text>
+  <text x="958" y="482" class="mono">policies/liquid/ (Git)</text>
+  <text x="958" y="500" class="d">Rego + roles, opa test in CI</text>
+  <text x="958" y="526" class="mono">ontology annotations</text>
+  <text x="958" y="544" class="d">criticality, data class, owner</text>
+  <text x="958" y="570" class="h2">overlays</text>
+  <text x="958" y="588" class="d">add = tighten · remove = a person</text>
+  <path d="M1050,428 L1050,398" class="ln" marker-end="url(#a)"/>
+</svg>

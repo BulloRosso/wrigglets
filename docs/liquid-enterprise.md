@@ -272,7 +272,33 @@ compatibility class and live apply (E4, with M8).
 
 ## Policies
 
-*(planned, M4)*
+Decision record: [ADR-0044](adr/0044-policy-as-code-opa.md).
+
+<img src="diagrams/25-liquid-policy.svg" alt="Policy as code: two enforcement points, one bundle" width="100%">
+
+Authorization rules are code in `policies/liquid/` (Rego, tested with `opa test` in `scripts/liquid/check.mjs`) and are
+enforced by OPA, a service of the extension, at two points:
+
+| Point | When | Decides with | Rules |
+|---|---|---|---|
+| **Gateway** | every call to an upstream with `policy: opa`, after the allow-list | agent, role, tool/action, task step, kill switch | role may write the action (`roles.json`, independent of allow-lists); read-only in plan steps; destructive actions only in an approved plan; overlays |
+| **Ontology server** | every action | the objects it touches: criticality, data class, owner, status | agent writes on payment-critical objects outside an approved task need **four eyes**; overlays per class |
+
+Both fail closed: OPA not configured, not reachable, wrong token, no bundle loaded or no decision all mean **denied**.
+
+**Obligations:** `require_four_eyes` — the action is not run; an `ActionApprovalRequested` event is recorded and the agent is
+told that a person must approve (the approval workflow follows in M5). `require_step_up` — denied in the prototype.
+
+**Overlays** tighten without code changes: Liquid enterprise → **Policies** → *Add overlay* (effect deny / four eyes /
+step-up, matching actions, classes, upstreams or agents, optional expiry). OPA picks it up within about 10 seconds.
+Removing an overlay loosens the policy: only a person can do it, and it is audited. From M7 playbooks add overlays
+automatically.
+
+**Switching it on for the sofa agents:** `node scripts/liquid/setup.mjs --opa` points `erp`/`crm` at the ontology server with
+`policy: opa`; the extension's own upstream `onto` always has it. Any upstream can be switched in Safety & tools → upstream →
+*Policy*.
+
+![Policies page: bundle, overlays, recent decisions](images/liquid/liquid-policies.png)
 
 ## Business workflows
 
@@ -527,6 +553,40 @@ Deviations
 - Editor E2 (drafts + validation) moves to M6 together with E3 (a draft is only useful once it can become a proposal).
 - T0 of the projection comes from the domain package's initial world (the same data as the lake extract); loading it
   through the bindings is part of the projection migration in M8.
+
+### M4 — Policy as code (2026-11-16)
+
+Done
+- `policies/liquid/`: `common.rego`, `gateway.rego`, `object.rego`, `system/authz.rego`, `roles/data.json` and tests; the
+  generated ontology Rego test fixed (it was not valid Rego).
+- OPA 1.22.0 (static, pinned by digest) as extension service; bundle and decision-log sink in the control plane;
+  overlays store with add (tighten) / remove (person, audited); gateway config carries OPA address + Key Vault token
+  reference. [ADR-0044](adr/0044-policy-as-code-opa.md).
+- Gateway: `policy: none | opa` per upstream, OPA query after the allow-list, fail closed, audit fields, `_step` caller
+  parameter. Ontology server: object policy with touched objects, obligations (four eyes → approval request event,
+  step-up → denied).
+- Extension manager: `vaultSecrets`, templated `command`, upstream `policy`. Admin console: Policies page, upstream
+  *Policy* field. `setup.mjs --opa`; `opa test` in `check.mjs` (pinned image via Docker).
+
+Verified
+- `opa test`: 27/27 (roles, plan step, destructive, kill switch, unknown action, overlays by upstream/class/action,
+  expiry, obligations, four eyes in and outside approved tasks, OPA API authorization).
+- TypeScript: gateway OPA client fail closed in every variant (not configured, unreachable, 403, no decision, malformed,
+  token not resolvable); object policy (touched objects, four eyes records a request and changes nothing, step-up,
+  fail closed); bundle (contents, no tests, revision stable and overlay-sensitive, deterministic tar.gz), overlays,
+  decision logs.
+- **End to end** (`node scripts/liquid/e2e-policy.mjs`, `scripts/liquid/results/m4-policy-e2e.json`): 15/15 — OPA polls the
+  bundle; with `policy: opa` on erp/crm a read and a write in the agent's role work; **Horst is denied
+  `create_purchase_order` by role although his allow-list was widened**; **an overlay takes effect in 6 s** without
+  restart and removing it restores; a destructive action without approved plan is denied; a payment-critical agent write
+  outside an approved task becomes an approval request; **OPA stopped ⇒ denied, started ⇒ allowed**; OPA's decisions
+  reach the Policies page.
+- Found on the way: Express's raw body parser already inflates gzip — the decision-log sink now detects compression by
+  magic bytes.
+
+Open
+- The sofa scenarios with real agents and `policy: opa` (part of the D1 runs).
+- Executing an approved four-eyes request: M5 (ApprovalWorkflow).
 
 ### Later
 

@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type RequestHandler, type Res
 import { z, ZodError } from 'zod';
 import type { EventStore, Lake } from '@cw/lake';
 import { freshWorld, identifierAttr, sofaExtract, worldToObjects } from '@cw/sofa-domain';
+import { opaData } from '@cw/ontology-sofa';
 import { GROUPS, rpc, type Group } from './mcp.js';
 import { OntologyService } from './service.js';
 
@@ -140,6 +141,8 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/ontology', (_req, res) => res.json(d.svc.ir));
+  /** Generated OPA data (data.liquid.ontology) for the policy bundle the control plane builds (ADR-0044). */
+  internal.get('/opa/data', (_req, res) => res.json(opaData()));
 
   // parity runner (the mock's control surface)
   internal.get('/sim/kpi', (_req, res) => res.json(d.svc.company.kpi()));

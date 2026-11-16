@@ -16,6 +16,7 @@ const CALLER_SCHEMA = {
   _agent: { type: 'string', description: 'Set by the gateway: calling agent' },
   _task: { type: 'string', description: 'Set by the gateway: task id' },
   _requestedBy: { type: 'string', description: 'Set by the gateway: person on whose behalf the agent acts' },
+  _step: { type: 'string', description: 'Set by the gateway: task step (plan | run | fix)' },
 };
 
 export function toolsFor(group: Group) {

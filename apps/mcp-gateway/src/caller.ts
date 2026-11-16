@@ -7,7 +7,8 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
  * the model sends under these names is replaced. Used by the company wiki to attach a verified author to a proposal.
  */
 
-export const CALLER_PARAMS = ['_agent', '_task', '_requestedBy'] as const;
+/** `_step`: the task step (plan | run | fix) — the ontology's object policy uses it (an approved plan is the second pair of eyes, ADR-0044). */
+export const CALLER_PARAMS = ['_agent', '_task', '_requestedBy', '_step'] as const;
 type CallerParam = (typeof CALLER_PARAMS)[number];
 
 const declared = (tool: Tool | undefined): CallerParam[] => CALLER_PARAMS.filter((p) => !!(tool?.inputSchema?.properties as Record<string, unknown> | undefined)?.[p]);
@@ -22,11 +23,11 @@ export function hideCallerParams(tool: Tool): Tool {
 }
 
 /** Arguments for the upstream: model-supplied caller parameters are dropped; declared ones are set from the verified context. */
-export function withCaller(tool: Tool | undefined, args: Record<string, unknown>, caller: { agentId: string; taskId?: string; requestedBy?: string }): Record<string, unknown> {
+export function withCaller(tool: Tool | undefined, args: Record<string, unknown>, caller: { agentId: string; taskId?: string; requestedBy?: string; step?: string }): Record<string, unknown> {
   const out: Record<string, unknown> = { ...args };
   for (const p of CALLER_PARAMS) delete out[p];
   for (const p of declared(tool)) {
-    const v = p === '_agent' ? caller.agentId : p === '_task' ? caller.taskId : caller.requestedBy;
+    const v = p === '_agent' ? caller.agentId : p === '_task' ? caller.taskId : p === '_step' ? caller.step : caller.requestedBy;
     if (v) out[p] = v;
   }
   return out;

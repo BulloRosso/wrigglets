@@ -1,0 +1,17 @@
+{
+  "_doc": "Roles of the sofa company's agents (ADR-0044): which ontology actions each role may WRITE. Reads are open to every role. Independent of the gateway allow-lists: widening an allow-list does not widen a role.",
+  "roles": {
+    "production": { "description": "Shop floor: machines, maintenance, staffing", "writes": ["create_maintenance_ticket", "request_overtime", "request_temp_workers"] },
+    "planning": { "description": "Production planning", "writes": ["update_production_order", "create_production_order"] },
+    "sales": { "description": "CRM: customers, delivery promises, campaigns", "writes": ["send_customer_notice", "update_delivery_date", "update_campaign"] },
+    "warehouse": { "description": "Stock, write-offs, incidents", "writes": ["write_off_stock", "release_stock", "file_incident_report"] },
+    "procurement": { "description": "Suppliers and purchase orders", "writes": ["create_purchase_order", "cancel_purchase_order"] }
+  },
+  "agents": {
+    "sofa-max": "production",
+    "sofa-cora": "planning",
+    "sofa-horst": "sales",
+    "sofa-tom": "warehouse",
+    "sofa-lara": "procurement"
+  }
+}

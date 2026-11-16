@@ -40,6 +40,24 @@ import type {
 } from '@cw/shared';
 export type { ExtensionStatus } from '@cw/extensions';
 
+/** A tightening policy overlay (ADR-0044). */
+export interface LiquidOverlay {
+  id: string;
+  effect: 'deny' | 'require_four_eyes' | 'require_step_up';
+  reason: string;
+  match: { actions?: string[]; classes?: string[]; upstreams?: string[]; agents?: string[] };
+  expires_at?: string;
+  source: string;
+  createdAt: string;
+  createdBy: string;
+}
+export interface LiquidPolicyStatus {
+  bundle: { revision: string; builtAt: string; files: string[] } | null;
+  lastFetchByOpa: { at: string; revision: string; notModified: boolean } | null;
+  overlays: LiquidOverlay[];
+  decisions: Array<{ at: string; path: string; allow: boolean | null; reason: string | null; obligations: string[]; input: { agent?: string; action?: string; tool?: string; caller?: string } }>;
+}
+
 /** Event log and lake of Liquid Enterprise (ADR-0040). */
 export interface LiquidLakeStatus {
   hwm: number;
@@ -233,6 +251,9 @@ export const api = {
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
+  liquidPolicy: () => apiFetch<LiquidPolicyStatus>('/api/liquid/policy'),
+  addLiquidOverlay: (o: Pick<LiquidOverlay, 'effect' | 'reason' | 'match' | 'expires_at'>) => apiFetch<LiquidOverlay>('/api/liquid/policy/overlays', { method: 'POST', json: o }),
+  removeLiquidOverlay: (overlayId: string) => apiFetch<void>(`/api/liquid/policy/overlays/${id(overlayId)}`, { method: 'DELETE' }),
   extensionLogs: (extId: string, service: string) =>
     fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {
       if (!r.ok) throw new Error(`logs: HTTP ${r.status}`);

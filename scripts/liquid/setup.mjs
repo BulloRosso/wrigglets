@@ -4,10 +4,12 @@
 // stay valid. Prerequisites: scripts/sofa-company/setup.mjs (agents, people, upstreams) and Liquid installed.
 //
 //   node scripts/liquid/setup.mjs            erp/crm -> ontology server (/erp/mcp, /crm/mcp, bearer from Key Vault)
+//   node scripts/liquid/setup.mjs --opa      additionally policy: opa on erp/crm (policy as code at the gateway, M4)
 //   node scripts/liquid/setup.mjs --restore  erp/crm -> the mock (http://mcp-sofa:7660)
 import { ADMIN, Session, env, log } from '../sofa-company/lib.mjs';
 
 const restore = process.argv.includes('--restore');
+const withOpa = process.argv.includes('--opa');
 const s = new Session();
 await s.signIn(ADMIN, env.BOOTSTRAP_ADMIN_EMAIL, env.BOOTSTRAP_ADMIN_PASSWORD);
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
@@ -31,9 +33,10 @@ for (const name of ['erp', 'crm']) {
         enabled: true,
         auth: 'static',
         oboFallback: 'deny',
+        policy: withOpa ? 'opa' : 'none',
       };
   await api('PUT', `/gateway/upstreams/${name}`, upstream);
-  log(`${name}: ${before?.url ?? '(new)'} → ${upstream.url}`);
+  log(`${name}: ${before?.url ?? '(new)'} → ${upstream.url}${upstream.policy === 'opa' ? ' (policy: opa)' : ''}`);
 }
 // the gateway caches tool lists for 60 s; a fresh list confirms the switch
 const tools = (await api('GET', '/gateway')).tools.filter((t) => /^(erp|crm)__/.test(t.name));

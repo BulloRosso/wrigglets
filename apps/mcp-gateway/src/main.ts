@@ -5,13 +5,14 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { SecretStore } from '@cw/secrets';
+import { askOpa, gatewayVerdict, opaInput } from './opa.js';
 import { A2A_TOOL, toolAllowed, type GatewayAgentConfig, type Identity } from '@cw/shared';
 import { A2aBroker } from './a2a.js';
 import { hideCallerParams, withCaller } from './caller.js';
 import { Audit } from './audit.js';
 import { loadConfig } from './config.js';
 import { OboClient } from './oboClient.js';
-import { authenticateAgent, decideDelegation, decideToolCall, decideUpstreamAuth, visiblePeers } from './policy.js';
+import { authenticateAgent, decideDelegation, decideToolCall, decideUpstreamAuth, visiblePeers, killLevel } from './policy.js';
 import { ConfigSync } from './sync.js';
 import { UpstreamPool, upstreamFor } from './upstreams.js';
 
@@ -89,8 +90,9 @@ function mcpServer(agent: GatewayAgentConfig): Server {
     const argBytes = Buffer.byteLength(JSON.stringify(args));
     const started = Date.now();
     const config = sync.config;
+    let policyAudit: { policy?: 'opa'; policyReason?: string; obligations?: string[] } = {};
     const record = (outcome: 'ok' | 'error' | 'denied', extra: { reason?: string; resultBytes?: number; peer?: string; remoteTaskId?: string; authMode?: 'static' | 'obo' | 'agent-only'; userOid?: string } = {}) =>
-      audit.write({ at: new Date().toISOString(), agentId: agent.agentId, tool, outcome, durationMs: Date.now() - started, argBytes, ...extra });
+      audit.write({ at: new Date().toISOString(), agentId: agent.agentId, tool, outcome, durationMs: Date.now() - started, argBytes, ...policyAudit, ...extra });
 
     const decision = decideToolCall(config, sync.stale, agent, tool);
     if (!decision.allowed) {
@@ -105,6 +107,24 @@ function mcpServer(agent: GatewayAgentConfig): Server {
     if (audit.callsLastMinute(agent.agentId) >= limits.callsPerMinute) {
       await record('denied', { reason: 'rate limit' });
       return text(`Rate limit of ${limits.callsPerMinute} tool calls per minute reached.`, true);
+    }
+
+    // Policy as code (Liquid Enterprise, ADR-0044): a second, independent decision for upstreams with policy "opa"
+    const policyUpstream = upstreamFor(config!.upstreams, tool);
+    if (policyUpstream?.policy === 'opa') {
+      const ctx = stepContext.get(agent.agentId);
+      const verdict = gatewayVerdict(
+        await askOpa(config!.opa, opaInput({ agentId: agent.agentId, tool, upstream: policyUpstream, ctx, killSwitch: killLevel(config!, agent.agentId).level }), async (v) => {
+          if (typeof v === 'string') return v;
+          if (!secrets) throw new Error('no Key Vault configured for the OPA token');
+          return secrets.get(v.secretRef);
+        }),
+      );
+      policyAudit = { policy: 'opa', policyReason: verdict.reason, obligations: verdict.obligations.length ? verdict.obligations : undefined };
+      if (!verdict.allowed) {
+        await record('denied', { reason: `policy: ${verdict.reason}` });
+        return text(`Denied by policy: ${verdict.reason}`, true);
+      }
     }
 
     try {
@@ -197,7 +217,7 @@ function mcpServer(agent: GatewayAgentConfig): Server {
       }
       const def = (await upstreams.listTools(config!.upstreams)).find((t) => t.name === tool);
       const ctx = stepContext.get(agent.agentId);
-      const callArgs = withCaller(def, args, { agentId: agent.agentId, taskId: ctx?.taskId, requestedBy: ctx?.requestedBy?.upn });
+      const callArgs = withCaller(def, args, { agentId: agent.agentId, taskId: ctx?.taskId, requestedBy: ctx?.requestedBy?.upn, step: ctx?.phase });
       const result = await upstreams.call(config!.upstreams, tool, callArgs, limits.callTimeoutMs, accessToken);
       await record(result.isError ? 'error' : 'ok', { resultBytes: Buffer.byteLength(JSON.stringify(result.content ?? '')), ...authAudit });
       return result;

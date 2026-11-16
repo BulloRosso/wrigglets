@@ -46,6 +46,8 @@ export const extensionUpstream = z.object({
   path: z.string().startsWith('/').default('/mcp'),
   /** Secret sent as "Authorization: Bearer <secret>" to the upstream. */
   tokenSecret: z.string().regex(SECRET).optional(),
+  /** Gateway policy mode of the upstream (ADR-0044). */
+  policy: z.enum(['none', 'opa']).default('none'),
 });
 
 export const extensionManifest = z
@@ -58,6 +60,8 @@ export const extensionManifest = z
     docs: z.string().optional(),
     services: z.array(serviceSpec).default([]),
     secrets: z.array(z.object({ name: z.string().regex(SECRET), bytes: z.number().int().min(16).max(64).default(24) })).default([]),
+    /** Secrets also stored in Key Vault as ext-<id>-<name> (raw value) for platform services, e.g. the gateway. */
+    vaultSecrets: z.array(z.string().regex(SECRET)).default([]),
     upstreams: z.array(extensionUpstream).default([]),
     /** Named bootstrap steps, run in order after all services are healthy; implemented by the control plane. */
     bootstrap: z.array(z.object({ id: z.string().regex(NAME), description: z.string().max(300), demoOnly: z.boolean().default(false) })).default([]),
@@ -73,6 +77,12 @@ export const extensionManifest = z
     const secrets = new Set(m.secrets.map((s) => s.name));
     for (const s of m.services) {
       for (const d of s.dependsOn) if (!names.has(d)) ctx.addIssue({ code: 'custom', message: `service "${s.name}" depends on unknown service "${d}"`, path: ['services'] });
+      for (const [i, c] of (s.command ?? []).entries()) {
+        for (const ref of templateRefs(c)) {
+          if (ref.kind === 'secret' && !secrets.has(ref.name)) ctx.addIssue({ code: 'custom', message: `${s.name}.command[${i}]: unknown secret "${ref.name}"`, path: ['services'] });
+          if (ref.kind === 'svc' && !names.has(ref.name)) ctx.addIssue({ code: 'custom', message: `${s.name}.command[${i}]: unknown service "${ref.name}"`, path: ['services'] });
+        }
+      }
       for (const [k, v] of Object.entries(s.env)) {
         for (const ref of templateRefs(v)) {
           if (ref.kind === 'secret' && !secrets.has(ref.name)) ctx.addIssue({ code: 'custom', message: `${s.name}.${k}: unknown secret "${ref.name}"`, path: ['services'] });
@@ -82,6 +92,7 @@ export const extensionManifest = z
         }
       }
     }
+    for (const v of m.vaultSecrets) if (!secrets.has(v)) ctx.addIssue({ code: 'custom', message: `vault secret "${v}" is not a declared secret`, path: ['vaultSecrets'] });
     for (const u of m.upstreams) {
       const svc = m.services.find((s) => s.name === u.service);
       if (!svc) ctx.addIssue({ code: 'custom', message: `upstream "${u.name}" refers to unknown service "${u.service}"`, path: ['upstreams'] });

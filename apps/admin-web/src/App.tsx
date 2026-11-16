@@ -12,6 +12,7 @@ import SensorsOutlined from '@mui/icons-material/SensorsOutlined';
 import ExtensionOutlined from '@mui/icons-material/ExtensionOutlined';
 import WaterDropOutlined from '@mui/icons-material/WaterDropOutlined';
 import HubOutlined from '@mui/icons-material/HubOutlined';
+import GavelOutlined from '@mui/icons-material/GavelOutlined';
 import { useQuery } from '@tanstack/react-query';
 import { AppShell, ErrorAlert, Loading } from '@cw/ui';
 import { api, useMe } from './api';
@@ -27,6 +28,7 @@ import { SignalsPage } from './pages/SignalsPage';
 import { ExtensionsPage } from './pages/ExtensionsPage';
 import { LiquidOverviewPage } from './pages/LiquidOverviewPage';
 import { LiquidOntologyPage } from './pages/LiquidOntologyPage';
+import { LiquidPoliciesPage } from './pages/LiquidPoliciesPage';
 import { WikiPage } from './pages/WikiPage';
 
 export function App() {
@@ -38,7 +40,7 @@ export function App() {
   // Installed extensions (ADR-0039) add their pages under their own nav group while they are available
   const extensions = useQuery({ queryKey: ['extensions'], queryFn: api.extensions, enabled: !!me.data, staleTime: 15_000 });
   const liquid = extensions.data?.find((e) => e.id === 'liquid');
-  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined />, '/liquid/ontology': <HubOutlined /> };
+  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined />, '/liquid/ontology': <HubOutlined />, '/liquid/policies': <GavelOutlined /> };
   const nav = [
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
@@ -87,6 +89,7 @@ export function App() {
           <Route path="/extensions" element={<ExtensionsPage />} />
           <Route path="/liquid" element={<LiquidOverviewPage />} />
           <Route path="/liquid/ontology" element={<LiquidOntologyPage />} />
+          <Route path="/liquid/policies" element={<LiquidPoliciesPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       )}

@@ -32,7 +32,8 @@ import type { SecurityGuardService } from './security.js';
 import type { SignalsControlService } from './signals.js';
 import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 import { extensionsAdminRouter } from './extensions/api.js';
-import { liquidAdminRouter } from './extensions/liquidApi.js';
+import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
+import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { ExtensionService } from './extensions/service.js';
 
 export interface ExtensionDeps {
@@ -55,6 +56,8 @@ export interface ExtensionDeps {
   signals: SignalsControlService;
   /** Optional extensions installed from the admin console (ADR-0039). */
   extensions: ExtensionService;
+  /** Liquid Enterprise policy as code: overlays, OPA bundle, decisions (ADR-0044). */
+  liquidPolicy?: LiquidPolicyService;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -355,7 +358,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
   r.use(extensionsAdminRouter(d.extensions, by));
-  r.use(liquidAdminRouter(d.extensions, d.audit, by));
+  r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
@@ -378,6 +381,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
 export function internalRouter(d: ExtensionDeps): Router {
   const r = Router();
   r.use(signalsInternalRouter({ config: d.config, signals: d.signals, registry: d.registry }));
+  if (d.liquidPolicy) r.use(liquidInternalRouter(d.extensions, d.liquidPolicy));
   r.get('/gateway-config', (req, res) => {
     if (!safeEqual(bearer(req), d.config.GATEWAY_TOKEN)) return res.status(401).json({ error: 'unauthorized' });
     res.json(d.gateway.build());

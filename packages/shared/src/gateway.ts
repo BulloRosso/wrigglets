@@ -26,6 +26,11 @@ export const upstreamServer = z.object({
   oboScope: z.string().max(300).optional(),
   /** Non-interactive tasks (no signed-in user): `agent-only` = agent client-credentials token, `deny` = refuse. */
   oboFallback: z.enum(['deny', 'agent-only']).default('deny'),
+  /**
+   * `none` (default): the gateway's own checks only. `opa`: after the allow-list, every call is also decided by OPA
+   * (Liquid Enterprise, ADR-0044) — fail closed when OPA is not configured or does not answer.
+   */
+  policy: z.enum(['none', 'opa']).default('none'),
 }).refine((u) => u.auth !== 'obo' || !!u.oboScope, { message: 'oboScope is required when auth is obo', path: ['oboScope'] });
 export type UpstreamServer = z.infer<typeof upstreamServer>;
 
@@ -58,6 +63,8 @@ export interface GatewayConfig {
   agents: GatewayAgentConfig[];
   upstreams: UpstreamServer[];
   limits: GatewayLimits;
+  /** OPA decision endpoint for upstreams with policy `opa` (present while Liquid Enterprise is installed). */
+  opa?: { url: string; token: UpstreamHeaderValue };
 }
 
 export const DEFAULT_GATEWAY_LIMITS: GatewayLimits = { callsPerMinute: 60, maxArgBytes: 64 * 1024, callTimeoutMs: 60_000 };
@@ -77,6 +84,10 @@ export interface ToolCallAuditEntry {
   /** Entra OBO: how the upstream was authenticated and on behalf of whom (never the token itself). */
   authMode?: 'static' | 'obo' | 'agent-only';
   userOid?: string;
+  /** Policy as code (ADR-0044): OPA was asked, its reason and obligations. */
+  policy?: 'opa';
+  policyReason?: string;
+  obligations?: string[];
 }
 
 export interface DelegationStatus {

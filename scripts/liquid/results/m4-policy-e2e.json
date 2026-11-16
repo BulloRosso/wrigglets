@@ -1,0 +1,91 @@
+{
+  "startedAt": "2026-11-16T17:47:28.626Z",
+  "checks": [
+    {
+      "name": "repair added OPA; all services running",
+      "ok": true,
+      "detail": [
+        "opa=running",
+        "ontology-db=running",
+        "ontology-server=running"
+      ]
+    },
+    {
+      "name": "OPA polls the bundle from the control plane",
+      "ok": true,
+      "detail": {
+        "revision": "85a21ebf69414335",
+        "files": [
+          "liquid/common.rego",
+          "liquid/gateway.rego",
+          "liquid/object.rego",
+          "system/authz.rego"
+        ]
+      }
+    },
+    {
+      "name": "erp/crm point at the ontology server with policy: opa",
+      "ok": true,
+      "detail": "18:47:36 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 18:47:36 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+    },
+    {
+      "name": "a read through gateway + OPA works",
+      "ok": true,
+      "detail": "881 chars"
+    },
+    {
+      "name": "a write in the agent's role works (production → request_overtime)",
+      "ok": true,
+      "detail": "{\n \"factory\": \"F-NORTH\",\n \"from\": \"2026-10-06\",\n \"to\": \"2026-10-07\",\n \"workdays\""
+    },
+    {
+      "name": "an agent outside its role is denied by OPA although its allow-list was widened",
+      "ok": true,
+      "detail": "Denied by policy: agent sofa-horst has no role that may run create_purchase_order"
+    },
+    {
+      "name": "an overlay denying an action takes effect within 30 s (6 s)",
+      "ok": true,
+      "detail": "Denied by policy: overlay ov-1: e2e: upstream erp under review"
+    },
+    {
+      "name": "other actions are unaffected by the overlay",
+      "ok": true
+    },
+    {
+      "name": "removing the overlay (a person, audited) restores the call",
+      "ok": true
+    },
+    {
+      "name": "destructive action without an approved plan is denied at the gateway",
+      "ok": true,
+      "detail": "Denied by policy: cancel_purchase_order is destructive: it needs an approved plan"
+    },
+    {
+      "name": "payment-critical write outside an approved task waits for four eyes (ontology server)",
+      "ok": true,
+      "detail": "Pending approval (four eyes): create_purchase_order needs a person's approval before it runs (approval request"
+    },
+    {
+      "name": "the approval request is recorded as an event",
+      "ok": true,
+      "detail": "2 request(s)"
+    },
+    {
+      "name": "OPA down ⇒ policy: opa calls are denied (fail closed)",
+      "ok": true,
+      "detail": "Denied by policy: OPA not reachable: TimeoutError: The operation was aborted due to timeout (fail cl"
+    },
+    {
+      "name": "OPA back ⇒ allowed again",
+      "ok": true
+    },
+    {
+      "name": "OPA reports its decisions to the control plane",
+      "ok": true,
+      "detail": "19 decisions, e.g. cancel_purchase_order is destructive: it needs an approved plan"
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T17:48:19.456Z"
+}

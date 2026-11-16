@@ -87,6 +87,8 @@ const DEFAULT_TIMING: Timing = { healthTimeoutMs: 240_000, pollMs: 2_000, availa
 const now = () => new Date().toISOString();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const upstreamSecretRef = (ext: string, secret: string) => `ext-${ext}-${secret.replace(/_/g, '-')}`;
+/** Key Vault name of a raw extension secret (manifest vaultSecrets). */
+export const vaultSecretRef = (ext: string, secret: string) => `ext-${ext}-${secret.replace(/_/g, '-')}-raw`;
 
 export class ExtensionService {
   private readonly registered = new Map<string, Registered>();
@@ -167,6 +169,12 @@ export class ExtensionService {
     const svc = this.reg(id).manifest.services.find((s) => s.name === service);
     if (!svc?.port) throw new ExtensionError(500, `extension ${id}: service "${service}" has no port`);
     return `http://${service}:${svc.port}`;
+  }
+
+  /** Installed (or overlay) — without checking health; for synchronous configuration builders. */
+  isInstalled(id: string): boolean {
+    const r = this.registered.get(id);
+    return !!r && (r.overlay.active || this.rec(id).phase === 'installed');
   }
 
   /** The extension's features are on: overlay present, or installed with every service running. Cached briefly. */
@@ -383,6 +391,8 @@ export class ExtensionService {
       if (changed) await this.persistSecrets();
       if (this.deps.secretStore) {
         for (const u of m.upstreams) if (u.tokenSecret) await this.deps.secretStore.set(upstreamSecretRef(id, u.tokenSecret), `Bearer ${mine[u.tokenSecret]}`, { tags: { extension: id } });
+        // raw values for platform services that read them from Key Vault (e.g. the gateway's OPA query token)
+        for (const v of m.vaultSecrets) await this.deps.secretStore.set(vaultSecretRef(id, v), mine[v]!, { tags: { extension: id } });
       }
       return;
     }
@@ -393,13 +403,15 @@ export class ExtensionService {
     if (step.id.startsWith('service:')) {
       const svc = m.services.find((s) => s.name === step.id.slice('service:'.length));
       if (!svc) throw new Error(`unknown service in ${step.id}`);
-      const env = renderEnv(svc.env, { secrets: this.secrets[id] ?? {}, host: (s) => s, port: (s) => m.services.find((x) => x.name === s)?.port });
+      const rctx = { secrets: this.secrets[id] ?? {}, host: (s: string) => s, port: (s: string) => m.services.find((x) => x.name === s)?.port };
+      const env = renderEnv(svc.env, rctx);
+      const command = svc.command?.map((c, i) => renderEnv({ [`ARG${i}`]: c }, rctx)[`ARG${i}`]!);
       // The image id is part of the fingerprint, so a rebuilt :local image re-creates the container on repair.
-      const fingerprint = serviceFingerprint({ ...svc, image: `${svc.image}@${(await rt.imageId(svc.image)) ?? "?"}` }, env);
+      const fingerprint = serviceFingerprint({ ...svc, command, image: `${svc.image}@${(await rt.imageId(svc.image)) ?? "?"}` }, env);
       const current = (await rt.list(id)).find((a) => a.service === svc.name);
       if (!current || current.fingerprint !== fingerprint) {
         logger.info({ extension: id, service: svc.name, env: maskEnv(env, svc.env) }, current ? 'extension service changed, re-creating' : 'creating extension service');
-        await rt.run(id, svc, env, fingerprint);
+        await rt.run(id, { ...svc, command }, env, fingerprint);
       } else if (!current.running) await rt.start(id, svc.name);
       await this.waitRunning(id, svc.name);
       return;
@@ -414,7 +426,7 @@ export class ExtensionService {
       for (const u of m.upstreams) {
         const token = u.tokenSecret ? this.secrets[id]?.[u.tokenSecret] : undefined;
         const headers: UpstreamServer['headers'] = u.tokenSecret ? { Authorization: this.deps.secretStore ? { secretRef: upstreamSecretRef(id, u.tokenSecret) } : `Bearer ${token}` } : {};
-        await this.deps.gateway.setUpstream({ name: u.name, description: u.description, url: `${this.url(id, u.service)}${u.path}`, headers, enabled: true, auth: 'static', oboFallback: 'deny' });
+        await this.deps.gateway.setUpstream({ name: u.name, description: u.description, url: `${this.url(id, u.service)}${u.path}`, headers, enabled: true, auth: 'static', oboFallback: 'deny', policy: u.policy });
         if (!rec.upstreams.includes(u.name)) rec.upstreams.push(u.name);
       }
       return;
@@ -443,7 +455,10 @@ export class ExtensionService {
       return;
     }
     if (step.id === 'secrets') {
-      if (this.deps.secretStore) for (const u of m.upstreams) if (u.tokenSecret) await this.deps.secretStore.remove(upstreamSecretRef(id, u.tokenSecret)).catch(() => undefined);
+      if (this.deps.secretStore) {
+        for (const u of m.upstreams) if (u.tokenSecret) await this.deps.secretStore.remove(upstreamSecretRef(id, u.tokenSecret)).catch(() => undefined);
+        for (const v of m.vaultSecrets) await this.deps.secretStore.remove(vaultSecretRef(id, v)).catch(() => undefined);
+      }
       delete this.secrets[id];
       await this.persistSecrets();
       return;

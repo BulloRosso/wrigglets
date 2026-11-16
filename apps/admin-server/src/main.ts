@@ -8,9 +8,13 @@ import { KillSwitchService } from './killswitch.js';
 import { SafetyRuleEngine } from './safety.js';
 import { SecurityGuardService } from './security.js';
 import { SignalsControlService } from './signals.js';
-import { liquidBootstrap, liquidManifest, liquidOverlay } from './extensions/liquid.js';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { LIQUID_ID, liquidBootstrap, liquidManifest, liquidOverlay, ontologyCall } from './extensions/liquid.js';
+import { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import { DockerExtensionRuntime } from './extensions/runtime.js';
-import { ExtensionService } from './extensions/service.js';
+import { ExtensionService, vaultSecretRef } from './extensions/service.js';
 import { createAdminApp } from './api.js';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
@@ -66,19 +70,19 @@ async function main() {
     {
       upstreams: [
         ...(config.DEMO_UPSTREAM_URL
-          ? [{ name: 'demo', description: 'Demo company systems (supplier directory, FX rates)', url: config.DEMO_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-demo-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          ? [{ name: 'demo', description: 'Demo company systems (supplier directory, FX rates)', url: config.DEMO_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-demo-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'none' as const }]
           : []),
         ...(config.WEB_UPSTREAM_URL
-          ? [{ name: 'web', description: 'Internet access: web search and reading public pages (ADR-0031)', url: config.WEB_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-web-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          ? [{ name: 'web', description: 'Internet access: web search and reading public pages (ADR-0031)', url: config.WEB_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-web-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'none' as const }]
           : []),
         ...(config.WIKI_UPSTREAM_URL
-          ? [{ name: 'wiki', description: 'Central company wiki, governed by people: agents read, search and propose edits (ADR-0035)', url: config.WIKI_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-wiki-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          ? [{ name: 'wiki', description: 'Central company wiki, governed by people: agents read, search and propose edits (ADR-0035)', url: config.WIKI_UPSTREAM_URL, headers: { Authorization: { secretRef: 'mcp-wiki-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'none' as const }]
           : []),
         ...(config.SIGNALS_HUB_URL && config.MCP_SIGNALS_TOKEN
-          ? [{ name: 'signals', description: 'Signals: report observations and list or resolve the open expectations of this agent (ADR-0037)', url: `${config.SIGNALS_HUB_URL.replace(/\/$/, '')}/mcp`, headers: { Authorization: { secretRef: 'mcp-signals-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          ? [{ name: 'signals', description: 'Signals: report observations and list or resolve the open expectations of this agent (ADR-0037)', url: `${config.SIGNALS_HUB_URL.replace(/\/$/, '')}/mcp`, headers: { Authorization: { secretRef: 'mcp-signals-authorization' } }, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'none' as const }]
           : []),
         ...(config.REDTEAM_UPSTREAM_URL
-          ? [{ name: 'redteam', description: 'Red-team mock: CRM, tickets with prompt injections and a recording mail tool (no authentication)', url: config.REDTEAM_UPSTREAM_URL, headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const }]
+          ? [{ name: 'redteam', description: 'Red-team mock: CRM, tickets with prompt injections and a recording mail tool (no authentication)', url: config.REDTEAM_UPSTREAM_URL, headers: {}, enabled: true, auth: 'static' as const, oboFallback: 'deny' as const, policy: 'none' as const }]
           : []),
       ],
     },
@@ -109,6 +113,21 @@ async function main() {
   const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
   extensions.register(liquidManifest, liquidBootstrap, liquidOverlay(config));
   await extensions.load();
+  // Liquid Enterprise policy as code (ADR-0044): overlays + OPA bundle; the gateway gets OPA's address while installed
+  const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
+  const liquidPolicy = new LiquidPolicyService(
+    config.DATA_DIR,
+    policyDir,
+    () => ontologyCall({ url: (s) => extensions.url(LIQUID_ID, s), secret: (n) => extensions.secret(LIQUID_ID, n) ?? '' }, 'GET', '/internal/opa/data'),
+    () => extensions.secret(LIQUID_ID, 'opa_query_token'),
+  );
+  await liquidPolicy.load();
+  gateway.opaProvider = () => {
+    if (!extensions.isInstalled(LIQUID_ID)) return undefined;
+    const raw = extensions.secret(LIQUID_ID, 'opa_query_token');
+    if (!raw) return undefined;
+    return { url: 'http://opa:8181', token: secrets && !liquidOverlay(config).active ? { secretRef: vaultSecretRef(LIQUID_ID, 'opa_query_token') } : raw };
+  };
   const avatars = new AvatarService({
     dataDir: config.DATA_DIR,
     defaultReference: config.AVATAR_DEFAULT_REFERENCE,
@@ -121,7 +140,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

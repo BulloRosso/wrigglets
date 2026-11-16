@@ -165,6 +165,8 @@ COPY --from=build /out/admin ./
 COPY --from=build /src/apps/admin-web/dist ./web
 # Default guiding image for agent portraits (replaceable in the admin console)
 COPY assets/agent-reference.png /app/assets/agent-reference.png
+# Liquid Enterprise policies (ADR-0044): served to OPA as a bundle by the control plane
+COPY policies/liquid /app/policies/liquid
 ENV NODE_ENV=production DATA_DIR=/data WEB_DIST_DIR=/app/web PORT=8080 TEMPORAL_BIN=/usr/local/bin/temporal TEMPORAL_ADDRESS=127.0.0.1:7233
 VOLUME ["/data"]
 EXPOSE 7233 8233 8080

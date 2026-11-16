@@ -19,13 +19,15 @@ export interface Caller {
   user?: string;
   task?: string;
   workflow?: string;
+  /** Task step (plan | run | fix) as the gateway knows it; run/fix = a person approved the plan. */
+  step?: string;
 }
 
-export type PolicyHook = (input: { action: string; target?: string; readOnly: boolean; destructive: boolean; caller: Caller; args: Args }) => Promise<{ allow: boolean; reason?: string }>;
+export type PolicyHook = (input: { action: string; target?: string; readOnly: boolean; destructive: boolean; caller: Caller; args: Args; company: SofaCompany }) => Promise<{ allow: boolean; reason?: string; obligations?: string[] }>;
 export const allowAll: PolicyHook = async () => ({ allow: true });
 
 /** Caller fields the gateway injects into tool arguments (apps/mcp-gateway caller.ts). */
-export const CALLER_PARAMS = ['_agent', '_task', '_requestedBy'] as const;
+export const CALLER_PARAMS = ['_agent', '_task', '_requestedBy', '_step'] as const;
 
 class Mutex {
   private tail: Promise<unknown> = Promise.resolve();
@@ -94,6 +96,7 @@ export class OntologyService {
       if (k === '_agent') caller.agent = String(v);
       else if (k === '_task') caller.task = String(v);
       else if (k === '_requestedBy') caller.user = String(v);
+      else if (k === '_step') caller.step = String(v);
       else rest[k] = v;
     }
     return { args: rest, caller };
@@ -108,8 +111,11 @@ export class OntologyService {
     if (!parsed.success) return { text: `Invalid input for ${name}: ${parsed.error!.issues.map((i) => `${i.path.join('.') || '(input)'}: ${i.message}`).join('; ')}`, isError: true };
     // keep the agent's original argument object (key order and extra keys matter for answers identical to the mock)
     const args = rawArgs ?? {};
-    const decision = await this.policy({ action: name, target: action.target, readOnly: action.readOnly, destructive: action.destructive, caller, args });
+    const decision = await this.policy({ action: name, target: action.target, readOnly: action.readOnly, destructive: action.destructive, caller, args, company: this.company });
     if (!decision.allow) return { text: `Denied by policy: ${decision.reason ?? 'not allowed'}`, isError: true, denied: true };
+    const obligations = decision.obligations ?? [];
+    if (obligations.includes('require_step_up')) return { text: 'Denied by policy: this action requires a step-up authentication of the person (not available in the prototype)', isError: true, denied: true };
+    if (obligations.includes('require_four_eyes')) return this.requestApproval(action.name, action.target, args, caller, decision.reason);
     if (action.readOnly) return this.company.call(name, args);
 
     return this.lock.run(async () => {
@@ -129,6 +135,17 @@ export class OntologyService {
       });
       return { ...res, seq };
     });
+  }
+
+  /**
+   * Four eyes (ADR-0044): the action is not run; the request is recorded as an event (no changes) and waits for a person.
+   * The approval workflow that runs it after approval is part of M5 (ApprovalWorkflow).
+   */
+  private async requestApproval(action: string, target: string | undefined, args: Args, caller: Caller, reason?: string): Promise<ActionOutcome> {
+    const [r] = await new EventStore(this.pool).append([
+      { type: 'ActionApprovalRequested', objectType: target ?? 'Company', objectId: '-', action, actorAgent: caller.agent, actorUser: caller.user, taskId: caller.task, payload: { input: args, obligation: 'require_four_eyes', reason: reason ?? null, step: caller.step ?? null }, ontologyVersion: this.ir.version },
+    ]);
+    return { text: `Pending approval (four eyes): ${action} needs a person's approval before it runs (approval request ${r!.seq}). Nothing was changed yet.`, isError: true, denied: true, seq: r!.seq };
   }
 
   private async commit(next: SofaCompany, changes: Change[], e: { type: string; objectType: string; objectId: string; action?: string; caller: Caller; payload: Record<string, unknown> }): Promise<number> {

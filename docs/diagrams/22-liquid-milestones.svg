@@ -75,12 +75,12 @@
   <text x="434" y="319" class="d">REST, parity with mock</text>
   <rect x="528" y="248" width="36" height="20" rx="10" class="demo"/><text x="546" y="262" class="bn">D1</text>
   <!-- M4 -->
-  <rect x="610" y="120" width="150" height="76" rx="10" class="wip"/>
+  <rect x="610" y="120" width="150" height="76" rx="10" class="done"/>
   <text x="624" y="143" class="id">M4</text><text x="658" y="143" class="h">Policy as code</text>
   <text x="624" y="163" class="d">OPA at gateway and</text>
   <text x="624" y="179" class="d">ontology server</text>
   <!-- M5 -->
-  <rect x="610" y="260" width="150" height="76" rx="10" class="plan"/>
+  <rect x="610" y="260" width="150" height="76" rx="10" class="wip"/>
   <text x="624" y="283" class="id">M5</text><text x="658" y="283" class="h">Business flows</text>
   <text x="624" y="303" class="d">holdable Temporal</text>
   <text x="624" y="319" class="d">workflows, approvals</text>

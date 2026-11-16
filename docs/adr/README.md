@@ -48,3 +48,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0041](0041-ontology-linkml-ir-generators.md) | Ontology in LinkML, compiled to an IR, every layer generated from the IR | Accepted |
 | [0042](0042-ontology-editor-react-flow.md) | Ontology editor in the admin console with React Flow | Accepted |
 | [0043](0043-ontology-server-action-pipeline.md) | Ontology server, action pipeline, event-sourced projection | Accepted |
+| [0044](0044-policy-as-code-opa.md) | Policy as code with OPA at two enforcement points | Accepted |

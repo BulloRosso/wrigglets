@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Liquid Enterprise: milestones and dependencies</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .id { font-size: 15px; font-weight: 700; fill: #1d2733; }
+    .h { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 11px; fill: #37414f; }
+    .lg { font-size: 12px; fill: #37414f; }
+    .bn { font-size: 11px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .done { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.8; }
+    .wip { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 2.2; }
+    .plan { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .ed { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .demo { fill: #e65100; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.2; stroke-dasharray: 6 4; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+  </defs>
+  <rect width="1200" height="660" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Liquid Enterprise: milestones and dependencies</text>
+  <text x="40" y="68" class="st">Each milestone ends with green checks, an ADR, updated docs and an implementation-log entry. Status as of 2026-11-16.</text>
+
+  <!-- phase labels -->
+  <text x="40" y="104" class="st">Foundation</text>
+  <text x="230" y="104" class="st">Data and ontology</text>
+  <text x="420" y="104" class="st">Backend swap</text>
+  <text x="610" y="104" class="st">Governance</text>
+  <text x="800" y="104" class="st">Control loop</text>
+  <text x="990" y="104" class="st">Evolution and proof</text>
+
+  <!-- edges (drawn first) -->
+  <path d="M115,196 L115,258" class="ln" marker-end="url(#a)"/>
+  <path d="M190,150 L206,150 L206,368 L228,368" class="ln" marker-end="url(#a)"/>
+  <path d="M190,298 L216,298 L216,228 L228,228" class="ln" marker-end="url(#a)"/>
+  <path d="M380,228 L400,228 L400,298 L418,298" class="ln" marker-end="url(#a)"/>
+  <path d="M380,368 L400,368 L400,298" class="ln"/>
+  <path d="M570,298 L590,298 L590,158 L608,158" class="ln" marker-end="url(#a)"/>
+  <path d="M570,298 L608,298" class="ln" marker-end="url(#a)"/>
+  <path d="M590,298 L590,438 L798,438" class="ln" marker-end="url(#a)"/>
+  <path d="M760,158 L798,158" class="ln" marker-end="url(#a)"/>
+  <path d="M875,196 L875,258" class="ln" marker-end="url(#a)"/>
+  <path d="M760,298 L798,298" class="ln" marker-end="url(#a)"/>
+  <path d="M950,140 L975,140 L975,372 L930,372 L930,398" class="ln" marker-end="url(#a)"/>
+  <path d="M950,298 L988,298" class="ln" marker-end="url(#a)"/>
+  <path d="M1065,336 L1065,398" class="ln" marker-end="url(#a)"/>
+  <path d="M950,452 L988,452" class="ln" marker-end="url(#a)"/>
+
+  <!-- M0 -->
+  <rect x="40" y="120" width="150" height="76" rx="10" class="done"/>
+  <text x="54" y="143" class="id">M0</text><text x="88" y="143" class="h">Baseline</text>
+  <text x="54" y="163" class="d">KPI baseline, ADR-0038,</text>
+  <text x="54" y="179" class="d">check script, this doc</text>
+  <!-- M0b -->
+  <rect x="40" y="260" width="150" height="76" rx="10" class="done"/>
+  <text x="54" y="283" class="id">M0b</text><text x="96" y="283" class="h">Extensions</text>
+  <text x="54" y="303" class="d">install / repair /</text>
+  <text x="54" y="319" class="d">uninstall from the console</text>
+  <!-- M1 -->
+  <rect x="230" y="190" width="150" height="76" rx="10" class="wip"/>
+  <text x="244" y="213" class="id">M1</text><text x="278" y="213" class="h">Data foundation</text>
+  <text x="244" y="233" class="d">event log (Postgres),</text>
+  <text x="244" y="249" class="d">DuckLake / Parquet, seed</text>
+  <!-- M2 -->
+  <rect x="230" y="330" width="150" height="76" rx="10" class="plan"/>
+  <text x="244" y="353" class="id">M2</text><text x="278" y="353" class="h">Ontology</text>
+  <text x="244" y="373" class="d">LinkML, IR, compiler,</text>
+  <text x="244" y="389" class="d">generators</text>
+  <!-- M3 -->
+  <rect x="420" y="260" width="150" height="76" rx="10" class="plan"/>
+  <text x="434" y="283" class="id">M3</text><text x="468" y="283" class="h">Ontology server</text>
+  <text x="434" y="303" class="d">only write path, MCP +</text>
+  <text x="434" y="319" class="d">REST, parity with mock</text>
+  <rect x="528" y="248" width="36" height="20" rx="10" class="demo"/><text x="546" y="262" class="bn">D1</text>
+  <!-- M4 -->
+  <rect x="610" y="120" width="150" height="76" rx="10" class="plan"/>
+  <text x="624" y="143" class="id">M4</text><text x="658" y="143" class="h">Policy as code</text>
+  <text x="624" y="163" class="d">OPA at gateway and</text>
+  <text x="624" y="179" class="d">ontology server</text>
+  <!-- M5 -->
+  <rect x="610" y="260" width="150" height="76" rx="10" class="plan"/>
+  <text x="624" y="283" class="id">M5</text><text x="658" y="283" class="h">Business flows</text>
+  <text x="624" y="303" class="d">holdable Temporal</text>
+  <text x="624" y="319" class="d">workflows, approvals</text>
+  <!-- M6 -->
+  <rect x="800" y="120" width="150" height="76" rx="10" class="plan"/>
+  <text x="814" y="143" class="id">M6</text><text x="848" y="143" class="h">Config repo</text>
+  <text x="814" y="163" class="d">desired state in Git,</text>
+  <text x="814" y="179" class="d">proposals, reconciler</text>
+  <!-- M7 -->
+  <rect x="800" y="260" width="150" height="76" rx="10" class="plan"/>
+  <text x="814" y="283" class="id">M7</text><text x="848" y="283" class="h">Playbooks</text>
+  <text x="814" y="303" class="d">tighten-only rule,</text>
+  <text x="814" y="319" class="d">blast radius, replay</text>
+  <!-- M9 -->
+  <rect x="800" y="400" width="150" height="76" rx="10" class="plan"/>
+  <text x="814" y="423" class="id">M9</text><text x="848" y="423" class="h">Identity and UIs</text>
+  <text x="814" y="443" class="d">Entra option, SDK,</text>
+  <text x="814" y="459" class="d">app registry</text>
+  <!-- M8 -->
+  <rect x="990" y="260" width="150" height="76" rx="10" class="plan"/>
+  <text x="1004" y="283" class="id">M8</text><text x="1038" y="283" class="h">Ontology change</text>
+  <text x="1004" y="303" class="d">compatibility, versions,</text>
+  <text x="1004" y="319" class="d">migration, modelling agent</text>
+  <!-- M10 -->
+  <rect x="990" y="400" width="150" height="76" rx="10" class="plan"/>
+  <text x="1004" y="423" class="id">M10</text><text x="1046" y="423" class="h">Acceptance</text>
+  <text x="1004" y="443" class="d">scripted scenarios,</text>
+  <text x="1004" y="459" class="d">final report</text>
+  <rect x="1060" y="388" width="36" height="20" rx="10" class="demo"/><text x="1078" y="402" class="bn">D2</text>
+  <rect x="1100" y="388" width="36" height="20" rx="10" class="demo"/><text x="1118" y="402" class="bn">D3</text>
+
+  <!-- editor tracks -->
+  <rect x="30" y="500" width="1120" height="74" rx="10" class="bnd"/>
+  <text x="44" y="522" class="h">Ontology editor (React Flow)</text>
+  <text x="44" y="540" class="d">delivered with the</text>
+  <text x="44" y="556" class="d">milestone it needs</text>
+  <rect x="230" y="512" width="365" height="50" rx="8" class="ed"/>
+  <text x="244" y="533" class="h">E1 viewer · E2 drafts + validate</text>
+  <text x="244" y="551" class="d">with M2 / M3: graph of classes and links, edits as YAML operations</text>
+  <rect x="800" y="512" width="150" height="50" rx="8" class="ed"/>
+  <text x="814" y="533" class="h">E3 proposals</text>
+  <text x="814" y="551" class="d">with M6: diff graph</text>
+  <rect x="990" y="512" width="150" height="50" rx="8" class="ed"/>
+  <text x="1004" y="533" class="h">E4 live apply</text>
+  <text x="1004" y="551" class="d">with M8: compatibility</text>
+
+  <!-- legend -->
+  <rect x="40" y="602" width="22" height="16" rx="4" class="done"/><text x="70" y="615" class="lg">done</text>
+  <rect x="130" y="602" width="22" height="16" rx="4" class="wip"/><text x="160" y="615" class="lg">in progress</text>
+  <rect x="260" y="602" width="22" height="16" rx="4" class="plan"/><text x="290" y="615" class="lg">planned</text>
+  <rect x="370" y="601" width="30" height="18" rx="9" class="demo"/><text x="385" y="614" class="bn">D</text>
+  <text x="408" y="615" class="lg">demonstration: D1 backend swap · D2 new security risk · D3 new business requirement</text>
+  <text x="40" y="642" class="d">Arrows: "needs". Transitive dependencies are omitted (e.g. M4 → M7 via M6, M7 → M10 via M8).</text>
+</svg>

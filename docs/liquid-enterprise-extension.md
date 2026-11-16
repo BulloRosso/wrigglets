@@ -43,7 +43,7 @@ plan adds the data half and turns the safety rule engine into a control loop for
 
 | Layer | Role | Implemented by (target) | Owned core or replaceable |
 |---|---|---|---|
-| Data lake and event log | raw, immutable operational data in open table formats; append-only events | SeaweedFS (S3) + Apache Iceberg (REST catalog) + Postgres event outbox; DuckDB for queries | **owned core** |
+| Data lake and event log | raw, immutable operational data in open table formats; append-only events | Postgres event log + DuckLake (catalog in Postgres, Parquet files on a volume), written and queried with DuckDB 2 | **owned core** |
 | Ontology and actions | object types, links, typed actions, bindings to lake objects; the **only write path** | LinkML schema + `actions.yaml` + `bindings.yaml` → ontology compiler → `apps/ontology-server` | **owned core** |
 | Policy | who may run which action on which object | OPA (Rego) at two points: MCP gateway (coarse) and ontology server (object level) | **owned core** |
 | Identity | people, agents, apps | Entra ID (target) / existing `oauth-server` (local fallback); Entra OBO at the gateway | replaceable behind OIDC |
@@ -115,7 +115,6 @@ tools/
 apps/
   ontology-server/              MCP + REST endpoint for objects and actions; event outbox; projection; OPA checks
   business-worker/              Temporal worker for the `business` namespace
-  lake-writer/                  flushes the event outbox and seeds into Iceberg (if not part of ontology-server, see M1)
 policies/
   liquid/                       Rego: gateway policy, object policy, tightening overlays; tests (`opa test`)
 playbooks/
@@ -125,7 +124,7 @@ scripts/liquid/
   parity.mjs                    D1: runs the sofa scenarios against both backends and compares KPIs
   scenario-security.mjs         D2
   scenario-business.mjs         D3
-docker-compose.liquid.yml       optional overlay: SeaweedFS, Iceberg catalog, ontology DB, ontology server, OPA, business worker
+docker-compose.liquid.yml       optional overlay: ontology DB, ontology server (with the lake), OPA, business worker
 docs/
   liquid-enterprise-extension.md  this file (the plan)
   liquid-enterprise.md          the one user/operator document: activation, architecture, ontology + IR contract,
@@ -148,6 +147,8 @@ during the parity phase (M3).
 ---
 
 ## 4. Milestones overview
+
+<img src="diagrams/22-liquid-milestones.svg" alt="Milestones and dependencies" width="100%">
 
 | # | Milestone | Main deliverable | Depends on |
 |---|---|---|---|
@@ -263,39 +264,47 @@ Exit criteria
 **Goal:** an open-format raw zone and an append-only event log, both rebuildable, with the sofa company's initial state
 seeded into them.
 
-Design
-- **Object storage:** SeaweedFS with its S3 gateway (Apache-2.0, pinned by digest). Decided 2026-11-16 instead of MinIO,
-  whose community images and binaries are no longer published. **⚠ VERIFY** S3 compatibility with the chosen catalog
-  and writer (multipart upload, path-style access).
-- **Table format and catalog:** Apache Iceberg with a REST catalog. Candidates: Lakekeeper or Apache Polaris.
-  **⚠ VERIFY** image, licence (must be OSS), REST catalog compatibility with the chosen writer.
-- **Writer and query engine:** DuckDB from Node (`@duckdb/node-api`) with the `iceberg` extension.
-  **⚠ VERIFY** that the DuckDB version in use can *write* (append) to Iceberg tables through a REST catalog. Fallback:
-  a small Python `apps/lake-writer` using `pyiceberg` (append via REST catalog), pinned, in its own container. Decide in
-  a spike at the start of M1 and record the decision in the ADR.
-- **Event log:** table `events` in a new Postgres (`cw-ontology-db`), append-only (no UPDATE/DELETE grants for the
-  application role). Columns: `seq bigserial`, `event_id uuid`, `type`, `object_type`, `object_id`, `action`,
-  `actor_agent`, `actor_user`, `task_id`, `workflow_id`, `payload jsonb`, `occurred_at`, `ontology_version`.
-- **Flush:** a Temporal schedule `lake-flush` (every minute) appends new events to Iceberg `raw.events` and records the
-  high-water mark. Idempotent by `seq`.
-- **Raw zone tables:** `raw.erp_*`, `raw.crm_*` (one per entity of the mock: factories, machines, workers, materials,
-  suppliers, inventory, purchase_orders, production_orders, maintenance_tickets, customers, orders, campaigns, demand).
-- **Seed:** `scripts/liquid/seed.mjs` exports the initial state of `mock-mcp.mjs` (refactor the mock so its initial
-  state can be imported as a module without starting the server, or read it from `/scenario` reset) and writes it into
-  the raw zone as the "source system extract" at time T0.
+Design (revised 2026-11-16 after the spike, ADR-0040: simpler than object storage + Iceberg catalog)
+- **No extra containers.** Event log, lake catalog and projection all live in `ontology-db` (Postgres); the lake's data
+  files are Parquet on a volume. MinIO is out (no community images since October 2025); SeaweedFS + an Iceberg REST
+  catalog was considered and dropped as too many moving parts for a prototype.
+- **Table format: DuckLake** (MIT, 1.0 since April 2026). Catalog in Postgres schema `lake_catalog`, data files in
+  `/lake` (volume `lake-data`). Snapshots and time travel are built in (used by shadow replay, M7). Data files are
+  Parquet and Iceberg-compatible; an Iceberg copy can be produced later without rewriting data.
+- **Writer and query engine: DuckDB 2** (`@duckdb/node-api` 2.0.0-r.1, extensions `ducklake` + `postgres` installed at
+  image build, no downloads at runtime), embedded in `apps/ontology-server`. The ontology server owns the event log
+  from M1 on and grows into the action pipeline in M3 (no separate `lake-writer`).
+- **Why DuckDB next to Postgres:** Postgres is the operational store (event log in the same transaction as the action,
+  projection for lookups). DuckDB writes and reads the open-format copy (Parquet, readable by any engine without our
+  code) and runs analytical scans and time travel without loading the operational database.
+- **Event log:** table `events` in `ontology-db`, append-only, enforced by a trigger that rejects UPDATE, DELETE and
+  TRUNCATE. Columns: `seq bigserial`, `event_id uuid` (unique, idempotent append), `type`, `object_type`, `object_id`,
+  `action`, `actor_agent`, `actor_user`, `task_id`, `workflow_id`, `payload jsonb`, `occurred_at`, `recorded_at`,
+  `ontology_version`.
+- **Flush:** a loop in the ontology server (every 60 s, and on demand) appends new events to `lake.raw.events` under a
+  Postgres advisory lock. The high-water mark is `max(seq)` in the lake table itself. Sequence gaps (rolled-back
+  inserts) are only skipped once they are older than a grace period, so a slow transaction is never lost. A Temporal
+  schedule replaces the loop when the `business` worker exists (M5).
+- **Raw zone tables:** `raw.erp_*`, `raw.crm_*`, one per entity of the mock (factories, machines, workers, absences,
+  materials, bom, suppliers, inventory, purchase_orders, production_orders, maintenance_tickets, customers, orders,
+  campaigns, demand), each with `_extract_id` and `_extracted_at`; `raw._extracts` records every extract.
+- **Seed:** the mock's initial state is importable (`freshWorld` exported, server only starts when run directly) and
+  ported to `packages/sofa-domain` (parity test against the mock). The seed is a demo-only bootstrap step of the
+  extension that calls the ontology server, which writes the "source system extract" at T0. Idempotent by extract id.
 
 Tasks
-1. Spike writer/catalog (⚠ VERIFY above), write ADR-0040 "Lake: Iceberg on SeaweedFS, event outbox in Postgres".
-2. `docker-compose.liquid.yml` with `minio`, catalog (+ its DB if needed), `ontology-db`; health checks; volumes;
-   loopback-only ports; secrets generated by `scripts/stack.mjs env` (extend it, keep existing behaviour).
-3. Package code for: event append (typed, zod-validated), outbox flush activity, raw-zone writer, raw-zone reader.
-4. `scripts/liquid/seed.mjs` + a `lake-flush` schedule registered by the control plane when the overlay is on.
-5. Tests: event append idempotency, flush high-water mark, seed round trip (state in → raw tables → read back equal).
+1. Spike (done): DuckLake on Postgres from DuckDB 2 in Node, on Windows and in the Linux image. ADR-0040.
+2. `ontology-server` service in the liquid manifest and the overlay (image built by `stack.mjs build --liquid`).
+3. `packages/lake`: event store (zod-validated append, idempotent), flush with gap handling, DuckLake writer/reader.
+4. `packages/sofa-domain`: initial world + raw extract mapping. Seed bootstrap step.
+5. Tests: event append idempotency and append-only trigger, flush high-water mark and gap handling, seed round trip
+   (state in → raw tables → read back equal). Unit tests run without Docker (PGlite for Postgres, a DuckDB-file
+   catalog for DuckLake).
 
-Deliverables: overlay compose file, ADR-0040, event log + flush, seeded raw zone, tests.
+Deliverables: ontology server (lake part), ADR-0040, event log + flush, seeded raw zone, tests.
 
 Exit criteria
-- `docker compose -f docker-compose.yml -f docker-compose.liquid.yml up` starts everything healthy.
+- Install from the console (and `stack.mjs liquid up`) starts everything healthy.
 - After seeding, a DuckDB query over the raw zone returns the same entity counts as the mock's initial state.
 - Appending 1,000 events and flushing twice yields exactly 1,000 rows in `raw.events`.
 
@@ -774,7 +783,7 @@ Exit criteria
 
 | Risk | Mitigation |
 |---|---|
-| Iceberg write path from Node not mature | Spike first (M1); fallback `pyiceberg` writer container |
+| Lake format less widely supported than Iceberg | DuckLake data files are Parquet and Iceberg-compatible; an Iceberg copy can be produced later (ADR-0040) |
 | Parity fails because the mock logic is subtle | Port with unit-level parity tests before end-to-end runs; KPI from `sofa-domain`, not from agents |
 | Model variance hides regressions | Baseline spread from M0; compare distributions, not single runs |
 | Config migration (M6) breaks the admin console | Export/import round trip test; keep JSON fallback behind a flag until M10 |

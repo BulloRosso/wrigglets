@@ -36,7 +36,7 @@ tighten automatically and loosen only with a human decision.
 
 | Layer | Role | Implemented by |
 |---|---|---|
-| Data lake and event log | raw, immutable data in open table formats; append-only events | SeaweedFS (S3) + Apache Iceberg + Postgres event outbox; DuckDB for queries |
+| Data lake and event log | raw, immutable data in open table formats; append-only events | Postgres event log + DuckLake (catalog in Postgres, Parquet files), written and queried with DuckDB 2 |
 | Ontology and actions | object types, links, typed actions; the **only write path** | LinkML schema + `actions.yaml` + `bindings.yaml` → compiler → ontology server |
 | Policy | who may run which action on which object | OPA at the MCP gateway and the ontology server |
 | Orchestration | long-running business processes, playbook runs, replays | Temporal, namespace `business` |
@@ -47,6 +47,15 @@ tighten automatically and loosen only with a human decision.
 The rules that hold everywhere (plan §1.3): nothing above the ontology binds to physical tables; actions are the only
 write path; raw data is immutable and the projection can be rebuilt from events; one source compiled everywhere; fail
 closed; tighten automatically, loosen only with approval; desired state in Git.
+
+**Why DuckDB next to Postgres?** Postgres is the operational store: the event log is written in the same transaction as
+an action, and the projection serves lookups. DuckDB (embedded in the ontology server, no container of its own) writes
+the open-format copy (DuckLake: Parquet files that any engine can read without our code) and runs historical scans and
+time travel without loading the operational database. The DuckLake catalog itself lives in the same Postgres.
+
+### Roadmap
+
+<img src="diagrams/22-liquid-milestones.svg" alt="Milestones and dependencies" width="100%">
 
 ## Activation
 

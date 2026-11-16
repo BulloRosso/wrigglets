@@ -1,0 +1,108 @@
+{
+  "startedAt": "2026-11-16T21:39:16.014Z",
+  "checks": [
+    {
+      "name": "the example playbook is in the config repository and valid",
+      "ok": true,
+      "detail": [
+        "playbooks/third-party-upstream-vulnerability.yaml"
+      ]
+    },
+    {
+      "name": "POST /internal/alerts without the token is refused",
+      "ok": true,
+      "detail": 401
+    },
+    {
+      "name": "baseline: erp enabled, no hold",
+      "ok": true,
+      "detail": {
+        "overlays": "[]"
+      }
+    },
+    {
+      "name": "the alert starts the matching playbook",
+      "ok": true,
+      "detail": [
+        {
+          "runId": "pr-mwjsdibl-e57d",
+          "playbook": "third-party-upstream-vulnerability",
+          "workflowId": "PlaybookRun-pr-mwjsdibl-e57d"
+        }
+      ]
+    },
+    {
+      "name": "tightening steps ran automatically; propose-fix is a pending proposal; restore waits",
+      "ok": true,
+      "detail": [
+        "disable-upstream=done",
+        "tighten-policy=done",
+        "hold-workflows=done",
+        "notify-owners=done",
+        "propose-fix=proposed",
+        "replay=done",
+        "restore=awaiting_approval"
+      ]
+    },
+    {
+      "name": "blast radius: erp tools → write actions → classes → the running purchase order",
+      "ok": true,
+      "detail": {
+        "tools": 23,
+        "writeActions": 10,
+        "workflows": 1
+      }
+    },
+    {
+      "name": "effects: upstream disabled, overlay added, workflow held",
+      "ok": true,
+      "detail": {
+        "overlays": "[\"ov-1\"]",
+        "held": "PurchaseOrderRelease-20410697-5632-42c3-9fea-c838d8e0e137"
+      }
+    },
+    {
+      "name": "shadow replay reported on the last 7 days",
+      "ok": true,
+      "detail": "replayed 3065 events: 10 action(s) would need approval or be blocked, 6 diverged"
+    },
+    {
+      "name": "the reconciler keeps the tightening (it was committed to the config repository)",
+      "ok": true
+    },
+    {
+      "name": "alert, run start and every step are events in the event log",
+      "ok": true,
+      "detail": "AgentTaskRequested:1,AlertReceived:1,BusinessNotification:1,PlaybookRunStarted:1,PlaybookStepAwaitingApproval:1,PlaybookStepExecuted:6"
+    },
+    {
+      "name": "after approval everything is back to baseline (upstreams, overlays, held workflows, repository)",
+      "ok": true,
+      "detail": "1 workflow(s) released; overlay ov-1 removed; upstream erp enabled"
+    },
+    {
+      "name": "restore was approved by the signed-in person",
+      "ok": true
+    },
+    {
+      "name": "decision, end of run and incident are events",
+      "ok": true,
+      "detail": "3"
+    },
+    {
+      "name": "a cancelled run loosens nothing (erp stays disabled until a person enables it)",
+      "ok": true
+    },
+    {
+      "name": "manual cleanup by a person restores the baseline",
+      "ok": true
+    },
+    {
+      "name": "a playbook that loosens automatically is rejected by validation",
+      "ok": true,
+      "detail": "steps.0.autonomy: gateway.upstream.enable loosens and must have autonomy \"human\" (tighten automatically, loosen only with a person)"
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-16T21:39:54.681Z"
+}

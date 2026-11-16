@@ -195,3 +195,28 @@ describe('MCP', () => {
     expect(out.result).toMatchObject({ isError: true, content: [{ text: 'Unknown tool list_customers' }] });
   });
 });
+
+describe('shadow replay (M7)', () => {
+  const work = async () => {
+    await svc.execute('create_purchase_order', { supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 2000 }, { agent: 'sofa-lara' });
+    await svc.scenario('supplier-beams');
+    await svc.execute('request_overtime', { factory: 'F-NORTH', from: '2026-10-06', to: '2026-10-07' }, { agent: 'sofa-max' });
+    await svc.execute('create_purchase_order', { supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 3000 }, { agent: 'sofa-lara' });
+  };
+  it('with the actual configuration nothing diverges and the KPIs are equal', async () => {
+    await work();
+    const r = await svc.shadowReplay({ fromSeq: 1 });
+    expect(r).toMatchObject({ actions: 3, replayed: 3, blocked: 0, diverged: 0 });
+    expect(Object.values(r.kpi.delta).every((v) => v === 0)).toBe(true);
+  });
+  it('a candidate that requires four eyes on purchase orders reports the blocked actions; same input, same report', async () => {
+    await work();
+    const candidate = { overlays: [{ effect: 'require_four_eyes' as const, match: { actions: ['create_purchase_order'] } }] };
+    const a = await svc.shadowReplay({ fromSeq: 1, candidate });
+    expect(a).toMatchObject({ blocked: 2, needsApproval: 2, replayed: 1 });
+    expect(a.blockedActions.map((b) => b.agent)).toEqual(['sofa-lara', 'sofa-lara']);
+    const b = await svc.shadowReplay({ fromSeq: 1, candidate });
+    expect(b.reportHash).toBe(a.reportHash);
+    expect((await svc.shadowReplay({ fromSeq: 1 })).reportHash).not.toBe(a.reportHash);
+  });
+});

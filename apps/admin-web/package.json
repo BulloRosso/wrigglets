@@ -13,6 +13,7 @@
   "dependencies": {
     "@cw/extensions": "workspace:*",
     "@cw/ontology-ir": "workspace:*",
+    "@cw/playbooks": "workspace:*",
     "@cw/shared": "workspace:*",
     "@cw/ui": "workspace:*",
     "@dagrejs/dagre": "3.1.3",

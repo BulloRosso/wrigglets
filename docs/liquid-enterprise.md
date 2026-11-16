@@ -407,7 +407,62 @@ and any drift; *Reconcile now* forces a run.
 
 ## Playbooks
 
-*(planned, M7)*
+Decision record: [ADR-0047](adr/0047-playbooks-tighten-only.md).
+
+<img src="diagrams/28-liquid-playbooks.svg" alt="Playbooks: one sensing path, tighten automatically, loosen with a person" width="100%">
+
+A playbook says what happens when something is sensed: which steps run, and how autonomously. Playbooks live in the
+config repository (`playbooks/*.yaml`) and are changed through proposals like any other configuration.
+
+```yaml
+id: third-party-upstream-vulnerability
+version: 1
+trigger: { kind: alert, match: { source: vuln-feed, severity: [high, critical] } }
+assess: { blast_radius: ontology }
+steps:
+  - { id: disable-upstream, type: gateway.upstream.disable, autonomy: auto, with: { upstream: "{{ trigger.upstream }}" } }
+  - { id: tighten-policy,   type: policy.overlay.add,       autonomy: auto, with: { actions: "{{ blast.writeActions }}", obligation: require_four_eyes } }
+  - { id: hold-workflows,   type: temporal.hold,            autonomy: auto, with: { objects: "{{ blast.objects }}", ref: "{{ run.id }}" } }
+  - { id: propose-fix,      type: agent.task,               autonomy: propose, with: { agent: platform-agent } }
+  - { id: replay,           type: shadow.replay,            autonomy: auto, with: { window: 7d } }
+  - { id: restore,          type: restore,                  autonomy: human }
+learn: { record_incident: true }
+```
+
+**Triggers** (one sensing path, everything becomes an event first): `alert` (`POST /internal/alerts` with the
+extension's alerts token, or *Send test alert* on the Playbooks page), `safety_metric` (a tripped safety rule),
+`schedule` (`every: 1h`), `event` (any event type of the log), `signal`.
+
+**Step types and directions:**
+
+| Direction | Steps | Allowed autonomy |
+|---|---|---|
+| tighten | `gateway.upstream.disable`, `policy.overlay.add`, `temporal.hold`, `killswitch.raise`, `entra.revoke_scope` | auto, human |
+| neutral | `notify`, `shadow.replay`, `agent.task`, `config.propose` | auto, propose, human |
+| loosen | `restore`, `policy.overlay.remove`, `temporal.release`, `gateway.upstream.enable`, `killswitch.lower` | **human only** |
+
+The **tighten-only rule** is checked three times: when a playbook is proposed (an auto-loosening playbook is invalid
+and cannot be approved), when `main` is reconciled, and by the control plane before each step.
+
+**A run** is a durable workflow. `auto` steps run at once, `propose` steps create a request a person decides later
+(the run continues), `human` steps wait on the Playbooks page. **Restore** reverts what this run tightened, newest
+first: re-enables the upstream, removes the overlay, releases the hold, lowers the kill switch. **Cancel** stops the run
+and loosens nothing; cleaning up is then a person's console work. Tightening is committed to the config repository,
+so the reconciler does not undo it. Every step, decision and the end of a run are events; with `record_incident` the
+run is also recorded as an incident.
+
+**Blast radius:** upstream → its tools → the ontology actions behind them → their classes → running business
+workflows that touch those classes (and their objects, which a hold step pauses).
+
+**Shadow replay** replays the event log of a window with a candidate configuration and reports how many actions the
+candidate would have blocked or sent to four eyes, which results diverge, and the KPI delta. Same window and same
+candidate give the same report (it carries a hash). With the current configuration the last week replays with zero
+divergence.
+
+**Safety rules** keep working as before (ADR-0022): the safety engine evaluates them and raises the kill switch. Each
+trip is now also a `SafetyRuleTripped` event that playbooks can react to.
+
+![Playbooks page: a run waiting for restore, the example playbook](images/liquid/liquid-playbooks.png)
 
 ## Identity and apps
 
@@ -756,6 +811,38 @@ Open
   supported (console only).
 - An early variant of the e2e called a tool on the sofa mock with empty arguments; the mock accepted it and filed
   incident `INC-0001` in its simulated world (gone with the next reset or scenario start).
+
+### M7 — Playbooks and the control loop (2026-11-16)
+
+Done
+- `packages/playbooks`: schema, step registry with directions, tighten-only validator, run-time step check, templates,
+  trigger matching, blast radius, safety rules as playbooks. [ADR-0047](adr/0047-playbooks-tighten-only.md).
+- `PlaybookRun` workflow (business namespace): auto / propose / human steps, `decideStep` update, cancel without
+  loosening, run state query. Worker activities call the control plane.
+- Control plane: sensing (`/internal/alerts`, console test alert, safety-rule trips, schedules), step executor with
+  undo data and restore, config-repository commits for tightening, events for every step; Playbooks page.
+- Ontology server: shadow replay (`POST /internal/shadow/replay`). Config repository validates playbooks and adds new
+  default files of a version once (the example playbook arrived in the existing repository this way).
+
+Verified
+- `@cw/playbooks` 8 tests (example valid, auto-loosening rejected, run-time check, templates, triggers, blast radius on
+  the sofa ontology, safety-rule equivalence); `PlaybookRun` 4 (tighten auto + restore waits with undo data, cancel
+  never loosens, reject skips, worker restart); shadow replay 2 (no divergence with the actual configuration,
+  candidate blocks + same report hash); config repository 16.
+- **End to end** (`node scripts/liquid/e2e-playbooks.mjs`, `scripts/liquid/results/e2e-playbooks.json`): 16/16. A
+  synthetic alert starts the example playbook; **upstream erp disabled, overlay with four eyes on its 10 write actions,
+  the running purchase-order workflow held, the week replayed — all automatically**; restore waits; the reconciler
+  keeps the tightening; alert, run start and every step are events; **after approving restore, upstreams, overlays,
+  held workflows and the repository equal the baseline**; a cancelled run loosens nothing; an auto-loosening playbook
+  cannot be proposed; the alert endpoint refuses calls without its token.
+- Found on the way: the shadow replay first reported divergences with the unchanged configuration; causes were
+  wall-clock timestamps in the domain, the projection's row order, and an attribute added in M5 that older events
+  lack. They are now ignored in the comparison; the real week replays with zero divergence.
+
+Open
+- `agent.task` records a request; starting the agent's task is a person's action (no automatic model spend). Signals
+  observations are not yet wired as a trigger source (the trigger kind exists); this follows with the event-log
+  refactoring after M8.
 
 ### Later
 

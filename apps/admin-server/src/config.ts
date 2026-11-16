@@ -112,6 +112,10 @@ const schema = z.object({
   LIQUID_POLICY_DIR: z.string().default('/app/policies/liquid'),
   /** Ontology sources copied into the image; seed of the config repository (ADR-0046). */
   LIQUID_ONTOLOGY_DIR: z.string().default('/app/ontology'),
+  /** Default playbooks copied into the image; seed of the config repository (ADR-0047). */
+  LIQUID_PLAYBOOKS_DIR: z.string().default('/app/playbooks'),
+  LIQUID_PLAYBOOK_TOKEN: z.string().optional(),
+  LIQUID_ALERTS_TOKEN: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

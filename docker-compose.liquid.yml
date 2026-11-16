@@ -20,6 +20,8 @@ services:
       LIQUID_OPA_QUERY_TOKEN: ${LIQUID_OPA_QUERY_TOKEN:?run scripts/stack.mjs env to add LIQUID_OPA_QUERY_TOKEN}
       LIQUID_CONFIG_MCP_TOKEN: ${LIQUID_CONFIG_MCP_TOKEN:?run scripts/stack.mjs env to add LIQUID_CONFIG_MCP_TOKEN}
       LIQUID_COMPILER_TOKEN: ${LIQUID_COMPILER_TOKEN:?run scripts/stack.mjs env to add LIQUID_COMPILER_TOKEN}
+      LIQUID_PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?run scripts/stack.mjs env to add LIQUID_PLAYBOOK_TOKEN}
+      LIQUID_ALERTS_TOKEN: ${LIQUID_ALERTS_TOKEN:?run scripts/stack.mjs env to add LIQUID_ALERTS_TOKEN}
 
   opa:
     image: openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3
@@ -123,6 +125,8 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       ONTOLOGY_URL: http://ontology-server:7710
       INTERNAL_TOKEN: ${LIQUID_ONTOLOGY_INTERNAL_TOKEN:?}
+      CONTROL_PLANE_URL: http://temporal:8080
+      PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?}
     depends_on:
       ontology-server: { condition: service_healthy }
     networks: [coworking]

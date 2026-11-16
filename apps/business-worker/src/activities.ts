@@ -1,5 +1,5 @@
 import { ApplicationFailure } from '@temporalio/common';
-import type { BusinessActivities } from '@cw/business-workflows';
+import type { BusinessActivities, PlaybookActivities } from '@cw/business-workflows';
 
 /*
  * Activities of the business worker. Every write is an ontology action (POST /actions/:name on the ontology server,
@@ -38,5 +38,22 @@ export function createActivities(o: { ontologyUrl: string; token: string; fetchI
       // recorded as an event (no changes: not business data); mail delivery can subscribe to it later
       await call('POST', '/internal/events', { events: [{ type: 'BusinessNotification', objectType: 'Notification', objectId: ref, payload: { kind, subject, body } }] });
     },
+  };
+}
+
+/** Playbook activities (ADR-0047): the control plane assesses the blast radius and executes the steps. */
+export function createPlaybookActivities(o: { controlPlaneUrl: string; token: string; fetchImpl?: typeof fetch }): PlaybookActivities {
+  const f = o.fetchImpl ?? fetch;
+  const base = o.controlPlaneUrl.replace(/\/$/, '');
+  const post = async <T>(path: string, body: unknown): Promise<T> => {
+    const res = await f(`${base}${path}`, { method: 'POST', headers: { authorization: `Bearer ${o.token}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(150_000) });
+    if (res.status === 401) throw ApplicationFailure.nonRetryable('control plane rejected the playbook token');
+    if (!res.ok) throw new Error(`control plane ${path}: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    return (await res.json()) as T;
+  };
+  return {
+    assessBlast: ({ trigger }) => post('/internal/liquid/playbooks/assess', { trigger }),
+    executeStep: (i) => post('/internal/liquid/playbooks/execute', i),
+    recordRun: async (i) => void (await post('/internal/liquid/playbooks/record', i)),
   };
 }

@@ -4,6 +4,7 @@ import type { OntologyIr } from '@cw/ontology-ir';
 import { types } from '@cw/ontology-sofa';
 import { SCENARIO_EVENT, SCENARIO_IDS, SofaCompany, diffObjects, metaOf, objectsToWorld, worldToObjects, type Args, type Change, type CompanyMeta, type ScenarioId, type ToolResult, type WriteRecord } from '@cw/sofa-domain';
 import { ddlFor, loadObjects, rowHash, runDq, seed, setMeta, upsert } from './projection.js';
+import { shadowReplay, type Candidate } from './shadow.js';
 
 /*
  * The action pipeline (ADR-0043): the ONLY write path for business data. One code path for MCP and REST:
@@ -175,6 +176,11 @@ export class OntologyService {
     });
     this.company = next;
     return seq;
+  }
+
+  /** The event log replayed with a candidate configuration (ADR-0047); read-only. */
+  shadowReplay(o: { windowMs?: number; fromSeq?: number; toSeq?: number; candidate?: Candidate }) {
+    return shadowReplay(this.pool, this.ir, o);
   }
 
   /** Starts a scenario disruption of the parity runner (written as an event like any other change). */

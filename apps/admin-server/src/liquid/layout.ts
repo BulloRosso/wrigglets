@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import YAML from 'yaml';
 import { agentEntra, safetyRules, upstreamServer, type AgentSpec, type GatewayLimits, type SafetyRule, type UpstreamServer } from '@cw/shared';
+import { validatePlaybook } from '@cw/playbooks';
 import { overlayInput, type Overlay } from '../extensions/liquidPolicy.js';
 
 /*
@@ -133,7 +134,11 @@ export function parseState(files: Record<string, string>): ParseResult {
   if (files['OWNERS.yaml'] !== undefined) issues('OWNERS.yaml', ownersFile.safeParse(parseYaml(files, 'OWNERS.yaml', errors)), errors);
   for (const p of Object.keys(files)) {
     if (!(ROOT_FILES as readonly string[]).includes(p) && !MANAGED_PREFIXES.some((x) => p.startsWith(x))) errors.push({ path: p, message: 'not part of the config repository layout' });
-    if (p.startsWith('playbooks/') && p.endsWith('.yaml')) parseYaml(files, p, errors);
+    if (p.startsWith('playbooks/') && /\.ya?ml$/.test(p)) {
+      const doc = parseYaml(files, p, errors);
+      // tighten-only rule and step registry (ADR-0047): an invalid playbook never reaches main
+      if (doc !== undefined) for (const i of validatePlaybook(doc).issues) errors.push({ path: p, message: `${i.path}: ${i.message}` });
+    }
   }
   if (errors.length || !up.success || !al.success || !li.success || !sr.success || !ov.success) return { errors };
   // normalised (order-free): files written by hand or by agents compare equal to the exported form

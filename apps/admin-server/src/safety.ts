@@ -49,6 +49,8 @@ export class SafetyRuleEngine {
   private readonly file: string;
   last: RuleObservation[] = [];
   lastRun?: string;
+  /** Called after a rule tripped (Liquid playbooks: safety_metric events). */
+  onTrip?: (t: { rule: string; kind: string; agent: string; level: string; value: number; threshold: number }) => Promise<unknown> | undefined;
   /** After a manual reset, rules do not re-trip immediately for this agent. */
   private readonly snoozedUntil = new Map<string, number>();
 
@@ -108,6 +110,8 @@ export class SafetyRuleEngine {
             rule: rule.id,
             detail: `${value} ≥ ${rule.threshold}`,
           });
+          // one sensing path (ADR-0047): the trip is also an event that playbooks can subscribe to
+          await this.onTrip?.({ rule: rule.id, kind: rule.kind, agent: agentId, level: rule.level, value, threshold: rule.threshold })?.catch?.(() => undefined);
         }
       }
     }

@@ -54,6 +54,7 @@ COPY packages/ontology-ir/package.json packages/ontology-ir/
 COPY packages/ontology-codegen/package.json packages/ontology-codegen/
 COPY packages/ontology-sofa/package.json packages/ontology-sofa/
 COPY packages/business-workflows/package.json packages/business-workflows/
+COPY packages/playbooks/package.json packages/playbooks/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY apps apps
 COPY packages packages
@@ -186,6 +187,8 @@ COPY assets/agent-reference.png /app/assets/agent-reference.png
 COPY policies/liquid /app/policies/liquid
 # Liquid Enterprise ontology sources: seed of the config repository (ADR-0046)
 COPY ontology /app/ontology
+# Liquid Enterprise default playbooks: seed of the config repository (ADR-0047)
+COPY playbooks /app/playbooks
 ENV NODE_ENV=production DATA_DIR=/data WEB_DIST_DIR=/app/web PORT=8080 TEMPORAL_BIN=/usr/local/bin/temporal TEMPORAL_ADDRESS=127.0.0.1:7233
 VOLUME ["/data"]
 EXPOSE 7233 8233 8080

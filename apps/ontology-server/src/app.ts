@@ -122,6 +122,15 @@ export function createApp(d: AppDeps) {
       res.status(201).json({ results: await d.store.append(body.events as never) });
     }),
   );
+  internal.post(
+    '/shadow/replay',
+    wrap(async (req, res) => {
+      const b = z
+        .object({ windowMs: z.number().int().min(60_000).max(90 * 86_400_000).optional(), fromSeq: z.number().int().min(0).optional(), toSeq: z.number().int().min(0).optional(), candidate: z.record(z.string(), z.unknown()).optional() })
+        .parse(req.body ?? {});
+      res.json(await d.svc.shadowReplay(b as never));
+    }),
+  );
   internal.post('/lake/flush', wrap(async (_req, res) => res.json(await d.lake.flush(d.store, { graceMs: d.flushGraceMs }))));
   internal.post(
     '/lake/seed',

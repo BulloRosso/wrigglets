@@ -19,13 +19,15 @@
   },
   "dependencies": {
     "@temporalio/common": "1.24.0",
-    "@temporalio/workflow": "1.24.0"
+    "@temporalio/workflow": "1.24.0",
+    "@cw/playbooks": "workspace:*"
   },
   "devDependencies": {
     "@temporalio/activity": "1.24.0",
     "@temporalio/client": "1.24.0",
     "@temporalio/testing": "1.24.0",
     "@temporalio/worker": "1.24.0",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
   }
 }

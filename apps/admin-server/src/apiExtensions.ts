@@ -35,6 +35,8 @@ import { extensionsAdminRouter } from './extensions/api.js';
 import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { LiquidProcesses } from './extensions/liquidProcesses.js';
+import { playbooksInternalRouter, playbooksRouter } from './liquid/playbooksApi.js';
+import type { PlaybookService } from './liquid/playbooks.js';
 import { captureEdits, liquidConfigInternalRouter, liquidConfigRouter, type LiquidConfigDeps } from './liquid/configApi.js';
 import type { ExtensionService } from './extensions/service.js';
 
@@ -63,6 +65,8 @@ export interface ExtensionDeps {
   liquidProcesses?: LiquidProcesses;
   /** Config repository, proposals, ontology drafts (ADR-0046). */
   liquidConfig?: LiquidConfigDeps;
+  /** Playbooks and the control loop (ADR-0047). */
+  liquidPlaybooks?: PlaybookService;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -367,6 +371,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   r.use(extensionsAdminRouter(d.extensions, by));
   r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy, d.liquidProcesses));
   if (d.liquidConfig) r.use(liquidConfigRouter(d.extensions, d.liquidConfig, by));
+  if (d.liquidPlaybooks) r.use(playbooksRouter(d.extensions, d.liquidPlaybooks, by, d.audit));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;
@@ -391,6 +396,7 @@ export function internalRouter(d: ExtensionDeps): Router {
   r.use(signalsInternalRouter({ config: d.config, signals: d.signals, registry: d.registry }));
   if (d.liquidPolicy) r.use(liquidInternalRouter(d.extensions, d.liquidPolicy));
   if (d.liquidConfig) r.use(liquidConfigInternalRouter(d.extensions, d.liquidConfig.repo, d.audit));
+  if (d.liquidPlaybooks) r.use(playbooksInternalRouter(d.extensions, d.liquidPlaybooks));
   r.get('/gateway-config', (req, res) => {
     if (!safeEqual(bearer(req), d.config.GATEWAY_TOKEN)) return res.status(401).json({ error: 'unauthorized' });
     res.json(d.gateway.build());

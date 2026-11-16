@@ -90,7 +90,7 @@
   <text x="814" y="163" class="d">desired state in Git,</text>
   <text x="814" y="179" class="d">proposals, reconciler</text>
   <!-- M7 -->
-  <rect x="800" y="260" width="150" height="76" rx="10" class="plan"/>
+  <rect x="800" y="260" width="150" height="76" rx="10" class="done"/>
   <text x="814" y="283" class="id">M7</text><text x="848" y="283" class="h">Playbooks</text>
   <text x="814" y="303" class="d">tighten-only rule,</text>
   <text x="814" y="319" class="d">blast radius, replay</text>

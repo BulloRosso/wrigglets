@@ -8,7 +8,7 @@ import { NativeConnection, Worker } from '@temporalio/worker';
 import pino from 'pino';
 import { z } from 'zod';
 import { BSA, BUSINESS_NAMESPACE, BUSINESS_TASK_QUEUE } from '@cw/business-workflows';
-import { createActivities } from './activities.js';
+import { createActivities, createPlaybookActivities } from './activities.js';
 import { commandsFor, type DispatchEvent, type IrActionLite } from './dispatcher.js';
 
 /*
@@ -30,6 +30,8 @@ const env = z
     DISPATCH_INTERVAL_MS: z.coerce.number().int().min(200).default(2000),
     LAKE_FLUSH_EVERY: z.string().default('1m'),
     LOG_LEVEL: z.string().default('info'),
+    CONTROL_PLANE_URL: z.string().url().default('http://temporal:8080'),
+    PLAYBOOK_TOKEN: z.string().default(''),
   })
   .parse(process.env);
 const log = pino({ level: env.LOG_LEVEL, base: { service: 'business-worker' } });
@@ -50,7 +52,7 @@ async function connect<T>(what: string, fn: () => Promise<T>): Promise<T> {
 const native = await connect('Temporal', () => NativeConnection.connect({ address: env.TEMPORAL_ADDRESS }));
 const connection = await connect('Temporal client', () => Connection.connect({ address: env.TEMPORAL_ADDRESS }));
 const client = new Client({ connection, namespace: BUSINESS_NAMESPACE });
-const activities = createActivities({ ontologyUrl: env.ONTOLOGY_URL, token: env.INTERNAL_TOKEN });
+const activities = { ...createActivities({ ontologyUrl: env.ONTOLOGY_URL, token: env.INTERNAL_TOKEN }), ...createPlaybookActivities({ controlPlaneUrl: env.CONTROL_PLANE_URL, token: env.PLAYBOOK_TOKEN }) };
 
 const bundlePath = path.resolve(here, 'workflow-bundle.js');
 // the namespace is created by the extension's bootstrap step after the services start: wait for it

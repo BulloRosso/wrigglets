@@ -31,6 +31,7 @@ import { ConfigRepoService, type Validators } from './liquid/configRepo.js';
 import { DraftStore } from './liquid/drafts.js';
 import { storeTargets } from './liquid/targets.js';
 import { readTree } from './liquid/seed.js';
+import { PlaybookService } from './liquid/playbooks.js';
 
 /**
  * Control plane process of the "temporal" container:
@@ -145,7 +146,8 @@ async function main() {
   );
   await configRepo.load();
   liquidPolicy.policySource = async () => (extensions.isInstalled(LIQUID_ID) ? configRepo.appliedFiles('policies/liquid/') : undefined);
-  const seedConfig = async () => ({ ...(await readTree(ontologyDir, 'ontology/')), ...(await readTree(policyDir, 'policies/liquid/')) });
+  const playbooksDir = [config.LIQUID_PLAYBOOKS_DIR, path.resolve(here, '../../../playbooks')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_PLAYBOOKS_DIR;
+  const seedConfig = async () => ({ ...(await readTree(ontologyDir, 'ontology/')), ...(await readTree(policyDir, 'policies/liquid/')), ...(await readTree(playbooksDir, 'playbooks/')) });
   // business workflows (ADR-0045): the namespace step needs the Temporal connection of this process
   extensions.register(
     liquidManifest,
@@ -173,6 +175,29 @@ async function main() {
   // owned upstreams (onto, config) are registered by the extension, not through the console: record them after each operation
   extensions.onOperationDone = (id, kind, who) => (id === LIQUID_ID ? configRepo.capture(who, `extension ${id} ${kind}`) : undefined);
   configRepo.start(60_000, () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID));
+  // Playbooks (ADR-0047): one sensing path, runs in the business worker, steps executed here
+  const liquidProcesses = new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined));
+  const playbooks = new PlaybookService({
+    client: () => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined),
+    files: () => configRepo.appliedFiles('playbooks/'),
+    ontologyIr: () => ontologyCall(liquidCtx, 'GET', '/internal/ontology'),
+    gatewayTools: async () => ((await gateway.gatewayCall<Array<{ name: string }>>('/internal/tools')) ?? []).map((t) => t.name),
+    runningWorkflows: async () => (await liquidProcesses.list()).running.map((r) => ({ workflowId: r.workflowId, objects: r.objects })),
+    events: async (events) => void (await ontologyCall(liquidCtx, 'POST', '/internal/events', { events })),
+    gateway,
+    overlays: liquidPolicy,
+    processes: liquidProcesses,
+    killSwitch,
+    capture: (who, what) => configRepo.capture(who, what),
+    propose: async (p) => {
+      const out = await configRepo.propose({ title: p.title, reason: p.reason, changes: p.changes, author: { kind: 'agent', id: p.author } });
+      return { id: out.id, valid: out.validation.ok };
+    },
+    shadowReplay: (body) => ontologyCall(liquidCtx, 'POST', '/internal/shadow/replay', body),
+    audit,
+  });
+  playbooks.start(() => extensions.isInstalled(LIQUID_ID));
+  safety.onTrip = (t) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'safety_metric', data: t }, 'safety-rules') : undefined);
   gateway.opaProvider = () => {
     if (!extensions.isInstalled(LIQUID_ID)) return undefined;
     const raw = extensions.secret(LIQUID_ID, 'opa_query_token');
@@ -191,7 +216,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses: new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined)), mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

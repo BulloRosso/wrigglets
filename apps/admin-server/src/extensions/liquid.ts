@@ -27,6 +27,8 @@ export const liquidManifest: ExtensionManifestInput = {
     { name: 'opa_query_token', bytes: 32 },
     { name: 'config_mcp_token', bytes: 32 },
     { name: 'compiler_token', bytes: 32 },
+    { name: 'playbook_token', bytes: 32 },
+    { name: 'alerts_token', bytes: 32 },
   ],
   // the gateway reads OPA's query token from Key Vault (ADR-0044)
   vaultSecrets: ['opa_query_token'],
@@ -113,6 +115,9 @@ export const liquidManifest: ExtensionManifestInput = {
         TEMPORAL_ADDRESS: 'temporal:7233',
         ONTOLOGY_URL: '{{svc:ontology-server.url}}',
         INTERNAL_TOKEN: '{{secret:ontology_internal_token}}',
+        // playbook steps are executed by the control plane (ADR-0047)
+        CONTROL_PLANE_URL: 'http://temporal:8080',
+        PLAYBOOK_TOKEN: '{{secret:playbook_token}}',
       },
       volumes: [{ name: 'business-worker-data', target: '/data' }],
       memoryMb: 512,
@@ -135,6 +140,7 @@ export const liquidManifest: ExtensionManifestInput = {
     { label: 'Policies', path: '/liquid/policies' },
     { label: 'Business processes', path: '/liquid/processes' },
     { label: 'Proposals', path: '/liquid/proposals' },
+    { label: 'Playbooks', path: '/liquid/playbooks' },
   ],
 };
 
@@ -159,9 +165,9 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
 };
 
 /** Overlay mode (docker-compose.liquid.yml): the services run from compose, secrets come from the environment. */
-export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_OPA_BUNDLE_TOKEN?: string; LIQUID_OPA_QUERY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string }): OverlayOptions {
+export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_OPA_BUNDLE_TOKEN?: string; LIQUID_OPA_QUERY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string; LIQUID_PLAYBOOK_TOKEN?: string; LIQUID_ALERTS_TOKEN?: string }): OverlayOptions {
   return {
     active: !!env.LIQUID_OVERLAY,
-    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, opa_bundle_token: env.LIQUID_OPA_BUNDLE_TOKEN, opa_query_token: env.LIQUID_OPA_QUERY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN },
+    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, opa_bundle_token: env.LIQUID_OPA_BUNDLE_TOKEN, opa_query_token: env.LIQUID_OPA_QUERY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN, playbook_token: env.LIQUID_PLAYBOOK_TOKEN, alerts_token: env.LIQUID_ALERTS_TOKEN },
   };
 }

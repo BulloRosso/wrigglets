@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@cw/ui';
 import type { ExtensionStatus } from '@cw/extensions';
 import type { IrDiff, OntologyIr } from '@cw/ontology-ir/browser';
+import type { Playbook } from '@cw/playbooks';
 import type {
   AdminAuditEntry,
   AgentEntra,
@@ -41,6 +42,38 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+export interface PlaybookStepResult {
+  id: string;
+  type: string;
+  autonomy: 'auto' | 'propose' | 'human';
+  state: 'pending' | 'awaiting_approval' | 'running' | 'done' | 'failed' | 'skipped' | 'proposed' | 'cancelled';
+  summary?: string;
+  error?: string;
+  data?: Record<string, unknown>;
+  approvedBy?: string;
+  decidedBy?: string;
+  comment?: string;
+  at?: string;
+}
+export interface PlaybookRunView {
+  runId: string;
+  workflowId: string;
+  playbook: string;
+  version: number;
+  state: 'running' | 'awaiting_approval' | 'completed' | 'cancelled' | 'failed';
+  trigger: { kind: string; data: Record<string, unknown> };
+  blast: { upstream: string; tools: string[]; actions: string[]; writeActions: string[]; classes: string[]; objects: string[]; workflows: string[] } | null;
+  steps: PlaybookStepResult[];
+  cancelledBy?: string;
+  startTime: string;
+  closeTime: string | null;
+}
+export interface PlaybookList {
+  playbooks: Playbook[];
+  invalid: Array<{ path: string; issues: Array<{ path: string; message: string }> }>;
+  sources: Record<string, string>;
+}
+
 export interface ConfigCheck {
   name: string;
   ok: boolean;
@@ -334,6 +367,11 @@ export const api = {
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
+  liquidPlaybooks: () => apiFetch<PlaybookList>('/api/liquid/playbooks'),
+  liquidPlaybookRuns: () => apiFetch<PlaybookRunView[]>('/api/liquid/playbooks/runs'),
+  decidePlaybookStep: (runId: string, stepId: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<unknown>(`/api/liquid/playbooks/runs/${id(runId)}/steps/${id(stepId)}/decide`, { method: 'POST', json: { decision, comment } }),
+  cancelPlaybookRun: (runId: string) => apiFetch<unknown>(`/api/liquid/playbooks/runs/${id(runId)}/cancel`, { method: 'POST', json: {} }),
+  sendPlaybookAlert: (alert: Record<string, unknown>) => apiFetch<{ runs: Array<{ runId: string; playbook: string }> }>('/api/liquid/playbooks/alerts', { method: 'POST', json: alert }),
   liquidConfig: () => apiFetch<ConfigStatus>('/api/liquid/config'),
   reconcileLiquidConfig: () => apiFetch<unknown>('/api/liquid/config/reconcile', { method: 'POST' }),
   liquidProposals: () => apiFetch<ConfigProposal[]>('/api/liquid/proposals'),

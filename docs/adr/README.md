@@ -51,3 +51,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0044](0044-policy-as-code-opa.md) | Policy as code with OPA at two enforcement points | Accepted |
 | [0045](0045-business-workflows-temporal.md) | Holdable business workflows in a separate Temporal namespace | Accepted |
 | [0046](0046-config-repository-proposals.md) | Desired state in a config repository; proposals and reconciler | Accepted |
+| [0047](0047-playbooks-tighten-only.md) | Playbooks, autonomy tiers and the tighten-only rule | Accepted |

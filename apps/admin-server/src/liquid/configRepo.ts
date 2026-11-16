@@ -57,6 +57,8 @@ export interface Proposal {
 
 interface Meta {
   applied: string | null;
+  /** Seed files ever added (a later version adds new defaults once; files removed on purpose stay removed). */
+  seeded?: string[];
   lastReconcile: { at: string; head: string | null; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> } | null;
   proposals: Proposal[];
 }
@@ -133,11 +135,27 @@ export class ConfigRepoService {
     return this.serial(async () => {
       await this.git.init();
       const existing = await this.git.rev('main');
-      if (existing) return { created: false, head: existing };
+      if (existing) {
+        // new default files of a newer version (e.g. playbooks) are added once
+        const have = new Set(await this.git.paths(existing));
+        const seeded = new Set(this.meta.seeded ?? [...have]);
+        const add = Object.fromEntries(Object.entries(seed).filter(([p]) => !have.has(p) && !seeded.has(p)));
+        let head = existing;
+        if (Object.keys(add).length) {
+          this.guard(add);
+          head = (await this.git.commit({ ref: 'main', parent: existing, changes: add, message: `Add default files of this version: ${Object.keys(add).sort().join(', ')}
+
+${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personAuthor(by), committer: SYSTEM })) ?? existing;
+        }
+        this.meta.seeded = [...new Set([...seeded, ...Object.keys(seed)])].sort();
+        await this.persist();
+        return { created: false, head };
+      }
       const files = { 'README.md': README, 'OWNERS.yaml': DEFAULT_OWNERS, 'playbooks/README.md': '# Playbooks (M7)\n', ...seed, ...exportState(this.targets.current()) };
       this.guard(files);
       const head = (await this.git.commit({ ref: 'main', parent: null, expect: null, changes: files, message: `Bootstrap config repository from the running platform\n\n${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personAuthor(by), committer: SYSTEM }))!;
       this.meta.applied = head;
+      this.meta.seeded = Object.keys(seed).sort();
       await this.persist();
       return { created: true, head };
     });

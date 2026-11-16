@@ -7,6 +7,7 @@ import { DEFAULT_GATEWAY_LIMITS, DEFAULT_SAFETY_RULES } from '@cw/shared';
 import { ConfigRepoService, type ConfigTargets } from './configRepo.js';
 import { exportState, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
 
+const PLAYBOOK = ['id: notify-on-alert', 'version: 1', 'trigger: { kind: alert, match: { source: test } }', 'steps:', '  - { id: tell, type: notify, autonomy: auto, with: { subject: hello } }', ''].join(String.fromCharCode(10));
 const SECRET = 'very-secret-internal-token-1234567890';
 const ADMIN = { email: 'ada@example.local', roles: ['Platform.Admin'] };
 
@@ -166,6 +167,13 @@ describe('config repository', () => {
     expect(await svc.git.rev('main')).toBe(head);
   });
 
+  it('a playbook that loosens automatically is invalid (tighten-only rule)', async () => {
+    await svc.init(seed, 'ada@example.local');
+    const bad = await svc.propose({ title: 'auto restore', reason: 'faster', changes: [{ path: 'playbooks/x.yaml', content: PLAYBOOK.replace('type: notify, autonomy: auto, with: { subject: hello }', 'type: restore, autonomy: auto') }], author: { kind: 'agent', id: 'sofa-max' } });
+    expect(bad.validation.ok).toBe(false);
+    expect(JSON.stringify(bad.validation.checks)).toMatch(/must have autonomy/);
+  });
+
   it('an invalid proposal cannot be approved; secrets and paths outside the layout are refused', async () => {
     await svc.init(seed, 'ada@example.local');
     const bad = await svc.propose({ title: 'broken', reason: 'typo', changes: [{ path: 'gateway/allow-lists.yaml', content: 'allowedTools: [1, 2]\n' }], author: { kind: 'person', id: 'ben@example.local' } });
@@ -180,7 +188,7 @@ describe('config repository', () => {
     const files = exportState(t.current());
     const a = await svc.propose({ title: 'Option A', reason: 'reason a', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_state') }], author: { kind: 'agent', id: 'sofa-max' } });
     const b = await svc.propose({ title: 'Option B', reason: 'reason b', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_log') }], author: { kind: 'agent', id: 'sofa-max' } });
-    const c = await svc.propose({ title: 'Option C', reason: 'reason c', changes: [{ path: 'playbooks/x.yaml', content: 'id: x\n' }], author: { kind: 'agent', id: 'sofa-max' } });
+    const c = await svc.propose({ title: 'Option C', reason: 'reason c', changes: [{ path: 'playbooks/x.yaml', content: PLAYBOOK }], author: { kind: 'agent', id: 'sofa-max' } });
     await svc.decide(a.id, 'approve', ADMIN);
     await expect(svc.decide(b.id, 'approve', ADMIN)).rejects.toThrow(/conflicts/);
     expect((await svc.decide(c.id, 'approve', ADMIN)).status).toBe('approved');

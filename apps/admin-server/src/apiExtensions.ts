@@ -32,6 +32,7 @@ import type { SecurityGuardService } from './security.js';
 import type { SignalsControlService } from './signals.js';
 import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 import { extensionsAdminRouter } from './extensions/api.js';
+import { liquidAdminRouter } from './extensions/liquidApi.js';
 import type { ExtensionService } from './extensions/service.js';
 
 export interface ExtensionDeps {
@@ -354,6 +355,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   /* ------------------------------------------------------------ Signals (optional module, ADR-0037) */
   r.use(signalsAdminRouter({ config: d.config, signals: d.signals, registry: d.registry }, by));
   r.use(extensionsAdminRouter(d.extensions, by));
+  r.use(liquidAdminRouter(d.extensions));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

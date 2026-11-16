@@ -39,6 +39,18 @@ import type {
 } from '@cw/shared';
 export type { ExtensionStatus } from '@cw/extensions';
 
+/** Event log and lake of Liquid Enterprise (ADR-0040). */
+export interface LiquidLakeStatus {
+  hwm: number;
+  snapshots: number;
+  lastSnapshotAt: string | null;
+  extracts: Array<{ id: string; source: string; at: string; tables: Record<string, number> }>;
+  lastFlush: { at: string; result: { flushed: number; hwm: number; waiting: number } } | null;
+  eventLog: { count: number; maxSeq: number };
+  counts: Record<string, number>;
+  files: Record<string, number>;
+}
+
 export interface AdminMe {
   user: Principal;
   temporalUiUrl: string;
@@ -218,6 +230,7 @@ export const api = {
   installExtension: (extId: string, seedDemo: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/install`, { method: 'POST', json: { seedDemo } }),
   repairExtension: (extId: string) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/repair`, { method: 'POST', json: {} }),
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
+  liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   extensionLogs: (extId: string, service: string) =>
     fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {
       if (!r.ok) throw new Error(`logs: HTTP ${r.status}`);

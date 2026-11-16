@@ -26,6 +26,8 @@ export interface ManagedContainer {
 export interface ExtensionRuntime {
   ping(): Promise<{ ok: boolean; detail: string }>;
   imagePresent(ref: string): Promise<boolean>;
+  /** Content id of a local image (changes when a :local tag is rebuilt); undefined when absent. */
+  imageId(ref: string): Promise<string | undefined>;
   pullImage(ref: string): Promise<void>;
   ensureVolume(ext: string, vol: string): Promise<void>;
   removeVolume(ext: string, vol: string): Promise<void>;
@@ -74,6 +76,14 @@ export class DockerExtensionRuntime implements ExtensionRuntime {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async imageId(ref: string) {
+    try {
+      return (await this.docker.getImage(ref).inspect()).Id;
+    } catch {
+      return undefined;
     }
   }
 

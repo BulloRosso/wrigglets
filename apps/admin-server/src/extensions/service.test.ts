@@ -25,8 +25,12 @@ class FakeRuntime implements ExtensionRuntime {
   async ping() {
     return { ok: true, detail: 'fake' };
   }
+  imageIds = new Map<string, string>();
   async imagePresent(ref: string) {
     return this.images.has(ref);
+  }
+  async imageId(ref: string) {
+    return this.images.has(ref) ? (this.imageIds.get(ref) ?? `sha256:${ref}`) : undefined;
   }
   async pullImage(ref: string) {
     this.calls.push(`pull ${ref}`);
@@ -286,6 +290,18 @@ describe('resume and repair', () => {
     await second.idle('demo');
     expect((await second.status('demo')).phase).toBe('installed');
     expect(rt.containers.has('demo/server')).toBe(true);
+  });
+
+  it('repair re-creates a container whose local image was rebuilt', async () => {
+    const svc = make();
+    await svc.load();
+    await svc.install('demo', { seedDemo: false }, 'a');
+    await svc.idle('demo');
+    rt.imageIds.set('cw/server:local', 'sha256:rebuilt');
+    rt.calls = [];
+    await svc.repair('demo', 'a');
+    await svc.idle('demo');
+    expect(rt.calls).toEqual(['run server']);
   });
 
   it('repair re-creates a missing container and starts a stopped one', async () => {

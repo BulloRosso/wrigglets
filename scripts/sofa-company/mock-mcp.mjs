@@ -14,6 +14,7 @@
 //   GET  /kpi                   business impact now (late orders, shortages, cost of measures)
 //   GET  /log                   every write an agent made     GET /notices  customer notices "sent"     GET /health
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const PORT = Number(process.env.PORT ?? 7660);
 const TODAY = '2026-10-05'; // a Monday
@@ -847,7 +848,11 @@ td.n{text-align:center;width:28px;font-size:11px;border:1px solid #fff;padding:4
 </div></body></html>`;
 }
 
-createServer(async (req, res) => {
+// Importable without side effects (Liquid Enterprise seed and parity tests import freshWorld and the constants).
+export { freshWorld, TODAY, PRODUCTS, SKU, SALES, CAMPAIGN_SALES, SHIPPING_DAYS };
+
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) createServer(async (req, res) => {
   const path = (req.url ?? '/').split('?')[0];
   if (path === '/health') return send(res, 200, { status: 'ok' });
   if (path === '/' || path === '/dashboard') {

@@ -37,6 +37,7 @@ COPY apps/mcp-demo/package.json apps/mcp-demo/
 COPY apps/mcp-web/package.json apps/mcp-web/
 COPY apps/mcp-wiki/package.json apps/mcp-wiki/
 COPY apps/signals-hub/package.json apps/signals-hub/
+COPY apps/ontology-server/package.json apps/ontology-server/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/signals/package.json packages/signals/
@@ -46,6 +47,8 @@ COPY packages/auth-rp/package.json packages/auth-rp/
 COPY packages/ui/package.json packages/ui/
 COPY packages/secrets/package.json packages/secrets/
 COPY packages/extensions/package.json packages/extensions/
+COPY packages/lake/package.json packages/lake/
+COPY packages/sofa-domain/package.json packages/sofa-domain/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY apps apps
 COPY packages packages
@@ -59,7 +62,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @cw/mcp-demo deploy --legacy --prod /out/mcp-demo && \
     pnpm --filter @cw/mcp-web deploy --legacy --prod /out/mcp-web && \
     pnpm --filter @cw/mcp-wiki deploy --legacy --prod /out/mcp-wiki && \
-    pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub
+    pnpm --filter @cw/signals-hub deploy --legacy --prod /out/signals-hub && \
+    pnpm --filter @cw/ontology-server deploy --legacy --prod /out/ontology-server
 
 # ---------------------------------------------------------------- mcp-gateway (ADR-0021)
 FROM ${NODE_IMAGE} AS mcp-gateway
@@ -101,6 +105,22 @@ RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]
 EXPOSE 7700
+CMD ["node", "dist/main.js"]
+
+# ---------------------------------------------------------------- ontology-server (Liquid Enterprise, ADR-0040)
+# Event log + lake (DuckLake via embedded DuckDB 2). The ducklake and postgres extensions are installed at build time,
+# so the server never downloads code at runtime.
+FROM ${NODE_IMAGE} AS ontology-server
+RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /out/ontology-server ./
+ENV NODE_ENV=production PORT=7710 LAKE_DATA_PATH=/lake/
+RUN mkdir -p /lake && chown node:node /lake
+USER node
+RUN node -e "import('@duckdb/node-api').then(async ({ DuckDBInstance }) => { const c = await (await DuckDBInstance.create(':memory:')).connect(); await c.run('INSTALL ducklake; INSTALL postgres;'); console.log('duckdb extensions installed'); })"
+VOLUME ["/lake"]
+EXPOSE 7710
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- signals-hub (optional Signals module, ADR-0037)

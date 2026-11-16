@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Liquid Enterprise data foundation: event log, flush and lake</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .ln2 { fill: none; stroke: #00796b; stroke-width: 2; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .db { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .lake { fill: #e0f2f1; stroke: #00796b; stroke-width: 1.5; }
+    .ext { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .bnd { fill: none; stroke: #5b6777; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00796b"/></marker>
+  </defs>
+  <rect width="1200" height="600" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Data foundation (M1): event log, flush, lake</text>
+  <text x="40" y="68" class="st">Two containers: ontology-db (Postgres) and ontology-server (Node with embedded DuckDB 2). The lake is Parquet files plus a catalog in the same Postgres.</text>
+
+  <!-- writers -->
+  <rect x="40" y="110" width="230" height="96" rx="10" class="usr"/>
+  <text x="60" y="138" class="h">Actions (from M3)</text>
+  <text x="60" y="160" class="d">agents via gateway tools,</text>
+  <text x="60" y="178" class="d">UIs via SDK — typed, validated,</text>
+  <text x="60" y="196" class="d">policy-checked, audited</text>
+
+  <rect x="40" y="240" width="230" height="96" rx="10" class="ext"/>
+  <text x="60" y="268" class="h">Source system extract</text>
+  <text x="60" y="290" class="d">sofa company at T0 (mock's</text>
+  <text x="60" y="308" class="d">initial state), demo-only</text>
+  <text x="60" y="326" class="d">bootstrap step "seed-sofa"</text>
+
+  <!-- ontology server -->
+  <rect x="320" y="96" width="400" height="420" rx="12" class="cp"/>
+  <text x="340" y="124" class="h">ontology-server (cw-ext-liquid-ontology-server)</text>
+
+  <rect x="340" y="140" width="360" height="74" rx="8" fill="#ffffff" stroke="#1f5fad"/>
+  <circle cx="358" cy="160" r="10" class="bd"/><text x="358" y="164" class="num">1</text>
+  <text x="376" y="164" class="h">EventStore.append</text>
+  <text x="376" y="184" class="d">zod-validated, one statement, idempotent</text>
+  <text x="376" y="201" class="d">by event_id</text>
+
+  <rect x="340" y="226" width="360" height="110" rx="8" fill="#ffffff" stroke="#1f5fad"/>
+  <circle cx="358" cy="246" r="10" class="bd"/><text x="358" y="250" class="num">2</text>
+  <text x="376" y="250" class="h">Lake.flush (every 60 s, on demand)</text>
+  <text x="376" y="270" class="d">high-water mark = max(seq) in lake.raw.events</text>
+  <text x="376" y="288" class="d">contiguous batch; a gap waits until it is 60 s old</text>
+  <text x="376" y="306" class="d">(rolled back) — one INSERT … SELECT = one snapshot</text>
+  <text x="376" y="324" class="lbl">→ Temporal schedule once the business worker exists (M5)</text>
+
+  <rect x="340" y="348" width="360" height="74" rx="8" fill="#ffffff" stroke="#1f5fad"/>
+  <circle cx="358" cy="368" r="10" class="bd"/><text x="358" y="372" class="num">3</text>
+  <text x="376" y="372" class="h">Lake.writeExtract</text>
+  <text x="376" y="392" class="d">raw.erp_* / raw.crm_* in one transaction,</text>
+  <text x="376" y="409" class="d">idempotent by extract id (sofa-T0)</text>
+
+  <rect x="340" y="434" width="360" height="66" rx="8" fill="#ffffff" stroke="#1f5fad"/>
+  <text x="358" y="458" class="h">DuckDB 2 (embedded)</text>
+  <text x="358" y="478" class="d">extensions ducklake + postgres installed at image</text>
+  <text x="358" y="494" class="d">build; no downloads at runtime</text>
+
+  <path d="M272,158 L338,176" class="ln" marker-end="url(#a)"/>
+  <path d="M272,300 L338,385" class="ln" marker-end="url(#a)"/>
+  <text x="276" y="226" class="lbl">POST /internal/events</text>
+  <text x="276" y="358" class="lbl">POST /internal/lake/seed</text>
+
+  <!-- postgres -->
+  <rect x="780" y="96" width="380" height="220" rx="12" class="db"/>
+  <text x="800" y="124" class="h">ontology-db (Postgres 17.6)</text>
+  <text x="800" y="150" class="mono">public.events</text>
+  <text x="800" y="168" class="d">append-only: a trigger rejects UPDATE, DELETE, TRUNCATE</text>
+  <text x="800" y="194" class="mono">lake_catalog.*</text>
+  <text x="800" y="212" class="d">DuckLake catalog: tables, snapshots, file lists</text>
+  <text x="800" y="238" class="mono">projection (M3)</text>
+  <text x="800" y="256" class="d">current state, rebuildable from events</text>
+  <text x="800" y="290" class="lbl">volume cw-ext-liquid-ontology-db-data</text>
+
+  <!-- lake files -->
+  <rect x="780" y="350" width="380" height="166" rx="12" class="lake"/>
+  <text x="800" y="378" class="h">Lake files (volume cw-ext-liquid-lake-data)</text>
+  <text x="800" y="402" class="mono">/lake/raw/events/*.parquet</text>
+  <text x="800" y="422" class="mono">/lake/raw/erp_suppliers/*.parquet …</text>
+  <text x="800" y="448" class="d">open format: any engine reads it without our code;</text>
+  <text x="800" y="466" class="d">snapshots + time travel (shadow replay, M7);</text>
+  <text x="800" y="484" class="d">Iceberg copy possible without rewriting data</text>
+
+  <path d="M702,176 L778,150" class="ln2" marker-end="url(#g)"/>
+  <text x="712" y="150" class="lbl">insert</text>
+  <path d="M778,160 L702,270" class="ln" marker-end="url(#a)"/>
+  <text x="706" y="226" class="lbl">read after mark</text>
+  <path d="M702,290 L778,200" class="ln" marker-end="url(#a)"/>
+  <text x="730" y="306" class="lbl">commit snapshot</text>
+  <path d="M702,300 L778,410" class="ln2" marker-end="url(#g)"/>
+  <path d="M702,385 L778,430" class="ln2" marker-end="url(#g)"/>
+  <text x="712" y="440" class="lbl">Parquet</text>
+
+  <!-- readers -->
+  <rect x="40" y="380" width="230" height="136" rx="10" class="db"/>
+  <text x="60" y="408" class="h">Readers</text>
+  <text x="60" y="430" class="d">admin console: Liquid → Overview</text>
+  <text x="60" y="448" class="d">(via /api/liquid/lake)</text>
+  <text x="60" y="470" class="d">read-only SQL: /internal/lake/query</text>
+  <text x="60" y="492" class="d">KPI, shadow replay (M3, M7)</text>
+  <path d="M272,450 L338,466" class="ln" marker-start="url(#a)"/>
+
+  <rect x="40" y="540" width="1120" height="40" rx="8" class="bnd"/>
+  <text x="60" y="565" class="d">Agents never get database or lake credentials: from M3 they reach business data only through ontology tools at the MCP gateway. /internal routes need the extension's token.</text>
+</svg>

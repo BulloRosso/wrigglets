@@ -1,0 +1,29 @@
+{
+  "name": "@cw/lake",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise data foundation (ADR-0040): append-only event log in Postgres, gap-safe flush and raw zone in DuckLake (Parquet), written and read with DuckDB 2.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "2.0.0-r.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cw/sofa-domain": "workspace:*",
+    "@electric-sql/pglite": "0.5.13",
+    "vitest": "5.0.5"
+  }
+}

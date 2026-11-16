@@ -1,0 +1,197 @@
+{
+  "startedAt": "2026-11-16T16:16:51.080Z",
+  "checks": [
+    {
+      "name": "installed and available",
+      "ok": true,
+      "detail": [
+        "preflight=done",
+        "secrets=done",
+        "volumes=done",
+        "service:ontology-db=done",
+        "service:ontology-server=done",
+        "bootstrap:seed-sofa=done"
+      ]
+    },
+    {
+      "name": "ontology-db and ontology-server running",
+      "ok": true,
+      "detail": [
+        "ontology-db=running",
+        "ontology-server=running"
+      ]
+    },
+    {
+      "name": "seed step ran",
+      "ok": true
+    },
+    {
+      "name": "raw zone entity counts equal the mock initial state",
+      "ok": true,
+      "detail": {
+        "erp_factories": 2,
+        "erp_machines": 6,
+        "erp_workers": 4,
+        "erp_absences": 0,
+        "erp_materials": 5,
+        "erp_bom": 3,
+        "erp_suppliers": 7,
+        "erp_inventory": 5,
+        "erp_purchase_orders": 4,
+        "erp_production_orders": 18,
+        "erp_maintenance_tickets": 0,
+        "crm_customers": 6,
+        "crm_orders": 18,
+        "crm_campaigns": 1,
+        "crm_demand": 18
+      }
+    },
+    {
+      "name": "DuckDB query over the raw zone matches the mock",
+      "ok": true,
+      "detail": {
+        "orders": 18,
+        "sofas": 1800,
+        "beam_suppliers": 3
+      }
+    },
+    {
+      "name": "1,000 events flushed twice → exactly 1,000 rows in lake.raw.events",
+      "ok": true,
+      "detail": {
+        "first": {
+          "flushed": 1000,
+          "hwm": 3000,
+          "waiting": 0
+        },
+        "second": {
+          "flushed": 0,
+          "hwm": 3000,
+          "waiting": 0
+        },
+        "rows": {
+          "n": 1000,
+          "d": 1000
+        }
+      }
+    },
+    {
+      "name": "event log rejects UPDATE (append-only trigger)",
+      "ok": true,
+      "detail": "ERROR:  events is append-only: UPDATE is not allowed (write a correcting event instead)"
+    },
+    {
+      "name": "every non-empty raw table is stored as Parquet (nothing inlined in the catalog)",
+      "ok": true,
+      "detail": {
+        "_extracts": 1,
+        "crm_campaigns": 1,
+        "crm_customers": 1,
+        "crm_demand": 1,
+        "crm_orders": 1,
+        "erp_absences": 0,
+        "erp_bom": 1,
+        "erp_factories": 1,
+        "erp_inventory": 1,
+        "erp_machines": 1,
+        "erp_maintenance_tickets": 0,
+        "erp_materials": 1,
+        "erp_production_orders": 1,
+        "erp_purchase_orders": 1,
+        "erp_suppliers": 1,
+        "erp_workers": 1,
+        "events": 3
+      }
+    },
+    {
+      "name": "lake data files are Parquet on the volume",
+      "ok": true,
+      "detail": "17 parquet files under /lake"
+    },
+    {
+      "name": "DuckLake catalog lives in Postgres schema lake_catalog",
+      "ok": true,
+      "detail": "46 catalog tables"
+    }
+  ],
+  "lake": {
+    "hwm": 3000,
+    "snapshots": 9,
+    "lastSnapshotAt": "2026-11-16 16:17:08.72947+00",
+    "extracts": [
+      {
+        "id": "sofa-T0",
+        "source": "sofa-company mock (scripts/sofa-company/mock-mcp.mjs), initial state",
+        "at": "2026-11-16 16:11:28.675+00",
+        "tables": {
+          "erp_factories": 2,
+          "erp_machines": 6,
+          "erp_workers": 4,
+          "erp_absences": 0,
+          "erp_materials": 5,
+          "erp_bom": 3,
+          "erp_suppliers": 7,
+          "erp_inventory": 5,
+          "erp_purchase_orders": 4,
+          "erp_production_orders": 18,
+          "erp_maintenance_tickets": 0,
+          "crm_customers": 6,
+          "crm_orders": 18,
+          "crm_campaigns": 1,
+          "crm_demand": 18
+        }
+      }
+    ],
+    "lastFlush": {
+      "at": "2026-11-16T16:17:08.963Z",
+      "result": {
+        "flushed": 0,
+        "hwm": 3000,
+        "waiting": 0
+      }
+    },
+    "files": {
+      "_extracts": 1,
+      "crm_campaigns": 1,
+      "crm_customers": 1,
+      "crm_demand": 1,
+      "crm_orders": 1,
+      "erp_absences": 0,
+      "erp_bom": 1,
+      "erp_factories": 1,
+      "erp_inventory": 1,
+      "erp_machines": 1,
+      "erp_maintenance_tickets": 0,
+      "erp_materials": 1,
+      "erp_production_orders": 1,
+      "erp_purchase_orders": 1,
+      "erp_suppliers": 1,
+      "erp_workers": 1,
+      "events": 3
+    },
+    "eventLog": {
+      "count": 3000,
+      "maxSeq": 3000
+    },
+    "counts": {
+      "crm_campaigns": 1,
+      "crm_customers": 6,
+      "crm_demand": 18,
+      "crm_orders": 18,
+      "erp_absences": 0,
+      "erp_bom": 3,
+      "erp_factories": 2,
+      "erp_inventory": 5,
+      "erp_machines": 6,
+      "erp_maintenance_tickets": 0,
+      "erp_materials": 5,
+      "erp_production_orders": 18,
+      "erp_purchase_orders": 4,
+      "erp_suppliers": 7,
+      "erp_workers": 4,
+      "events": 3000
+    }
+  },
+  "ok": true,
+  "finishedAt": "2026-11-16T16:17:10.022Z"
+}

@@ -41,6 +41,7 @@ const laterSecrets = () => ({
   MCP_SIGNALS_TOKEN: secret(24),
   // Liquid Enterprise as compose overlay (docker-compose.liquid.yml); console installs generate their own secrets
   LIQUID_ONTOLOGY_DB_PASSWORD: secret(24),
+  LIQUID_ONTOLOGY_INTERNAL_TOKEN: secret(32),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,
   CW_LITELLM_SALT_KEY: `sk-${secret(32)}`,
@@ -111,8 +112,8 @@ function readEnv() {
   );
 }
 
-/** Compose targets of the Liquid Enterprise images (grows per milestone; empty while it only uses public images). */
-const LIQUID_BUILD_SERVICES = [];
+/** Compose services of the Liquid Enterprise images built locally (grows per milestone). */
+const LIQUID_BUILD_SERVICES = ['ontology-server'];
 
 function build() {
   ensureEnv();
@@ -121,11 +122,17 @@ function build() {
 }
 
 const LIQUID_FILES = ['-f', 'docker-compose.yml', '-f', 'docker-compose.liquid.yml'];
-const LIQUID_SERVICES = () =>
-  readFileSync(path.join(root, 'docker-compose.liquid.yml'), 'utf8')
-    .split(/\r?\n/)
-    .map((l) => /^  ([a-z][a-z0-9-]*):\s*$/.exec(l)?.[1])
-    .filter((n) => n && n !== 'temporal');
+/** Service names of the overlay: the two-space keys of its top-level `services:` block (not volumes). */
+const LIQUID_SERVICES = () => {
+  const out = [];
+  let inServices = false;
+  for (const l of readFileSync(path.join(root, 'docker-compose.liquid.yml'), 'utf8').split(/\r?\n/)) {
+    if (/^\S/.test(l)) inServices = /^services:\s*$/.test(l);
+    const m = inServices && /^  ([a-z][a-z0-9-]*):\s*$/.exec(l);
+    if (m && m[1] !== 'temporal') out.push(m[1]);
+  }
+  return out;
+};
 
 /** Containers and volumes the control plane created for extensions installed from the console. */
 function removeExtensionResources() {

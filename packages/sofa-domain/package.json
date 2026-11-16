@@ -1,0 +1,24 @@
+{
+  "name": "@cw/sofa-domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Domain of the sofa-company example (docs/agentic-mitigations.md) for Liquid Enterprise: initial world, raw extract, later KPI, simulation and action handlers (M3).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

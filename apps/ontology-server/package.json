@@ -1,0 +1,29 @@
+{
+  "name": "@cw/ontology-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise ontology server (ADR-0040, ADR-0043): owns the append-only event log and the lake (DuckLake) from M1; becomes the only write path for business data (actions, MCP, REST) in M3.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cw/lake": "workspace:*",
+    "@cw/sofa-domain": "workspace:*",
+    "@duckdb/node-api": "2.0.0-r.1",
+    "express": "5.3.0",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.13",
+    "@types/express": "5.0.6",
+    "@types/pg": "8.23.1",
+    "vitest": "5.0.5"
+  }
+}

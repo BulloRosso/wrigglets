@@ -59,12 +59,12 @@
   <text x="54" y="303" class="d">install / repair /</text>
   <text x="54" y="319" class="d">uninstall from the console</text>
   <!-- M1 -->
-  <rect x="230" y="190" width="150" height="76" rx="10" class="wip"/>
+  <rect x="230" y="190" width="150" height="76" rx="10" class="done"/>
   <text x="244" y="213" class="id">M1</text><text x="278" y="213" class="h">Data foundation</text>
   <text x="244" y="233" class="d">event log (Postgres),</text>
   <text x="244" y="249" class="d">DuckLake / Parquet, seed</text>
   <!-- M2 -->
-  <rect x="230" y="330" width="150" height="76" rx="10" class="plan"/>
+  <rect x="230" y="330" width="150" height="76" rx="10" class="wip"/>
   <text x="244" y="353" class="id">M2</text><text x="278" y="353" class="h">Ontology</text>
   <text x="244" y="373" class="d">LinkML, IR, compiler,</text>
   <text x="244" y="389" class="d">generators</text>

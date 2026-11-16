@@ -91,7 +91,8 @@ What gets created:
 | secrets | `DATA_DIR/admin/extensions-secrets.json` (0600) | upstream credentials also in Key Vault as `ext-liquid-<secret>` |
 | state | `DATA_DIR/admin/extensions.json` | phase, steps of the last operation, owned upstreams |
 
-Services so far: `ontology-db` (Postgres 17.6: event log and projection). The list grows with each milestone.
+Services so far: `ontology-db` (Postgres 17.6: event log, lake catalog, later the projection) and `ontology-server`
+(event log owner and lake writer, from M3 the only write path). The list grows with each milestone.
 
 **Compose overlay** (development and CI): the same services under the same names, secrets from `.env`.
 
@@ -110,7 +111,51 @@ console install exists. `node scripts/stack.mjs reset` removes both.
 
 ## Architecture
 
-*(planned, M1–M5)*
+Decision record: [ADR-0040](adr/0040-lake-ducklake-event-log.md).
+
+<img src="diagrams/23-liquid-data-flow.svg" alt="Data foundation: event log, flush and lake" width="100%">
+
+### Event log
+
+Table `events` in `ontology-db` (Postgres 17.6). Every change to business data is an event; from M3 only the action
+pipeline writes them. Appends are zod-validated, written in one statement and idempotent by `event_id`. A trigger
+rejects `UPDATE`, `DELETE` and `TRUNCATE` for every role: corrections are new events.
+
+| Column | Meaning |
+|---|---|
+| `seq` | position in the log (bigserial); the lake's high-water mark |
+| `event_id` | uuid, unique; a repeated append returns the existing `seq` |
+| `type`, `object_type`, `object_id` | e.g. `SupplierNoticeIssued`, `Supplier`, `S-NORDHOLZ` |
+| `action`, `actor_agent`, `actor_user`, `task_id`, `workflow_id` | who and what caused it (filled by the action pipeline, M3) |
+| `payload` | jsonb |
+| `occurred_at`, `recorded_at`, `ontology_version` | when it happened, when it was stored, under which ontology version |
+
+### Lake (raw zone)
+
+A DuckLake database: catalog in Postgres schema `lake_catalog`, data as Parquet files in the volume
+`cw-ext-liquid-lake-data` (`/lake`), written and read by DuckDB 2 inside the ontology server. Data inlining is off,
+so every table is real Parquet files.
+
+| Table | Content |
+|---|---|
+| `raw.events` | the flushed event log (same columns) |
+| `raw.erp_*` | factories, machines, workers, absences, materials, bom, suppliers, inventory, purchase_orders, production_orders, maintenance_tickets |
+| `raw.crm_*` | customers, orders, campaigns, demand |
+| `raw._extracts` | one row per source system extract (`sofa-T0`: the sofa company's initial state) |
+
+Each extract row carries `_extract_id` and `_extracted_at`. Raw tables are never updated.
+
+**Flush:** every 60 s (and on demand) the ontology server appends the events after the lake's high-water mark
+(`max(seq)` in `lake.raw.events`) as one snapshot. A gap in `seq` stops the batch until it is 60 s old (the missing
+number then belonged to a rolled-back insert), so a slow transaction is never skipped. Running the flush twice adds
+nothing.
+
+**Seed:** with *Seed the sofa-company demo data*, the install step `seed-sofa` writes the extract `sofa-T0` from
+`packages/sofa-domain` (a port of the mock's initial state, checked against the mock by a test).
+
+The Overview page shows the event log, the flush state and every raw table:
+
+![Liquid overview with event log and lake](images/liquid/liquid-overview-lake.png)
 
 ## Ontology and IR contract
 
@@ -145,8 +190,27 @@ owner approves.
 
 ## Operations runbook
 
-*(planned)* Rebuilding the projection, replaying a window, restoring after a playbook run, rotating the ontology DB
-credentials, repairing a failed install.
+All `/internal` routes of the ontology server need its token; from the host, run them inside the container:
+
+```bash
+# flush now / lake status
+docker exec cw-ext-liquid-ontology-server node -e "fetch('http://127.0.0.1:7710/internal/lake/flush',{method:'POST',headers:{authorization:'Bearer '+process.env.INTERNAL_TOKEN}}).then(r=>r.text()).then(console.log)"
+docker exec cw-ext-liquid-ontology-server node -e "fetch('http://127.0.0.1:7710/internal/lake/status',{headers:{authorization:'Bearer '+process.env.INTERNAL_TOKEN}}).then(r=>r.text()).then(console.log)"
+
+# read-only SQL over the lake (single SELECT)
+docker exec cw-ext-liquid-ontology-server node -e "fetch('http://127.0.0.1:7710/internal/lake/query',{method:'POST',headers:{authorization:'Bearer '+process.env.INTERNAL_TOKEN,'content-type':'application/json'},body:JSON.stringify({sql:process.argv[1]})}).then(r=>r.text()).then(console.log)" "SELECT id, name, rating FROM lake.raw.erp_suppliers"
+
+# the event log directly (read only!)
+docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, type, object_id, occurred_at FROM events ORDER BY seq DESC LIMIT 20"
+```
+
+- **Re-seed:** the seed is idempotent by extract id; it only writes again after *Uninstall* with *delete data*.
+- **Lake files outside the platform:** the Parquet files are in the volume `cw-ext-liquid-lake-data` under
+  `raw/<table>/`; any Parquet reader can open them, and DuckDB with the `ducklake` extension can attach the catalog.
+- **Failed install:** the Extensions page shows the failed step and its error; *Retry install* continues there,
+  *Repair* re-runs all steps and re-creates containers whose image was rebuilt.
+- *(planned)* Rebuilding the projection, replaying a window, restoring after a playbook run, rotating the ontology DB
+  credentials.
 
 ## Results D1–D3
 
@@ -240,6 +304,49 @@ Deviations
   line continuation in the `pnpm deploy` step, so no image could be built from that commit (`/bin/sh: n: not found`).
 - The control plane was rebuilt with `docker compose build temporal` + `up -d --no-deps temporal`, not `stack.mjs up`,
   because `up --remove-orphans` would remove services of other overlays (e.g. the running `mcp-sofa`).
+
+### M1 — Data foundation: event log and lake (2026-11-16)
+
+Done
+- Spike: MinIO no longer viable (no community images since October 2025); SeaweedFS + Iceberg REST catalog dropped as
+  too many moving parts. **DuckLake** on DuckDB 2 (2.0.0) works on Windows and in the Linux image: Postgres catalog in
+  its own schema, Parquet data files, snapshots, time travel, extensions installed at build. [ADR-0040](adr/0040-lake-ducklake-event-log.md).
+- `packages/lake`: event store (validated, idempotent, append-only trigger), gap-safe flush, DuckLake writer/reader
+  (extracts in one transaction, read-only query, status, Parquet file counts).
+- `packages/sofa-domain`: the mock's initial world in TypeScript plus the raw extract (15 tables). The mock exports
+  `freshWorld` and its constants and only starts its server when run directly.
+- `apps/ontology-server` (M1 part): internal API, flush loop, image with DuckDB extensions preinstalled.
+- Liquid manifest + overlay: `ontology-server` with volume `lake-data`, internal token, demo-only bootstrap step
+  `seed-sofa`. Admin API `GET /api/liquid/lake`, "Event log and lake" card on the Overview page.
+- Extension manager: the image id is now part of the service fingerprint, so *Repair* re-creates a container whose
+  `:local` image was rebuilt.
+- Diagrams: milestones (`22-liquid-milestones.svg`), data flow (`23-liquid-data-flow.svg`).
+
+Verified
+- `check.mjs` green. New tests: sofa-domain 5 (world and constants identical to the mock, extract shape), lake 15
+  (idempotent append, invalid input writes nothing, UPDATE/DELETE/TRUNCATE rejected, gap table, 1,000 events flushed
+  twice = 1,000 rows, continuation, field round trip, query guard, seed round trip, every table as Parquet, time
+  travel), ontology-server 5 (health, auth, append + flush + status, seed once with counts equal to the extract,
+  validation), admin-server +1 (rebuilt image re-created on repair).
+- **End to end** on the stack (`node scripts/liquid/e2e-lake.mjs`, result `scripts/liquid/results/m1-lake-e2e.json`):
+  10/10 — install with seed; raw-zone counts equal to the **mock's** initial state (not only our port); a DuckDB query
+  over the raw zone matches the mock (18 orders, 1,800 sofas, 3 beam suppliers); 1,000 events flushed twice = exactly
+  1,000 rows; UPDATE on `events` rejected; every non-empty raw table stored as Parquet; catalog in `lake_catalog`.
+- **Overlay path:** `stack.mjs liquid up` started both services healthy, the console switched to overlay mode and read
+  the lake with the `.env` secrets, the seed worked; `liquid down` removed them and restarted the control plane
+  without the overlay; `mcp-sofa` of the sofa overlay kept running. Reinstall from the console kept the data of the
+  earlier install (uninstall without purge).
+
+Deviations
+- Plan said MinIO + Iceberg (later SeaweedFS); built DuckLake on Postgres with no extra containers (ADR-0040, decided
+  with the user). DuckDB 2.0.0 instead of the 1.5 line (user's choice).
+- The flush is a loop in the ontology server, not a Temporal schedule; it moves to one in M5.
+- Found on the way: DuckLake inlines small inserts into the catalog by default — switched off
+  (`DATA_INLINING_ROW_LIMIT 0`); already inlined data is moved to Parquet at startup. `stack.mjs liquid down` passed
+  volume names as services — fixed.
+
+Open
+- Baseline runs 2 and 3 (before M3).
 
 ### Later
 

@@ -394,7 +394,8 @@ export class ExtensionService {
       const svc = m.services.find((s) => s.name === step.id.slice('service:'.length));
       if (!svc) throw new Error(`unknown service in ${step.id}`);
       const env = renderEnv(svc.env, { secrets: this.secrets[id] ?? {}, host: (s) => s, port: (s) => m.services.find((x) => x.name === s)?.port });
-      const fingerprint = serviceFingerprint(svc, env);
+      // The image id is part of the fingerprint, so a rebuilt :local image re-creates the container on repair.
+      const fingerprint = serviceFingerprint({ ...svc, image: `${svc.image}@${(await rt.imageId(svc.image)) ?? "?"}` }, env);
       const current = (await rt.list(id)).find((a) => a.service === svc.name);
       if (!current || current.fingerprint !== fingerprint) {
         logger.info({ extension: id, service: svc.name, env: maskEnv(env, svc.env) }, current ? 'extension service changed, re-creating' : 'creating extension service');

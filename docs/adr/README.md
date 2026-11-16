@@ -44,3 +44,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0037](0037-optional-signals.md) | Optional Signals: proactive follow-up on observations and deadlines | Accepted |
 | [0038](0038-liquid-enterprise-extension.md) | Liquid Enterprise as an optional, installable extension | Accepted |
 | [0039](0039-extension-manager.md) | Extension manager: optional modules installed from the admin console | Accepted |
+| [0040](0040-lake-ducklake-event-log.md) | Lake on DuckLake, event log in Postgres, DuckDB 2 embedded in the ontology server | Accepted |

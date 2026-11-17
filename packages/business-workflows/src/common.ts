@@ -44,4 +44,6 @@ export interface BusinessActivities {
   getObject(i: { cls: string; id: string }): Promise<Record<string, unknown> | null>;
   flushLake(): Promise<{ flushed: number; hwm: number }>;
   notify(i: { kind: string; subject: string; body: string; ref: string }): Promise<void>;
+  /** The core checks (preconditions) an action would run, without running it (v2 gates, D3). */
+  checkPreconditions(i: { action: string; args: Record<string, unknown> }): Promise<{ ok: boolean; reasons: string[] }>;
 }

@@ -448,7 +448,6 @@ export const api = {
   liquidProposals: () => apiFetch<ConfigProposal[]>('/api/liquid/proposals'),
   liquidProposal: (pid: string) => apiFetch<ConfigProposal>(`/api/liquid/proposals/${id(pid)}`),
   liquidProposalIr: (pid: string) => apiFetch<OntologyIr | null>(`/api/liquid/proposals/${id(pid)}/ir`),
-  decideLiquidProposal: (pid: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<ConfigProposal>(`/api/liquid/proposals/${id(pid)}/decide`, { method: 'POST', json: { decision, comment } }),
   createOntologyDraft: (domain = 'sofa') => apiFetch<OntologyDraft>('/api/liquid/ontology/drafts', { method: 'POST', json: { domain } }),
   ontologyDrafts: () => apiFetch<OntologyDraft[]>('/api/liquid/ontology/drafts'),
   ontologyDraft: (did: string) => apiFetch<OntologyDraft>(`/api/liquid/ontology/drafts/${id(did)}`),

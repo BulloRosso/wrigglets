@@ -56,3 +56,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0049](0049-liquid-simplification.md) | Simplification: event log as truth, embedded policy, enterprise core, Git host, one approval mechanism | Accepted |
 | [0050](0050-entra-option-app-registry.md) | Entra ID as identity provider option; app registry and app host for generated UIs | Accepted |
 | [0051](0051-control-loop-health-robustness.md) | Control loop health and robustness rules | Accepted |
+| [0052](0052-acceptance-core-checks-workflow-v2.md) | Acceptance D2/D3: core checks switched on by the ontology, workflow v2 by ontology version | Accepted |

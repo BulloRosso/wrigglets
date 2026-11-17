@@ -137,11 +137,11 @@ try {
   // proposals are pull requests on the Git host (ADR-0049): the invalid one is closed there (its check failed)
   const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
   const auth = `Basic ${Buffer.from(`reviewer:${secrets.forgejo_reviewer_password}`).toString('base64')}`;
-  if (bad.pr) {
+  {
     const st = await (await fetch(`http://localhost:3300/api/v1/repos/liquid/config/commits/${bad.head}/status`, { headers: { authorization: auth } })).json();
     check('on the Git host the required check liquid/validate failed', st.state === 'failure', st.state);
     await fetch(`http://localhost:3300/api/v1/repos/liquid/config/pulls/${bad.pr.number}`, { method: 'PATCH', headers: { authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify({ state: 'closed' }) });
-  } else await api('POST', `/liquid/proposals/${bad.id}/decide`, { decision: 'reject', comment: 'e2e' });
+  }
   result.ok = true;
 } catch (err) {
   result.ok = false;

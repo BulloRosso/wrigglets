@@ -177,6 +177,9 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
 export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_POLICY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string; LIQUID_PLAYBOOK_TOKEN?: string; LIQUID_ALERTS_TOKEN?: string; LIQUID_FORGEJO_DB_PASSWORD?: string; LIQUID_FORGEJO_SECRET_KEY?: string; LIQUID_FORGEJO_INTERNAL_TOKEN?: string; LIQUID_FORGEJO_BOT_PASSWORD?: string; LIQUID_FORGEJO_REVIEWER_PASSWORD?: string; LIQUID_FORGEJO_WEBHOOK_SECRET?: string }): OverlayOptions {
   return {
     active: !!env.LIQUID_OVERLAY,
+    containerPrefix: 'cw-liquid-',
+    // the Git host is set up by the control plane in overlay mode too: one review path (user decision 2026-11-17)
+    bootstrap: ['forgejo-db', 'forgejo-setup'],
     secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, policy_token: env.LIQUID_POLICY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN, playbook_token: env.LIQUID_PLAYBOOK_TOKEN, alerts_token: env.LIQUID_ALERTS_TOKEN, forgejo_db_password: env.LIQUID_FORGEJO_DB_PASSWORD, forgejo_secret_key: env.LIQUID_FORGEJO_SECRET_KEY, forgejo_internal_token: env.LIQUID_FORGEJO_INTERNAL_TOKEN, forgejo_bot_password: env.LIQUID_FORGEJO_BOT_PASSWORD, forgejo_reviewer_password: env.LIQUID_FORGEJO_REVIEWER_PASSWORD, forgejo_webhook_secret: env.LIQUID_FORGEJO_WEBHOOK_SECRET },
   };
 }

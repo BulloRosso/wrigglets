@@ -53,6 +53,10 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   r.get('/liquid/ontology/versions', pass('GET', () => '/internal/ontology/versions'));
   /** Audit is a query over the event log (ADR-0049): filter by type, actor, object, text. */
   r.get('/liquid/events', pass('GET', (req) => `/internal/events/query?${new URLSearchParams(Object.entries(req.query).filter(([, v]) => typeof v === 'string') as Array<[string, string]>).toString()}`));
+  /** Shadow replay of a precondition (D3 evidence): how many releases of a window it would have blocked. */
+  r.post('/liquid/shadow/precondition', pass('POST', () => '/internal/shadow/precondition'));
+  /** The core checks an action would run now, without running it. */
+  r.post('/liquid/actions/:name/check', pass('POST', (req) => `/internal/actions/${encodeURIComponent(String(req.params.name))}/check`));
   r.get('/liquid/ontology/sdk', async (req, res, next) => {
     try {
       // ?kind=app: the standalone SDK for registered apps (ADR-0050); default: the SDK for server-side code

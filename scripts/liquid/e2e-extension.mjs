@@ -48,6 +48,9 @@ try {
     log('liquid is installed from an earlier run: uninstalling first');
     await api('POST', '/extensions/liquid/uninstall', { purgeData: true });
     await until('uninstalled', async () => (await status()).phase === 'not_installed', 120_000);
+    // delete data also removes what the extension keeps in the control plane (user decision 2026-11-17, no archive)
+    const left = spawnSync('docker', ['exec', 'cw-temporal', 'sh', '-c', 'ls -d /data/liquid /data/admin/liquid-drafts 2>/dev/null'], { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } }).stdout.trim();
+    check('delete data removed the control-plane data (config repository, proposals, apps)', left === '', left);
   }
   check('starts not installed and not available', (st = await status()) && st.phase === 'not_installed' && !st.available);
   check('no liquid containers before install', extContainers().length === 0, extContainers());

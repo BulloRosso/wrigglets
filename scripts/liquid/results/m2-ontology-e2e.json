@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:56:51.470Z",
+  "startedAt": "2026-11-17T08:21:31.866Z",
   "checks": [
     {
       "name": "repair picked up the new images and is available",
@@ -66,38 +66,20 @@
     {
       "name": "the enterprise core runs the ontology of the config repository (source hashes of main)",
       "ok": true,
-      "detail": "sofa@7.0.0 0dcbd0d195c4"
+      "detail": "sofa@0.1.0 d3b7090b2597"
     },
     {
       "name": "every class and action of the built-in sofa ontology is served (additions only through reviewed changes)",
       "ok": true,
       "detail": {
-        "classes": 20,
-        "actions": 34,
-        "links": 22,
+        "classes": 19,
+        "actions": 32,
+        "links": 21,
         "builtIn": "0.1.0",
-        "added": [
-          "DueDiligenceStatement",
-          "submit_due_diligence_statement",
-          "list_due_diligence_statements"
-        ]
+        "added": []
       }
-    },
-    {
-      "name": "React Flow renders one node per class",
-      "ok": true,
-      "detail": "20 nodes"
-    },
-    {
-      "name": "React Flow renders one edge per link",
-      "ok": true,
-      "detail": "22 edges"
-    },
-    {
-      "name": "selecting a class shows its details and source table",
-      "ok": true
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:57:00.085Z"
+  "finishedAt": "2026-11-17T08:21:35.416Z"
 }

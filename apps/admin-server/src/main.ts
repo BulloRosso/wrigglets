@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { MailService } from './mail.js';
 import { LiteLLMService } from './litellm.js';
 import { SecretStore } from '@cw/secrets';
@@ -185,6 +186,8 @@ async function main() {
     const r = await ontologyCall<{ applied: boolean; from?: string; to?: string; level?: string; migration?: string; reason?: string }>(liquidCtx, 'POST', '/internal/ontology/apply', { ir: out.ir, allowBreaking: true, note, by: 'reconciler' });
     if (!r.applied) return undefined;
     await gateway.push(); // agents see the new tools at once (the gateway drops its tool cache)
+    // live means usable: both policy engines know the new actions before the change counts as applied (fail closed until)
+    if (!(await liquidPolicy.waitConverged(['gateway', 'core']))) logger.warn('ontology applied, but the policy engines did not pick up the new package within 30 s');
     return `ontology ${domain} ${r.from} → ${r.to} (${r.level}, ${r.migration})`;
   };
   liquidPolicy.policySource = async () => (extensions.isInstalled(LIQUID_ID) ? configRepo.appliedFiles('policies/liquid/') : undefined);
@@ -268,7 +271,10 @@ async function main() {
     void temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES).catch((err) => logger.warn({ err: String(err) }, 'could not ensure the business namespace'));
     void seedConfig()
       .then((seed) => configRepo.init(seed, 'overlay@liquid.local'))
-      .catch((err) => logger.warn({ err: String(err) }, 'could not initialise the config repository'));
+      // the Git host is set up like on a console install (one review path): database, accounts, repository, protection
+      .then(() => extensions.bootstrapOverlay(LIQUID_ID))
+      .then((steps) => logger.info({ steps }, 'liquid overlay: bootstrap done'))
+      .catch((err) => logger.warn({ err: String(err) }, 'liquid overlay: config repository or Git host not ready'));
   }
   // owned upstreams (onto, config) are registered by the extension, not through the console: record them after each operation
   extensions.onOperationDone = (id, kind, who) =>
@@ -276,6 +282,7 @@ async function main() {
       ? configRepo.capture(who, `extension ${id} ${kind}`).then(() => configRepo.reconcile('extension operation')) // a fresh core gets main's ontology at once
       : undefined;
   configRepo.start(60_000, () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID));
+  // uninstall with delete data (user decision 2026-11-17): the control plane's Liquid data goes too, without archive
   // Playbooks (ADR-0047): one sensing path, runs in the business worker, steps executed here
   const liquidProcesses = new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined));
   const playbooks = new PlaybookService({
@@ -290,6 +297,7 @@ async function main() {
     processes: liquidProcesses,
     killSwitch,
     capture: (who, what) => configRepo.capture(who, what),
+    mail: async (m) => void (await mailService.send({ agentId: 'liquid', agentName: 'Liquid Enterprise', kind: 'playbook_notification', to: m.to, subject: m.subject, html: m.html })),
     editing: async (fn) => {
       configRepo.beginEdit();
       try {
@@ -378,6 +386,17 @@ async function main() {
       playbookRuns: () => playbooks.runs(),
       apps: () => appRegistry.list(),
     });
+
+  extensions.onPurgeData = async (id) => {
+    if (id !== LIQUID_ID) return;
+    const apps = await appRegistry.purge(); // OIDC clients and access lists of the apps
+    await rm(path.join(config.DATA_DIR, 'liquid'), { recursive: true, force: true }); // config repository, proposals, mails, feed cursor
+    await rm(path.join(config.DATA_DIR, 'admin', 'liquid-drafts'), { recursive: true, force: true });
+    await configRepo.reset();
+    await liquidPolicy.replaceOverlays([]);
+    eventFeed.reset(); // forwards again from now, once installed
+    logger.info({ apps }, 'liquid: control-plane data deleted');
+  };
 
   const appHost = createAppHost({
     registry: appRegistry,

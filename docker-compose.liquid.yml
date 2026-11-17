@@ -96,7 +96,7 @@ services:
       FORGEJO__database__NAME: forgejo
       FORGEJO__database__USER: forgejo
       FORGEJO__database__PASSWD: ${LIQUID_FORGEJO_DB_PASSWORD:?}
-      FORGEJO__server__ROOT_URL: http://localhost:3300/
+      FORGEJO__server__ROOT_URL: http://${PUBLIC_HOST:-localhost}:3300/
       FORGEJO__server__HTTP_PORT: "3000"
       FORGEJO__server__DISABLE_SSH: "true"
       FORGEJO__server__OFFLINE_MODE: "true"

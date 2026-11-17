@@ -72,7 +72,7 @@ Decisions made with the user before the work started:
 - **The wiki keeps its own review page**; the approval is a mirror, not a replacement (the user chose to keep the
   wiki service).
 - **Overlay mode** (compose) keeps the built-in console review until Forgejo is set up, so the dev path without the
-  Git host still works.
+  Git host still works. *(Superseded by ADR-0052: the overlay runs Forgejo and the console review is gone.)*
 
 ## Consequences
 

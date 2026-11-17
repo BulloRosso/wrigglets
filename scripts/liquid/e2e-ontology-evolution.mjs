@@ -20,8 +20,11 @@ const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
 const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 // ADR-0049: proposals are pull requests on the Git host; the reviewer approves and merges there (webhook → reconcile)
 const approve = async (id, comment) => {
-  const p = await api('GET', `/liquid/proposals/${id}`);
-  if (!p.pr) return api('POST', `/liquid/proposals/${id}/decide`, { decision: 'approve', comment });
+  // the pull request may be opened by the next reconcile if the host was busy
+  const p = await until('the proposal has its pull request', async () => {
+    const x = await api('GET', `/liquid/proposals/${id}`);
+    return x.pr ? x : undefined;
+  }, 90_000, 2000);
   const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
   const headers = { authorization: `Basic ${Buffer.from(`reviewer:${secrets.forgejo_reviewer_password}`).toString('base64')}`, 'content-type': 'application/json' };
   const call = async (path, body) => {

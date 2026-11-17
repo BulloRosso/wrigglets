@@ -282,6 +282,20 @@ export class AppRegistry {
     });
   }
 
+  /** Uninstall with delete data: every app loses its OIDC client and its access list; the registry is emptied. */
+  async purge(): Promise<number> {
+    return this.serial(async () => {
+      const n = this.apps.length;
+      for (const a of this.apps) if (a.clientId) await this.d.oauth.deleteClient(a.clientId, true).catch(() => undefined);
+      this.apps = [];
+      this.secrets = {};
+      await rm(this.dir, { recursive: true, force: true });
+      await rm(this.file, { force: true });
+      await rm(this.secretsFile, { force: true });
+      return n;
+    });
+  }
+
   /** Active apps get their OIDC client back (e.g. after the OAuth server's data was reset). */
   async reconcileClients(): Promise<number> {
     let n = 0;

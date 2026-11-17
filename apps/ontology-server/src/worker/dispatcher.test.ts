@@ -42,9 +42,24 @@ describe('dispatcher', () => {
     expect(commandsFor(ev({ type: 'BusinessNotification', payload: {} }), actions, cfg)).toEqual([]);
   });
 
+  it('v2 (D3): with the due-diligence check on the release in the ontology, new release workflows wait for it', () => {
+    const e = ev({ type: 'PurchaseOrderCreated', action: 'create_purchase_order', payload: { changes: [{ class: 'PurchaseOrder', id: 'PO-4430', after: { supplier: 'S-BALTIC', sku: 'BEAM-PINE-80', qty: 1500, eta: '2026-10-09' } }] } });
+    const v1 = commandsFor(e, actions, cfg)[0] as { args: Array<Record<string, unknown>> };
+    expect(v1.args[0]!.dueDiligence).toBeUndefined();
+    const withCheck = new Map(actions);
+    withCheck.set('release_purchase_order', { name: 'release_purchase_order', target: 'PurchaseOrder', input: [], preconditions: ['purchase_order_open_not_released', 'due_diligence_for_high_risk_material'] });
+    const v2 = commandsFor(e, withCheck, { ...cfg, dueDiligencePollMs: 5000, dueDiligenceReminderMs: 20_000 })[0] as { args: Array<Record<string, unknown>> };
+    expect(v2.args[0]).toMatchObject({ dueDiligence: true, dueDiligencePollMs: 5000, dueDiligenceReminderMs: 20_000 });
+  });
+
   it('a simulation reset cancels the running release workflows of the old world', () => {
     const c = commandsFor(ev({ type: 'SimulationReset', objectType: 'Company', objectId: 'sofa', payload: { changes: [] } }), actions, cfg);
-    expect(c).toEqual([{ kind: 'signal', workflowType: 'PurchaseOrderRelease', query: "WorkflowType = 'PurchaseOrderRelease' AND ExecutionStatus = 'Running'", signal: 'cancel', payload: { reason: 'simulation reset (event 10)' } }]);
+    expect(c[0]).toEqual({ kind: 'signal', workflowType: 'PurchaseOrderRelease', query: "WorkflowType = 'PurchaseOrderRelease' AND ExecutionStatus = 'Running'", signal: 'cancel', payload: { reason: 'simulation reset (event 10)' } });
+    expect(c[1]).toMatchObject({ workflowType: 'ApprovalWorkflow', signal: 'withdraw' });
+    const only = new RegExp(c[1]!.kind === 'signal' ? c[1]!.idPattern! : '');
+    expect(only.test('ApprovalWorkflow-3f2b1c4d-1111-4222-8333-944455556666')).toBe(true); // four-eyes request
+    expect(only.test('ApprovalWorkflow-pr-mwjyq86r-42de-restore')).toBe(false); // playbook step
+    expect(only.test('ApprovalWorkflow-wiki-abc')).toBe(false);
   });
 
   it('objectsOf resolves class-typed and multi-valued inputs', () => {

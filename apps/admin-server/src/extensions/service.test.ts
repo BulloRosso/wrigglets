@@ -25,6 +25,14 @@ class FakeRuntime implements ExtensionRuntime {
   async ping() {
     return { ok: true, detail: 'fake' };
   }
+  execs: string[] = [];
+  async exec(ext: string, service: string, cmd: string[]) {
+    return this.execIn(`cw-ext-${ext}-${service}`, cmd);
+  }
+  async execIn(container: string, cmd: string[]) {
+    this.execs.push(`${container}: ${cmd.join(' ')}`);
+    return { code: 0, output: 'ok' };
+  }
   imageIds = new Map<string, string>();
   async imagePresent(ref: string) {
     return this.images.has(ref);
@@ -368,6 +376,36 @@ describe('overlay mode', () => {
     expect(s.mode).toBe('overlay');
     expect(s.blockedReason).toContain('overlay');
     await expect(svc.install('demo', { seedDemo: false }, 'a')).rejects.toThrow(/overlay/);
+  });
+});
+
+describe('overlay bootstrap', () => {
+  it('runs the declared steps itself (no install), retries until they succeed, execs in the overlay containers', async () => {
+    const svc = make({ overlay: true });
+    let tries = 0;
+    svc.register(
+      manifest,
+      {
+        migrate: async () => {
+          if (++tries < 3) throw new Error('database not up yet');
+          boot.push('migrate');
+        },
+        seed: async (ctx) => void boot.push(`seed ${(await ctx.exec('db', ['psql', '-c', 'select 1'])).output}`),
+      },
+      { active: true, secrets: { db_password: 'from-env' }, containerPrefix: 'cw-demo-', bootstrap: ['migrate', 'seed'] },
+    );
+    await svc.load();
+    expect(await svc.bootstrapOverlay('demo', { delayMs: 1 })).toEqual(['migrate', 'seed']);
+    expect(tries).toBe(3);
+    expect(boot).toEqual(['migrate', 'seed ok']);
+    expect(rt.execs).toEqual(['cw-demo-db: psql -c select 1']);
+  });
+
+  it('gives up after the attempts with the step named; outside overlay mode it does nothing', async () => {
+    const svc = make({ overlay: true });
+    svc.register(manifest, { migrate: async () => Promise.reject(new Error('no database')), seed: async () => undefined }, { active: true, secrets: {}, bootstrap: ['migrate'] });
+    await expect(svc.bootstrapOverlay('demo', { attempts: 2, delayMs: 1 })).rejects.toThrow(/overlay bootstrap migrate failed: no database/);
+    expect(await make().bootstrapOverlay('demo')).toEqual([]);
   });
 });
 

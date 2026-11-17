@@ -102,7 +102,7 @@ describe('install plan', () => {
 
   it('uninstalls upstreams first, services in reverse order, data only on purge', () => {
     expect(uninstallSteps(m, { purgeData: false }).map((s) => s.id)).toEqual(['upstreams', 'service:server', 'service:db', 'orphans']);
-    expect(uninstallSteps(m, { purgeData: true }).map((s) => s.id)).toEqual(['upstreams', 'service:server', 'service:db', 'orphans', 'volumes', 'secrets']);
+    expect(uninstallSteps(m, { purgeData: true }).map((s) => s.id)).toEqual(['upstreams', 'service:server', 'service:db', 'orphans', 'volumes', 'control-plane-data', 'secrets']);
   });
 
   it('fingerprint changes with image or environment, not with key order', () => {

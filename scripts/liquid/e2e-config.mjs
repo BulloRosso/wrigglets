@@ -127,7 +127,7 @@ try {
   const pr = (await forge('GET', `/repos/liquid/config/pulls/${p1.pr?.number}`)).body;
   check('it is a pull request on the Git host with the required check liquid/validate = success', pr?.state === 'open' && (await prStatus(p1.head)) === 'success', { pr: p1.pr?.url });
   const consoleDecide = await api('POST', `/liquid/proposals/${prop.id}/decide`, { decision: 'approve' }).then(() => 'decided', (e) => String(e));
-  check('the console no longer decides: review and merge happen on the Git host', /409|Git host/.test(consoleDecide), consoleDecide.slice(0, 100));
+  check('the console has no decision route: review and merge happen on the Git host only', /404/.test(consoleDecide), consoleDecide.slice(0, 100));
 
   // 3. invalid proposals cannot be approved; a broken policy is caught by opa check
   const bad = JSON.parse(agentCall(AGENT, 'config__propose_change', { title: 'broken allow-list', reason: 'typo test', changes: [{ path: 'gateway/allow-lists.yaml', content: 'allowedTools: [1\n' }] }).text);

@@ -19,6 +19,7 @@ describe('compatibility', () => {
   const cases: Array<[string, (ir: OntologyIr) => void, 'patch' | 'minor' | 'major', RegExp]> = [
     ['description', (ir) => (po(ir).description = 'changed'), 'patch', /description changed/],
     ['annotation', (ir) => (po(ir).annotations.owner = 'head-of-sales'), 'patch', /annotations.owner/],
+    ['precondition added to an action (M10 D3)', (ir) => act(ir, 'release_purchase_order').preconditions.push('due_diligence_for_high_risk_material'), 'minor', /preconditions changed/],
     ['new class + optional link (D3)', (ir) => {
       ir.classes.push(carrier);
       po(ir).attributes.push({ name: 'carrier', range: 'Carrier', rangeKind: 'class', required: false, multivalued: false, identifier: false });

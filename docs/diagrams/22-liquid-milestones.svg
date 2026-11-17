@@ -111,10 +111,10 @@
   <text x="1004" y="179" class="d">core, Forgejo, one inbox</text>
   <path d="M1065,258 L1065,198" class="ln" marker-end="url(#a)"/>
   <!-- M10 -->
-  <rect x="990" y="400" width="150" height="76" rx="10" class="plan"/>
+  <rect x="990" y="400" width="150" height="76" rx="10" class="done"/>
   <text x="1004" y="423" class="id">M10</text><text x="1046" y="423" class="h">Acceptance</text>
-  <text x="1004" y="443" class="d">scripted scenarios,</text>
-  <text x="1004" y="459" class="d">final report</text>
+  <text x="1004" y="443" class="d">D2 + D3 green,</text>
+  <text x="1004" y="459" class="d">results report</text>
   <rect x="1060" y="388" width="36" height="20" rx="10" class="demo"/><text x="1078" y="402" class="bn">D2</text>
   <rect x="1100" y="388" width="36" height="20" rx="10" class="demo"/><text x="1118" y="402" class="bn">D3</text>
 

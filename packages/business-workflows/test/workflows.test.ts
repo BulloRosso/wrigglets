@@ -22,6 +22,8 @@ let bundle: WorkflowBundle;
 let client: Client;
 const calls: Array<{ name: string; action?: string; caller?: ActionCaller; args?: Record<string, unknown> }> = [];
 let poStatus: Record<string, { status: string; eta: string }> = {};
+/** v2 gate: the release is refused until this is true (a statement arrived). */
+let statementThere = false;
 
 const activities: BusinessActivities = {
   async runAction({ action, args, caller }) {
@@ -37,6 +39,10 @@ const activities: BusinessActivities = {
   },
   async notify(i) {
     calls.push({ name: `notify:${i.kind}` });
+  },
+  async checkPreconditions({ action }) {
+    calls.push({ name: 'checkPreconditions', action });
+    return statementThere ? { ok: true, reasons: [] } : { ok: false, reasons: ['a valid due-diligence statement of S-NORDHOLZ is missing'] };
   },
 };
 
@@ -64,6 +70,7 @@ afterAll(async () => env?.teardown());
 beforeEach(() => {
   calls.length = 0;
   poStatus = {};
+  statementThere = false;
 });
 
 describe('PurchaseOrderRelease', () => {
@@ -86,6 +93,26 @@ describe('PurchaseOrderRelease', () => {
     const out = await withWorker(async () => (await client.workflow.start('PurchaseOrderRelease', { taskQueue: QUEUE, workflowId: 'po-release-late', args: [po('PO-4431', 'S-NORDHOLZ')] })).result());
     expect(out).toMatchObject({ outcome: 'late', detail: 'eta 2026-11-30' });
     expect(calls.map((c) => c.name)).toContain('notify:purchase_order_late');
+  });
+
+  it('v2 (D3): waits for the due-diligence statement, reminds once, releases when it arrived; v1 has no gate', async () => {
+    const out = await withWorker(async () => {
+      const h = await client.workflow.start('PurchaseOrderRelease', { taskQueue: QUEUE, workflowId: 'po-release-dd', args: [po('PO-4440', 'S-NORDHOLZ', { dueDiligence: true, dueDiligencePollMs: 1000, dueDiligenceReminderMs: 2500 })] });
+      await sleep(1500);
+      expect(await h.query(releaseStateQuery)).toMatchObject({ state: 'awaiting_due_diligence', version: 2 });
+      await sleep(3000);
+      statementThere = true;
+      return h.result();
+    });
+    expect(out).toMatchObject({ poId: 'PO-4440', outcome: 'received' });
+    expect(calls.filter((c) => c.name === 'notify:due_diligence_missing')).toHaveLength(1);
+    expect(calls.findIndex((c) => c.name === 'runAction')).toBeGreaterThan(calls.findLastIndex((c) => c.name === 'checkPreconditions') - 1);
+    // v1: no flag, no gate
+    calls.length = 0;
+    statementThere = false;
+    const v1 = await withWorker(async () => (await client.workflow.start('PurchaseOrderRelease', { taskQueue: QUEUE, workflowId: 'po-release-v1-nogate', args: [po('PO-4441', 'S-NORDHOLZ')] })).result());
+    expect(v1).toMatchObject({ outcome: 'received' });
+    expect(calls.some((c) => c.name === 'checkPreconditions')).toBe(false);
   });
 
   it('cancel ends it without a release', async () => {

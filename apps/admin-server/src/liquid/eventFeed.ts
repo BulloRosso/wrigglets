@@ -59,6 +59,13 @@ export class EventFeed {
     this.file = path.join(dataDir, 'liquid', 'event-feed.json');
   }
 
+  /** Uninstall with delete data: forward from now on; written to disk only by the next run (when installed again). */
+  reset() {
+    const now = new Date().toISOString();
+    this.cursor = { start: now, admin: now, gateway: now, agents: {} };
+    this.last = undefined;
+  }
+
   async load() {
     try {
       this.cursor = { ...this.cursor, ...(JSON.parse(await readFile(this.file, 'utf8')) as typeof this.cursor) };

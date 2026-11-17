@@ -29,6 +29,8 @@ export interface PlaybookDeps {
   killSwitch: { effective(agentId: string): { level: KillLevel }; get(): { global: { level: KillLevel } }; setAgent(agentId: string, level: KillLevel, reason: string | undefined, by: string): Promise<void>; setGlobal(level: KillLevel, reason: string | undefined, by: string): Promise<void> };
   /** Records store changes in the config repository (author = the playbook run). */
   capture: (by: string, what: string) => Promise<unknown>;
+  /** Mail outbox for notify steps with recipients (e.g. the security owner). */
+  mail?: (m: { to: string[]; subject: string; html: string; ref: string }) => Promise<void>;
   /** Marks a store change whose capture is still to come, so a reconcile meanwhile does not revert it (ADR-0046). */
   editing?: <T>(fn: () => Promise<T>) => Promise<T>;
   propose: (p: { title: string; reason: string; changes: Array<{ path: string; content: string | null }>; author: string }) => Promise<{ id: string; valid: boolean }>;
@@ -216,8 +218,13 @@ export class PlaybookService {
         return { ok: true, summary: `${before.length - after.length} pattern(s) of ${String(w.upstream)} removed from ${agent} (local stand-in for Entra)`, undo: { kind: 'allowlist', agent, patterns: before } };
       }
       case 'notify':
-        await this.d.events([{ type: 'BusinessNotification', objectType: 'Notification', objectId: r.runId, payload: { kind: 'playbook', subject: w.subject, body: w.body ?? '' } }]);
-        return { ok: true, summary: `notified: ${String(w.subject)}` };
+        await this.d.events([{ type: 'BusinessNotification', objectType: 'Notification', objectId: r.runId, payload: { kind: 'playbook', subject: w.subject, body: w.body ?? '', to: (w.to as string[] | undefined) ?? [] } }]);
+        const to = (w.to as string[] | undefined) ?? [];
+        if (to.length && this.d.mail) {
+          const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+          await this.d.mail({ to, subject: String(w.subject), html: `<p><b>${esc(w.subject)}</b></p><p>${esc(w.body)}</p><p>Playbook ${esc(r.playbook)}, run ${esc(r.runId)}.</p>`, ref: r.runId });
+        }
+        return { ok: true, summary: `notified: ${String(w.subject)}${to.length ? ` (${to.join(', ')})` : ''}` };
       case 'shadow.replay': {
         const report = await this.d.shadowReplay({ windowMs: durationMs(String(w.window)), candidate: w.candidate as Record<string, unknown> | undefined });
         return { ok: true, summary: `replayed ${String(report.events)} events: ${String(report.blocked ?? 0)} action(s) would need approval or be blocked, ${String(report.diverged ?? 0)} diverged`, data: { report } };

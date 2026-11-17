@@ -42,6 +42,8 @@ export interface ExtensionRuntime {
   logs(ext: string, service: string, tail: number): Promise<string>;
   /** Runs a command in the service's container (bootstrap of third-party services, e.g. an admin CLI). */
   exec(ext: string, service: string, cmd: string[], user?: string): Promise<{ code: number; output: string }>;
+  /** exec in a container by name (overlay services started by compose). */
+  execIn?(container: string, cmd: string[], user?: string): Promise<{ code: number; output: string }>;
 }
 
 export function parseState(status: string, running: boolean): ServiceState {
@@ -158,7 +160,11 @@ export class DockerExtensionRuntime implements ExtensionRuntime {
   }
 
   async exec(ext: string, service: string, cmd: string[], user?: string) {
-    const c = this.docker.getContainer(containerName(ext, service));
+    return this.execIn(containerName(ext, service), cmd, user);
+  }
+
+  async execIn(container: string, cmd: string[], user?: string) {
+    const c = this.docker.getContainer(container);
     const x = await c.exec({ Cmd: cmd, User: user, AttachStdout: true, AttachStderr: true });
     const stream = await x.start({ hijack: true, stdin: false });
     const chunks: Buffer[] = [];

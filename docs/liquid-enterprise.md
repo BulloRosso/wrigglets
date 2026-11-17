@@ -12,8 +12,8 @@ tighten automatically and loosen only with a human decision.
 - Implementation plan: [liquid-enterprise-extension.md](liquid-enterprise-extension.md).
 - Why LinkML, and how a requirement travels from data to ontology to logic and UI: [link-ml.md](link-ml.md).
 
-> **Status:** under construction. Sections marked *(planned)* describe what the named milestone delivers; the
-> [implementation log](#appendix-implementation-log) says what exists today.
+> **Status:** implemented (M0–M10). The [results](#results-d1d3) say what was shown and what was not (real-model
+> runs, Entra tenant); the [implementation log](#appendix-implementation-log) records each milestone.
 
 ## Contents
 
@@ -82,7 +82,8 @@ Every step is shown with its state; a failed step shows its error and **Retry in
 interrupted by a restart of the control plane resumes by itself. While installed and healthy, the navigation shows a
 **Liquid enterprise** group. **Repair** re-creates missing or changed containers and starts stopped ones (data and
 secrets are kept). **Uninstall** removes the upstreams it registered and its containers; *also delete its data volumes
-and secrets* removes everything.
+and secrets* removes everything — including what Liquid keeps in the control plane (config repository, proposals, app
+registry and the apps' OIDC clients, drafts), without archive.
 
 What gets created:
 
@@ -406,6 +407,9 @@ cancel_purchase_order:
 **Every step that changes data is an ontology action** through the ontology server: validated, policy-checked, an
 event. A refused action is a result of the workflow (e.g. the order was cancelled meanwhile), not a crash.
 
+**Simulation reset** (demo): it replaces the company's world, so the release workflows of the old world are cancelled
+and pending four-eyes approvals are withdrawn (playbook steps and wiki proposals stay).
+
 **Hold by object.** Each workflow carries the objects it touches in the search attribute `OntologyObjects`
 (`PurchaseOrder:PO-4430`, `Supplier:S-NORDHOLZ`, `Material:BEAM-PINE-80`). Liquid enterprise → **Business processes** →
 *Hold by object* signals `hold` to every running workflow with that object; they pause before their next step and show
@@ -476,8 +480,9 @@ structural diff and compatibility class, `opa check` + `opa test` for policies. 
 Liquid enterprise → **Proposals** still shows reason, evidence, checks, owners, the text diff and, for ontology changes,
 the diff graph, with the link to the pull request. The Git host's web UI is only bound to `127.0.0.1:3300`; the
 `reviewer` account's password is the extension secret `forgejo_reviewer_password` (`DATA_DIR/admin/extensions-secrets.json`).
-In overlay mode without the Git host the console's own review (*Approve and apply*, owners from `OWNERS.yaml`, not the
-requester) is used.
+There is no console decision any more: compose overlay mode runs Forgejo too, and the control plane sets it up at start
+(the same idempotent bootstrap as a console install). A proposal made while the Git host is not reachable gets its pull
+request as soon as it is.
 
 **Giving an agent the config tools:** add `config__*` (or only `config__read` and `config__get_proposal`) to its
 allow-list. Proposing changes nothing by itself.
@@ -673,13 +678,131 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
 
 ## Results D1–D3
 
-*(planned, M3 and M10)*
+Decision record of the acceptance: [ADR-0052](adr/0052-acceptance-core-checks-workflow-v2.md).
 
-| # | Demonstration | Status |
-|---|---|---|
-| D1 | Backend swap: sofa scenarios against the ontology server | open |
-| D2 | New security risk: automatic containment, human-gated recovery | open |
-| D3 | New business requirement: ontology extension compiled into all layers | open |
+| # | Demonstration | Result | Evidence |
+|---|---|---|---|
+| D1 | Backend swap: the sofa company's tools served by the ontology server instead of the mock | **deterministic parity green**; real-model runs not done | `results/m3-backend-e2e.json`, sofa-domain tests |
+| D2 | New security risk: automatic containment, human-gated recovery | **18/18**, contained in 4 s, restored 5 s after the approval | `results/d2-security.json`, event log, Temporal `PlaybookRun-*`, Forgejo PR, mail outbox |
+| D3 | New business requirement: ontology extension live in every layer | **18/18**, live 3 s after the merge, 44.4 % of last week's releases would have waited | `results/d3-business.json`, Forgejo PR, Temporal `PurchaseOrderRelease-*` (v1 and v2), app registry |
+
+The complete runtime test, `node scripts/liquid/e2e-all.mjs`, runs every milestone check and both scenarios in one go
+after a fresh install (uninstall with *delete data*, then install from the console):
+M0b 12, M1 10, M2 4, M3 13, M4 14, M5 19, M6 25, M7 18, M8 19, M9 20, D2 18, D3 18 — **190/190**, about 8 minutes.
+Each script writes its results file under `scripts/liquid/results/`.
+
+### What was real, what was scripted
+
+| Real (the platform as it runs) | Scripted (to make it repeatable) |
+|---|---|
+| gateway, embedded policy engines, enterprise core with action pipeline and event log, lake, Temporal workflows (namespace `business`), Forgejo with branch protection and webhooks, reconciler, app host, mail outbox | the vulnerability feed (a synthetic alert) |
+| every tool call of an agent goes through the gateway with the agent's own token | the agent's *part*: its MCP calls (`config__read/validate/propose_change`) are made by the script from inside the agent's container — no model decides |
+| every person's decision goes through the same API the console uses | the people: the reviewer (Forgejo API), the security owner (approvals API), the buyer (the app's API with his session) |
+| ontology changes are compiled, validated, reviewed and applied live | the timing: demo pace (release window 30 s, simulated day 20 s, due-diligence re-check 5 s, reminder 20 s) |
+
+### D1 — backend swap
+
+- **Deterministic parity** (no model): the ontology server answers every call of the 6 states (baseline and 5
+  scenarios) × 57 calls byte-identically to the mock, including world state, id sequences and KPI (sofa-domain tests).
+  Through the full stack (gateway → ontology server → Postgres), agent Lara's reads, writes, a failed precondition and
+  the KPI answer like the mock, with exactly one event per business change (`m3-backend-e2e.json`, 13/13).
+- **Not done: real-model runs.** The plan's D1 judgement compares the sofa scenarios run by the real agents against
+  both backends (3 runs × 5 scenarios, about 15 runs of up to 45 min each). They need model budget and your approval;
+  the baseline exists only with n = 1 (M0). Deterministic parity makes a difference in outcomes unlikely to come from
+  the backend, but that is an argument, not a measurement.
+
+### D2 — new security risk
+
+`node scripts/liquid/scenario-security.mjs`: a critical alert says the ERP connector leaks suppliers' bank details.
+
+1. **Containment, automatic, in 4 s:**
+   - the upstream `erp` is disabled, so agents can no longer reach it;
+   - a policy overlay requires four eyes on the 10 write actions the upstream reaches (blast radius from the ontology:
+     upstream → tools → actions → 14 classes);
+   - the release workflows of the two affected purchase orders are held;
+   - the security owner gets a mail;
+   - a shadow replay of the last week with the candidate policy is attached.
+2. **Fix:** the platform agent reads the configuration and proposes the fix (the connector pinned to the patched
+   build) with the replay as evidence. The proposal is a pull request with the required check green; the reviewer
+   approves and merges it on Forgejo.
+3. **Recovery, by a person:** the security owner approves *restore* in the approvals inbox. 5 s later:
+   - the upstream is enabled again;
+   - the overlay is gone;
+   - the workflows are released;
+   - the fix stays.
+4. **Learning:** the incident and every step are events (31 events in this run). The agent's proposal to restore
+   *automatically after a clean replay* is **refused by validation**, because tighten-only is a security default.
+   The plan listed this step as "allow automatic remediation"; we kept the rule and record it as a deliberate deviation.
+
+### D3 — new business requirement
+
+`node scripts/liquid/scenario-business.mjs`: *"Purchase orders for high-risk commodities need a valid supplier
+due-diligence statement before release."*
+
+1. **Proposal by the modelling agent:**
+   - `Material.commodity_risk` (enum `CommodityRisk`) and the action `set_commodity_risk`;
+   - the due-diligence statement, already added by M9 through a reviewed change;
+   - the rule `due_diligence_for_high_risk_material` on `release_purchase_order`;
+   - the role to write the new action.
+
+   Validation: compiles, **minor** (additive), existing data fits, policy tests pass.
+2. **Evidence:** the shadow replay of the rule over the last week, with timber (`BEAM-PINE-80`) classified high-risk:
+   **4 of 9 releases (44.4 %) would have waited** for a statement.
+3. **Live:** the owner merges on Forgejo, and 3 s later the new ontology runs. 6 s after the merge both
+   policy engines know the new actions; the reconciler now waits for that before a change counts as applied.
+
+   The app SDK is regenerated. The registered sample app fails its re-check (its SDK is stale) and is registered
+   again with the new SDK.
+4. **In operation:**
+   - Timber is classified high-risk through the new action, which runs generically from the IR.
+   - A new purchase order runs **`PurchaseOrderRelease` v2**: after its release window it waits
+     (`awaiting_due_diligence`), a direct release is refused by the rule, and a reminder goes out.
+   - The buyer submits the statement in the app, and 57 s after it started waiting the order is released. The
+     statement is an event with the buyer as actor and the app recorded.
+   - The order that was already in flight before the change **finished on v1**: released before, never waited.
+
+### Findings
+
+The runtime tests found these problems. Each is fixed and covered by a unit test or a check:
+
+- **Concurrency of independent loops:**
+  - a reconcile reverted an edit not yet committed;
+  - a webhook-triggered reconcile re-added an upstream during an uninstall;
+  - suites raced the 5 s policy poll;
+  - an ontology was "live" before the policy engines knew its actions (unknown actions were correctly denied: fail
+    closed).
+
+  The rules now: edits in flight defer the reconciler; a gate stops all writes while an operation runs; "live"
+  includes the policy engines (ADR-0051, ADR-0052).
+- **State outliving its context:**
+  - holds and overlays of aborted runs;
+  - release workflows and four-eyes approvals of a world replaced by a simulation reset;
+  - proposals whose pull request belonged to a recreated Git host;
+  - control-plane data surviving *delete data*.
+- **Classification:** adding a precondition counted as a *patch*; it changes behaviour and is now *minor*.
+- **Configuration:** browser URLs of the Git host were hard-coded to localhost.
+
+### Limits
+
+- Business rules beyond create, read, update and delete still need code: the due-diligence check and the v2 wait step
+  ship with the core, and the ontology decides where and when they apply. A rule switched on applies to direct calls
+  at once; workflows in flight are protected by the version split only if they are past the step it guards.
+- The agent and the people are scripted. Whether a model makes the same proposals unaided is not shown here (see D1).
+- The mock ERP connector has no versions; the D2 fix pins a build only in the upstream's description.
+- The incident is recorded in the event log (`IncidentRecorded`, the run's events), not as an object of a new
+  ontology class.
+- Entra ID sign-in is implemented but not tested against a tenant (postponed). Apps sign in at the local OAuth server.
+- The compose-overlay path (Forgejo bootstrap by the control plane) is covered by unit tests, not by an end-to-end run.
+- One machine, demo pace, one simulated company.
+
+### Next steps
+
+1. Real-model runs for D1 (and D3 with an unscripted modelling agent), with your approval of the model budget.
+2. The Entra check with a tenant: admin console and one agent with mapped app roles.
+3. Red-team cases for the new tools: a prompt-injected config proposal, loosening through a playbook proposal, a
+   destructive action in a plan step.
+4. A rule language for simple preconditions in the ontology, so that rules like D3's need no code.
+5. Per-app Entra registrations when the console runs on Entra.
 
 ## Appendix: implementation log
 
@@ -1177,6 +1300,47 @@ Verified
   re-added the extension's gateway upstream. Fixed with the gate (unit test), then the run above.
 - Right after a fresh install the health view honestly shows *fail* for a few seconds (no policy package yet, so
   everything is denied) until the first build.
+
+### M10 — Acceptance D2/D3, final report (2026-11-17)
+
+Done
+- [ADR-0052](adr/0052-acceptance-core-checks-workflow-v2.md).
+- **D2** `scripts/liquid/scenario-security.mjs` and **D3** `scripts/liquid/scenario-business.mjs`, both part of the
+  complete runtime test; shared helpers in `scripts/liquid/lib.mjs`. Report: [Results D1–D3](#results-d1d3).
+- **Core checks:** named preconditions in the enterprise core (`checks.ts`), switched on by the ontology per action,
+  enforced in the action pipeline. Dry-run check for workflows. Shadow replay of a precondition
+  (`/api/liquid/shadow/precondition`).
+- **`PurchaseOrderRelease` v2:** due-diligence gate behind `patched()`, chosen per workflow by the ontology in force
+  (dispatcher flag). Re-check, reminder, release; v1 workflows finish on v1.
+- **Playbook `notify` with recipients** (mail outbox). **Live means usable:** the reconciler waits until both policy
+  engines know a changed ontology's actions.
+- Adding a precondition is now classified *minor*.
+- **Operator decisions of 2026-11-17:**
+  - *delete data* also removes the control plane's Liquid data;
+  - Forgejo in the compose overlay, set up by the control plane, and the console decision removed;
+  - a simulation reset withdraws pending four-eyes approvals.
+
+Verified
+- Unit tests:
+  - core check and its replay (5);
+  - dispatcher v2 flag and reset withdrawals;
+  - workflow v2 with reminder and the v1 control (Temporal test server), replay of recorded histories;
+  - overlay bootstrap (2);
+  - app registry purge;
+  - compatibility of preconditions.
+- **Complete runtime test**, uninterrupted after a fresh install: 190/190 (D2 18/18, D3 18/18). The numbers are in the
+  results.
+
+Open
+- Real-model runs (D1, unscripted D3); Entra tenant check (postponed); red-team cases for the new tools; overlay path
+  not run end to end (stack in console mode).
+
+Deviations
+- D2's "automatic remediation after a clean replay" is refused by tighten-only (kept as a security default).
+- The D3 rule and the v2 step are code switched on by the ontology, not generated from it.
+- The incident is recorded as events, not as an object of a new class.
+- The "fresh stack" is a fresh *extension* install (uninstall with *delete data*, install), not `stack reset`, which
+  would remove the host's other services.
 
 ### Later
 

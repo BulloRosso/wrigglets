@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -14,7 +13,6 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
 import ErrorOutlined from '@mui/icons-material/ErrorOutlined';
@@ -77,17 +75,7 @@ function OntologyDiff({ p }: { p: ConfigProposal }) {
 }
 
 function Detail({ pid }: { pid: string }) {
-  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['liquid-proposal', pid], queryFn: () => api.liquidProposal(pid) });
-  const [comment, setComment] = useState('');
-  const decide = useMutation({
-    mutationFn: (d: 'approve' | 'reject') => api.decideLiquidProposal(pid, d, comment || undefined),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['liquid-proposal', pid] });
-      void qc.invalidateQueries({ queryKey: ['liquid-proposals'] });
-      void qc.invalidateQueries({ queryKey: ['liquid-config'] });
-    },
-  });
   if (q.isLoading) return <Loading />;
   if (!q.data) return <ErrorAlert error={q.error} title="Could not load the proposal" />;
   const p = q.data;
@@ -146,21 +134,7 @@ function Detail({ pid }: { pid: string }) {
                 Pull request #{p.pr.number} on the Git host: reviewers approve and merge there (CODEOWNERS, branch protection, required check <code>liquid/validate</code> {p.validation.ok ? 'passed' : 'failed'}). The merge is applied within one reconcile.
               </Alert>
             )}
-            {open && !p.pr && (
-              <>
-                {!p.validation.ok && <Alert severity="error">Not valid: it cannot be approved. The proposer has to fix it and propose again.</Alert>}
-                <TextField size="small" label="Comment" value={comment} onChange={(e) => setComment(e.target.value)} />
-                <ErrorAlert error={decide.error} title="Decision refused" />
-                <Stack direction="row" spacing={1}>
-                  <Button variant="contained" disabled={!p.validation.ok || decide.isPending} onClick={() => decide.mutate('approve')}>
-                    Approve and apply
-                  </Button>
-                  <Button color="error" disabled={decide.isPending} onClick={() => decide.mutate('reject')}>
-                    Reject
-                  </Button>
-                </Stack>
-              </>
-            )}
+            {open && !p.pr && <Alert severity="warning">Waiting for the Git host: the pull request is opened as soon as it is reachable (see Overview → Control loop health).</Alert>}
           </Stack>
         </CardContent>
       </Card>

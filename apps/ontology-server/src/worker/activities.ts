@@ -25,6 +25,9 @@ export function coreActivities(o: { svc: OntologyService; store: EventStore; lak
       const r = await o.lake.flush(o.store, { graceMs: o.flushGraceMs });
       return { flushed: Number((r as { flushed?: number }).flushed ?? 0), hwm: Number((r as { hwm?: number }).hwm ?? 0) };
     },
+    async checkPreconditions({ action, args }) {
+      return o.svc.checkPreconditions(action, args);
+    },
     async notify({ kind, subject, body, ref }) {
       await o.store.append([{ type: 'BusinessNotification', objectType: 'Notification', objectId: ref, payload: { kind, subject, body } }]);
     },

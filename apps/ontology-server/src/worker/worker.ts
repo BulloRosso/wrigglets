@@ -24,6 +24,8 @@ export interface WorkerConfig {
   msPerSimDay: number;
   releaseAfterMs: number;
   approvalReminderMs: number;
+  dueDiligencePollMs?: number;
+  dueDiligenceReminderMs?: number;
   approvalExpireMs: number;
   dispatchIntervalMs: number;
   lakeFlushEvery: string;
@@ -81,7 +83,7 @@ export async function startBusinessWorker(o: { cfg: WorkerConfig; svc: OntologyS
   let cursor = Number((await o.pool.query<{ seq: string }>("SELECT seq FROM dispatch_cursor WHERE id = 'business'")).rows[0]?.seq ?? (await o.store.stats()).maxSeq);
   const save = () => o.pool.query("INSERT INTO dispatch_cursor (id, seq) VALUES ('business', $1) ON CONFLICT (id) DO UPDATE SET seq = EXCLUDED.seq, updated_at = now()", [cursor]);
   await save();
-  const dcfg = { today: cfg.today, msPerSimDay: cfg.msPerSimDay, releaseAfterMs: cfg.releaseAfterMs, approvalReminderMs: cfg.approvalReminderMs, approvalExpireMs: cfg.approvalExpireMs };
+  const dcfg = { today: cfg.today, msPerSimDay: cfg.msPerSimDay, releaseAfterMs: cfg.releaseAfterMs, approvalReminderMs: cfg.approvalReminderMs, approvalExpireMs: cfg.approvalExpireMs, dueDiligencePollMs: cfg.dueDiligencePollMs, dueDiligenceReminderMs: cfg.dueDiligenceReminderMs };
   let stopping = false;
   const loop = async () => {
     while (!stopping) {
@@ -98,7 +100,9 @@ export async function startBusinessWorker(o: { cfg: WorkerConfig; svc: OntologyS
                 if (!(err instanceof WorkflowExecutionAlreadyStartedError)) throw err;
               }
             } else {
+              const only = c.idPattern ? new RegExp(c.idPattern) : undefined;
               for await (const w of client.workflow.list({ query: c.query })) {
+                if (only && !only.test(w.workflowId)) continue;
                 await client.workflow.getHandle(w.workflowId).signal(c.signal, c.payload).catch((err: unknown) => log.warn({ err: String(err), workflowId: w.workflowId }, 'signal failed'));
               }
             }

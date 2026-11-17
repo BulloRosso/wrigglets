@@ -152,6 +152,15 @@ export class ConfigRepoService {
     }
   }
 
+  /** Uninstall with delete data (the files are removed by the caller): forget everything held in memory. */
+  async reset() {
+    return this.serial(async () => {
+      this.meta = { applied: null, lastReconcile: null, proposals: [] };
+      this.forge = undefined;
+      this.lastRunAt = undefined;
+    });
+  }
+
   private async persist() {
     await mkdir(this.dir, { recursive: true });
     await writeFile(`${this.metaFile}.tmp`, JSON.stringify(this.meta, null, 2));
@@ -462,6 +471,15 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     const f = this.forge;
     if (!f) return 0;
     let n = 0;
+    // proposals made while the host was not reachable (or before it was set up) get their pull request now
+    for (const p of this.meta.proposals.filter((x) => x.status === 'pending' && !x.pr)) {
+      try {
+        await this.openPullRequest(p);
+        n++;
+      } catch {
+        return n; // host not ready: try again next run
+      }
+    }
     for (const p of this.meta.proposals.filter((x) => x.status === 'pending' && x.pr)) {
       let pr: (PullRequest & { merge_commit_sha?: string }) | undefined;
       try {
@@ -614,6 +632,11 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
   }
 
   /** A person decides. Approve = owners satisfied, not the requester, valid on top of the current main → merge commit. */
+  /**
+   * Local review without a Git host: owners from OWNERS.yaml, not the requester, re-validated on main. There is no
+   * console route for it any more (proposals are reviewed on the Git host, user decision 2026-11-17); the merge rules it
+   * implements are kept and unit-tested, and the Git host enforces the same rules through CODEOWNERS and protection.
+   */
   async decide(id: string, decision: 'approve' | 'reject', person: { email: string; roles: string[] }, comment?: string): Promise<Proposal> {
     const out = await this.serial(async () => {
       const p = this.meta.proposals.find((x) => x.id === id);

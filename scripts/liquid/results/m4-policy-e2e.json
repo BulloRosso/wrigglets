@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:57:18.840Z",
+  "startedAt": "2026-11-17T08:21:58.930Z",
   "checks": [
     {
       "name": "all services running, no OPA container (policy embedded)",
@@ -15,7 +15,7 @@
       "name": "gateway and enterprise core load the same compiled policy (WASM) from the control plane",
       "ok": true,
       "detail": {
-        "revision": "5f5490d482fff669",
+        "revision": "a4263df6e3b7c9f5",
         "files": [
           "liquid/common.rego",
           "liquid/gateway.rego",
@@ -31,7 +31,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "02:57:26 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 02:57:26 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+      "detail": "09:22:06 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 09:22:06 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
     },
     {
       "name": "a read through gateway + embedded policy works",
@@ -79,9 +79,9 @@
     {
       "name": "policy decisions are in the event log (gateway and core)",
       "ok": true,
-      "detail": "10 decisions, e.g. policy: cancel_purchase_order is destructive: it needs an approved plan"
+      "detail": "11 decisions, e.g. policy: cancel_purchase_order is destructive: it needs an approved plan"
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:57:59.646Z"
+  "finishedAt": "2026-11-17T08:22:38.081Z"
 }

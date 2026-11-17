@@ -62,6 +62,10 @@ Each failure was invisible until a check tripped over it.
 
 ## Not decided here (needs the operator)
 
+*Decided on 2026-11-17, implemented in M10 ([ADR-0052](0052-acceptance-core-checks-workflow-v2.md)):
+delete data removes the control plane's Liquid data, without archive; Forgejo joins the compose overlay and the console
+review is dropped; a simulation reset withdraws pending four-eyes approvals.*
+
 - **Purge scope.** *Uninstall → delete data* removes the extension's volumes and secrets but keeps `DATA_DIR/liquid`:
   the config repository, proposals and the app registry. A reinstall therefore inherits the desired state, and the
   health view and the settling of proposals keep that consistent. Whether purge should also archive and remove it is

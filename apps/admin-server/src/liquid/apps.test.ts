@@ -93,4 +93,15 @@ describe('app registry (ADR-0050)', () => {
     expect((await reg.disable('supplier-dd', 'admin@example.local')).status).toBe('disabled');
     expect(clients.size).toBe(0);
   });
+
+  it('purge (uninstall with delete data): every OIDC client goes, the registry and its files are empty', async () => {
+    await reg.register(input(), 'admin@example.local');
+    await reg.activate('supplier-dd', 'admin@example.local');
+    expect(await reg.purge()).toBe(1);
+    expect(clients.size).toBe(0);
+    expect(reg.list()).toEqual([]);
+    await expect(stat(path.join(dir, 'liquid', 'apps'))).rejects.toThrow();
+    await reg.load();
+    expect(reg.list()).toEqual([]);
+  });
 });

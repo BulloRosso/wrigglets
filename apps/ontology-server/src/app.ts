@@ -213,6 +213,15 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/policy/engine', (_req, res) => res.json(d.engine ?? { loaded: false }));
+  // core checks of an action without running it, and the shadow replay of a precondition (D3, M10)
+  internal.post('/actions/:name/check', (req, res) => res.json(d.svc.checkPreconditions(String(req.params.name), (req.body ?? {}) as Record<string, unknown>)));
+  internal.post(
+    '/shadow/precondition',
+    wrap(async (req, res) => {
+      const b = z.object({ action: z.string().min(1), precondition: z.string().min(1), windowMs: z.number().int().min(60_000).max(90 * 86_400_000).optional(), assume: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.unknown()))).optional() }).parse(req.body ?? {});
+      res.json(await d.svc.shadowPrecondition(b));
+    }),
+  );
   /** Health of the core's part of the control loop (ADR-0051): dispatcher and lake lag, policy engine, ontology. */
   internal.get(
     '/health/loop',

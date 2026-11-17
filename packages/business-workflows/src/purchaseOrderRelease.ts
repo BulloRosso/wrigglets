@@ -1,4 +1,4 @@
-import { condition, defineQuery, defineSignal, proxyActivities, setHandler, upsertSearchAttributes, workflowInfo } from '@temporalio/workflow';
+import { condition, defineQuery, defineSignal, patched, proxyActivities, setHandler, upsertSearchAttributes, workflowInfo } from '@temporalio/workflow';
 import { BSA, objectRef, type BusinessActivities } from './common.js';
 import { holdable } from './hold.js';
 
@@ -7,7 +7,13 @@ import { holdable } from './hold.js';
  *   awaiting_release (release window) → (hold?) → release (action release_purchase_order) → awaiting_delivery (timer until the ETA in
  *   simulated days) → received | late | cancelled.
  * `cancel` (signalled by cancel_purchase_order) ends it at any point. While held, nothing is released.
- * Versioning: changes that alter the command sequence use patched() (v2 for D3 adds a wait-for-statement step, M8).
+ * Versioning: changes that alter the command sequence use patched().
+ *
+ * v2 (D3, M10): when the ontology in force puts the precondition `due_diligence_for_high_risk_material` on
+ * release_purchase_order, the dispatcher starts the workflow with `dueDiligence`. Before releasing, the workflow then
+ * waits while the release would be refused (state awaiting_due_diligence), checks again every `dueDiligencePollMs`
+ * and reminds once after `dueDiligenceReminderMs`. Workflows started before the change carry no flag and finish on v1;
+ * the patch marker keeps the histories of both replayable.
  */
 
 export interface PurchaseOrderReleaseInput {
@@ -24,6 +30,10 @@ export interface PurchaseOrderReleaseInput {
   releaseAfterMs: number;
   /** seq of the event that started the workflow. */
   eventSeq: number;
+  /** v2: wait for a due-diligence statement before releasing (set by the dispatcher from the ontology in force). */
+  dueDiligence?: boolean;
+  dueDiligencePollMs?: number;
+  dueDiligenceReminderMs?: number;
 }
 
 export interface PurchaseOrderReleaseResult {
@@ -34,7 +44,7 @@ export interface PurchaseOrderReleaseResult {
 }
 
 export const cancelSignal = defineSignal<[{ reason?: string }]>('cancel');
-export const releaseStateQuery = defineQuery<{ poId: string; state: string; releasedSeq?: number }>('releaseState');
+export const releaseStateQuery = defineQuery<{ poId: string; state: string; releasedSeq?: number; version: 1 | 2 }>('releaseState');
 
 const acts = proxyActivities<BusinessActivities>({ startToCloseTimeout: '30 seconds', retry: { maximumAttempts: 10, initialInterval: '2 seconds' } });
 
@@ -52,7 +62,8 @@ export async function PurchaseOrderRelease(input: PurchaseOrderReleaseInput): Pr
   setHandler(cancelSignal, () => {
     cancelled = true;
   });
-  setHandler(releaseStateQuery, () => ({ poId: input.poId, state, releasedSeq }));
+  const version: 1 | 2 = input.dueDiligence ? 2 : 1;
+  setHandler(releaseStateQuery, () => ({ poId: input.poId, state, releasedSeq, version }));
   upsertSearchAttributes([{ key: BSA.OntologyObjects, value: [objectRef('PurchaseOrder', input.poId), objectRef('Supplier', input.supplierId), objectRef('Material', input.sku)] }]);
   set('awaiting_release');
 
@@ -62,6 +73,29 @@ export async function PurchaseOrderRelease(input: PurchaseOrderReleaseInput): Pr
   if (cancelled) {
     set('cancelled');
     return { poId: input.poId, outcome: 'cancelled' };
+  }
+  if (input.dueDiligence && patched('due-diligence-gate')) {
+    const since = Date.now();
+    let reminded = false;
+    for (;;) {
+      const c = await acts.checkPreconditions({ action: 'release_purchase_order', args: { poId: input.poId } });
+      if (c.ok) break;
+      set('awaiting_due_diligence');
+      if (!reminded && Date.now() - since >= (input.dueDiligenceReminderMs ?? 4 * 3_600_000)) {
+        await acts.notify({ kind: 'due_diligence_missing', subject: `${input.poId} waits for a due-diligence statement`, body: `Purchase order ${input.poId} (${input.qty} ${input.sku} from ${input.supplierId}) is not released: ${c.reasons.join('; ')}`, ref: input.poId });
+        reminded = true;
+      }
+      await condition(() => cancelled, input.dueDiligencePollMs ?? 60_000);
+      if (cancelled) {
+        set('cancelled');
+        return { poId: input.poId, outcome: 'cancelled' };
+      }
+    }
+    await condition(() => cancelled || !h.isHeld()); // a hold placed meanwhile still stops the release
+    if (cancelled) {
+      set('cancelled');
+      return { poId: input.poId, outcome: 'cancelled' };
+    }
   }
   const rel = await acts.runAction({ action: 'release_purchase_order', args: { poId: input.poId }, caller: { workflow: workflowInfo().workflowId } });
   if (!rel.ok) {

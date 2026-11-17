@@ -145,6 +145,20 @@ export class LiquidPolicyService {
    * The policy package: WASM (compiled when the Rego changed) + data. Compile errors keep the last good WASM: a broken
    * policy never replaces a working one (proposals validate with opa check/test before they can be approved).
    */
+  /**
+   * Waits until the given consumers fetched the current package (built now from the current data). The reconciler
+   * calls it after an ontology change: "live" then means every enforcement point knows the new actions (ADR-0052).
+   */
+  async waitConverged(consumers: string[], timeoutMs = 30_000): Promise<boolean> {
+    const rev = (await this.package()).revision;
+    const until = Date.now() + timeoutMs;
+    while (Date.now() < until) {
+      if (consumers.every((c) => this.fetches.get(c)?.revision === rev)) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  }
+
   async package(): Promise<PolicyPackage> {
     try {
       this.ontologyData = (await this.fetchOntologyData()) ?? this.ontologyData;

@@ -54,6 +54,10 @@ export interface OverlayOptions {
   active: boolean;
   /** Secret values from the environment in overlay mode, by secret name. */
   secrets: Record<string, string | undefined>;
+  /** Container names of the overlay's services: <prefix><service> (e.g. cw-liquid-). */
+  containerPrefix?: string;
+  /** Bootstrap steps the control plane runs itself in overlay mode (idempotent, retried until they succeed). */
+  bootstrap?: string[];
 }
 
 interface Registered {
@@ -367,12 +371,40 @@ export class ExtensionService {
     if (hook) setImmediate(() => void Promise.resolve(hook(id, op.kind, op.by)).catch((err: unknown) => logger.warn({ extension: id, err: String(err) }, 'onOperationDone failed')));
   }
 
+  /** Uninstall with delete data: removes what the extension keeps in the control plane (no archive). */
+  onPurgeData?: (id: string) => Promise<void>;
+
   /** Called after an install/repair/uninstall finished (e.g. to record owned upstreams in the config repository). */
   onOperationDone?: (id: string, kind: ExtensionOperation['kind'], by: string) => Promise<unknown> | undefined;
 
   /** An install/repair/uninstall is running right now. */
   busy(id: string): boolean {
     return this.running.has(id);
+  }
+
+  /**
+   * Overlay mode (compose): nobody presses Install, so the bootstrap steps the overlay declares run here — idempotent,
+   * retried with backoff until each succeeded (the services start in parallel with the control plane).
+   */
+  async bootstrapOverlay(id: string, opts: { attempts?: number; delayMs?: number } = {}): Promise<string[]> {
+    const { handlers, overlay } = this.reg(id);
+    if (!overlay.active) return [];
+    const done: string[] = [];
+    for (const step of overlay.bootstrap ?? []) {
+      const handler = handlers[step];
+      if (!handler) throw new ExtensionError(500, `no handler for bootstrap step ${step}`);
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await handler(this.context(id));
+          done.push(step);
+          break;
+        } catch (err) {
+          if (attempt >= (opts.attempts ?? 60)) throw new ExtensionError(500, `overlay bootstrap ${step} failed: ${(err as Error).message}`);
+          await new Promise((r) => setTimeout(r, opts.delayMs ?? 5000));
+        }
+      }
+    }
+    return done;
   }
 
   private context(id: string): BootstrapContext {
@@ -386,6 +418,8 @@ export class ExtensionService {
       url: (service) => this.url(id, service),
       exec: async (service, cmd, user) => {
         if (!this.runtime) throw new Error('no container runtime');
+        const ov = this.reg(id).overlay;
+        if (ov.active && ov.containerPrefix && this.runtime.execIn) return this.runtime.execIn(`${ov.containerPrefix}${service}`, cmd, user);
         return this.runtime.exec(id, service, cmd, user);
       },
       host: (service) => service,
@@ -493,6 +527,11 @@ export class ExtensionService {
       // declared volumes and those of services an earlier version had (labelled for this extension)
       const all = new Set([...m.services.flatMap((s) => s.volumes.map((x) => x.name)), ...((await rt.listVolumes?.(id).catch(() => [])) ?? [])]);
       for (const v of all) await rt.removeVolume(id, v);
+      return;
+    }
+    if (step.id === 'control-plane-data') {
+      // what the extension keeps in the control plane (e.g. Liquid: config repository, proposals, app registry)
+      await this.onPurgeData?.(id);
       return;
     }
     if (step.id === 'secrets') {

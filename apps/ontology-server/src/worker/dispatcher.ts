@@ -7,7 +7,8 @@ import { BSA, objectRef, type ApprovalInput, type PurchaseOrderReleaseInput } fr
  *   - an action with `starts_workflow` (ontology) → start that workflow
  *   - an action with `signals_workflow` → signal the running workflows of the action's object
  *   - ActionApprovalRequested (four eyes, ADR-0044) → start an ApprovalWorkflow
- *   - SimulationReset → cancel the running PurchaseOrderRelease workflows (their orders belong to the old world)
+ *   - SimulationReset → cancel the running PurchaseOrderRelease workflows and withdraw pending four-eyes approvals
+ *     (they belong to the old world)
  */
 
 export interface DispatchEvent {
@@ -30,6 +31,7 @@ export interface IrActionLite {
   startsWorkflow?: string;
   signalsWorkflow?: { workflow: string; signal: string };
   input: Array<{ name: string; range: string; rangeKind: string; multivalued: boolean }>;
+  preconditions?: string[];
 }
 
 export interface DispatchConfig {
@@ -38,11 +40,14 @@ export interface DispatchConfig {
   releaseAfterMs: number;
   approvalReminderMs: number;
   approvalExpireMs: number;
+  /** v2 gate of PurchaseOrderRelease (D3): re-check interval and reminder delay. */
+  dueDiligencePollMs?: number;
+  dueDiligenceReminderMs?: number;
 }
 
 export type Command =
   | { kind: 'start'; workflowType: string; workflowId: string; args: unknown[]; objects: string[] }
-  | { kind: 'signal'; workflowType: string; query: string; signal: string; payload: unknown };
+  | { kind: 'signal'; workflowType: string; query: string; signal: string; payload: unknown; /** only workflow ids matching this pattern */ idPattern?: string };
 
 type Row = Record<string, unknown>;
 const changeOf = (e: DispatchEvent, cls: string, id: string): Row | undefined =>
@@ -81,6 +86,9 @@ export function commandsFor(e: DispatchEvent, actions: Map<string, IrActionLite>
   // get the same ids (PO numbering restarts) — they are cancelled; they write nothing on cancel
   if (e.type === 'SimulationReset') {
     out.push({ kind: 'signal', workflowType: 'PurchaseOrderRelease', query: "WorkflowType = 'PurchaseOrderRelease' AND ExecutionStatus = 'Running'", signal: 'cancel', payload: { reason: `simulation reset (event ${e.seq})` } });
+    // pending four-eyes approvals of actions of the old world are withdrawn (ids from their request event: a uuid);
+    // playbook steps (ApprovalWorkflow-<run>-<step>) and wiki proposals (ApprovalWorkflow-wiki-…) stay
+    out.push({ kind: 'signal', workflowType: 'ApprovalWorkflow', query: "WorkflowType = 'ApprovalWorkflow' AND ExecutionStatus = 'Running'", signal: 'withdraw', payload: { reason: `simulation reset (event ${e.seq}): the request belongs to the replaced world` }, idPattern: '^ApprovalWorkflow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' });
     return out;
   }
   const a = e.action ? actions.get(e.action) : undefined;
@@ -88,7 +96,9 @@ export function commandsFor(e: DispatchEvent, actions: Map<string, IrActionLite>
   if (a.startsWorkflow === 'PurchaseOrderRelease') {
     const po = changeOf(e, 'PurchaseOrder', e.objectId);
     if (po) {
-      const input: PurchaseOrderReleaseInput = { poId: e.objectId, supplierId: String(po.supplier), sku: String(po.sku), qty: Number(po.qty), eta: String(po.eta), today: cfg.today, msPerSimDay: cfg.msPerSimDay, releaseAfterMs: cfg.releaseAfterMs, eventSeq: e.seq };
+      // v2 (D3): the ontology in force puts the due-diligence check on the release → the workflow waits for it
+      const dueDiligence = (actions.get('release_purchase_order')?.preconditions ?? []).includes('due_diligence_for_high_risk_material');
+      const input: PurchaseOrderReleaseInput = { poId: e.objectId, supplierId: String(po.supplier), sku: String(po.sku), qty: Number(po.qty), eta: String(po.eta), today: cfg.today, msPerSimDay: cfg.msPerSimDay, releaseAfterMs: cfg.releaseAfterMs, eventSeq: e.seq, ...(dueDiligence ? { dueDiligence, dueDiligencePollMs: cfg.dueDiligencePollMs, dueDiligenceReminderMs: cfg.dueDiligenceReminderMs } : {}) };
       out.push({ kind: 'start', workflowType: 'PurchaseOrderRelease', workflowId: `PurchaseOrderRelease-${e.eventId}`, args: [input], objects: [objectRef('PurchaseOrder', input.poId), objectRef('Supplier', input.supplierId), objectRef('Material', input.sku)] });
     }
   } else if (a.startsWorkflow) {

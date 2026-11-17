@@ -43,6 +43,9 @@ const env = z
     SIM_TODAY: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default('2026-10-05'),
     MS_PER_SIM_DAY: z.coerce.number().int().min(0).default(20_000),
     RELEASE_AFTER_MS: z.coerce.number().int().min(0).default(30_000),
+    // v2 gate of PurchaseOrderRelease (D3): demo pace; in production minutes and days
+    DUE_DILIGENCE_POLL_MS: z.coerce.number().int().min(1000).default(5000),
+    DUE_DILIGENCE_REMINDER_MS: z.coerce.number().int().min(1000).default(20_000),
     APPROVAL_REMINDER_MS: z.coerce.number().int().min(1000).default(4 * 3_600_000),
     APPROVAL_EXPIRE_MS: z.coerce.number().int().min(1000).default(7 * 86_400_000),
     DISPATCH_INTERVAL_MS: z.coerce.number().int().min(200).default(2000),
@@ -106,7 +109,7 @@ if (env.FLUSH_INTERVAL_SEC > 0) {
 const business =
   env.BUSINESS_WORKER === 'on'
     ? await startBusinessWorker({
-        cfg: { temporalAddress: env.TEMPORAL_ADDRESS, controlPlaneUrl: env.CONTROL_PLANE_URL, playbookToken: env.PLAYBOOK_TOKEN, today: env.SIM_TODAY, msPerSimDay: env.MS_PER_SIM_DAY, releaseAfterMs: env.RELEASE_AFTER_MS, approvalReminderMs: env.APPROVAL_REMINDER_MS, approvalExpireMs: env.APPROVAL_EXPIRE_MS, dispatchIntervalMs: env.DISPATCH_INTERVAL_MS, lakeFlushEvery: env.LAKE_FLUSH_EVERY, flushGraceMs: env.FLUSH_GRACE_SEC * 1000 },
+        cfg: { temporalAddress: env.TEMPORAL_ADDRESS, controlPlaneUrl: env.CONTROL_PLANE_URL, playbookToken: env.PLAYBOOK_TOKEN, today: env.SIM_TODAY, msPerSimDay: env.MS_PER_SIM_DAY, releaseAfterMs: env.RELEASE_AFTER_MS, dueDiligencePollMs: env.DUE_DILIGENCE_POLL_MS, dueDiligenceReminderMs: env.DUE_DILIGENCE_REMINDER_MS, approvalReminderMs: env.APPROVAL_REMINDER_MS, approvalExpireMs: env.APPROVAL_EXPIRE_MS, dispatchIntervalMs: env.DISPATCH_INTERVAL_MS, lakeFlushEvery: env.LAKE_FLUSH_EVERY, flushGraceMs: env.FLUSH_GRACE_SEC * 1000 },
         svc,
         store,
         lake,

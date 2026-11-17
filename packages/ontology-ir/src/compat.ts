@@ -56,7 +56,9 @@ function actionChange(c: IrChange, f: CompatFinding[]) {
   const a = c.before as IrAction;
   const b = c.after as IrAction;
   for (const field of c.fields ?? []) {
-    if (field === 'description' || field === 'deprecated' || field === 'preconditions') f.push({ level: 'patch', path: c.path, reason: `${field} changed` });
+    if (field === 'description' || field === 'deprecated') f.push({ level: 'patch', path: c.path, reason: `${field} changed` });
+    // a precondition changes behaviour (calls that worked may now be refused, or the reverse): reviewed as minor (D3)
+    else if (field === 'preconditions') f.push({ level: 'minor', path: c.path, reason: 'preconditions changed (behaviour of the action)' });
     else if (field === 'input') {
       for (const i of a.input) {
         const j = b.input.find((x) => x.name === i.name);

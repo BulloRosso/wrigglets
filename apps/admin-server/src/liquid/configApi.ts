@@ -94,16 +94,7 @@ export function liquidConfigRouter(ext: ExtensionService, d: LiquidConfigDeps, b
     }),
   );
   r.post('/liquid/proposals/:id/revalidate', h(async (req, res) => res.json(await d.repo.revalidate(String(req.params.id)))));
-  r.post(
-    '/liquid/proposals/:id/decide',
-    h(async (req, res) => {
-      const decision = req.body?.decision;
-      if (decision !== 'approve' && decision !== 'reject') throw new HttpError(400, 'decision must be approve or reject');
-      const p = await d.repo.decide(String(req.params.id), decision, person(req), str(req.body?.comment, 2000));
-      await d.audit?.write({ by: by(req), action: `liquid.proposal.${decision}`, target: p.id, details: { paths: p.paths, mergedAs: p.mergedAs, comment: p.comment } });
-      res.json(p);
-    }),
-  );
+  // no console decision (user decision 2026-11-17): proposals are reviewed and merged on the Git host only (ADR-0049)
 
   /* -------------------------------------------------------------------------------- ontology drafts (E2) */
   const compile = async (files: Record<string, string>) => {

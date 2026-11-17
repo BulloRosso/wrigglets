@@ -29,7 +29,7 @@ export const STEP_TYPES = {
   },
   'temporal.hold': { direction: 'tighten', with: z.object({ objects: z.array(z.string()), ref: z.string().min(1), reason: z.string().max(300).optional() }).strict() },
   'entra.revoke_scope': { direction: 'tighten', with: z.object({ agent: z.string().min(1), upstream: z.string().min(1) }).strict() },
-  notify: { direction: 'neutral', with: z.object({ subject: z.string().min(1).max(200), body: z.string().max(4000).optional() }).strict() },
+  notify: { direction: 'neutral', with: z.object({ subject: z.string().min(1).max(200), body: z.string().max(4000).optional(), to: z.array(z.string().email()).max(20).optional() }).strict() },
   'shadow.replay': { direction: 'neutral', with: z.object({ window: z.string().regex(/^\d+(m|h|d)$/).default('7d'), candidate: z.record(z.string(), z.unknown()).optional() }).strict() },
   'agent.task': { direction: 'neutral', with: z.object({ agent: z.string().min(1), prompt: z.string().max(8000).optional(), approval: z.enum(['plan', 'none']).default('plan') }).strict() },
   'config.propose': { direction: 'neutral', with: z.object({ title: z.string().min(3).max(140), reason: z.string().min(3).max(4000), changes: z.array(z.object({ path: z.string(), content: z.string().nullable() })).min(1) }).strict() },

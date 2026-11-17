@@ -36,7 +36,7 @@ export function uninstallSteps(m: ExtensionManifest, opts: { purgeData: boolean 
       .reverse()
       .map((s) => ({ id: `service:${s.name}`, label: `Remove ${s.name}` })),
     { id: 'orphans', label: 'Remove leftover containers of this extension' },
-    ...(opts.purgeData ? [{ id: 'volumes', label: 'Delete data volumes' }, { id: 'secrets', label: 'Delete secrets' }] : []),
+    ...(opts.purgeData ? [{ id: 'volumes', label: 'Delete data volumes' }, { id: 'control-plane-data', label: 'Delete its data in the control plane' }, { id: 'secrets', label: 'Delete secrets' }] : []),
   ];
 }
 

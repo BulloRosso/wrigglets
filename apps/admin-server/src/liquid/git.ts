@@ -167,6 +167,12 @@ export class GitRepo {
       });
   }
 
+  /** a is an ancestor of (or equal to) b. */
+  async isAncestor(a: string, b: string): Promise<boolean> {
+    const { code } = await this.run(['merge-base', '--is-ancestor', a, b], { okCodes: [1] });
+    return code === 0;
+  }
+
   async deleteRef(ref: string): Promise<void> {
     await this.run(['update-ref', '-d', ref.startsWith('refs/') ? ref : `refs/heads/${ref}`], { okCodes: [1] });
   }

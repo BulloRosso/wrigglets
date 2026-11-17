@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// M6 check on the running stack (docs/liquid-enterprise-extension.md, exit criteria of M6):
+// M6 check on the running stack (docs/liquid-enterprise-extension.md, exit criteria of M6), with the Git host of
+// ADR-0049: proposals are pull requests on Forgejo, the reviewer approves and merges there, the merge is reconciled.
 //   - repair creates the config repository from the running platform, without secrets; main is applied, no drift;
 //   - a console edit becomes a commit on main with the signed-in admin as author;
 //   - an agent proposes an allow-list change through the MCP upstream "config"; it is validated; after approval it takes
@@ -24,6 +25,27 @@ let s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
 const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 const AGENT = 'sofa-max';
+// the reviewer account of the local Git host (its password is an extension secret of the control plane)
+const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
+const FORGE = 'http://localhost:3300/api/v1';
+const forge = async (method, p, body, user = 'reviewer', password = secrets.forgejo_reviewer_password) => {
+  const init = { method, headers: { authorization: `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined };
+  // a fresh Git host occasionally drops a connection while it indexes: retry network errors (not HTTP errors)
+  let res;
+  for (let i = 0; ; i++) {
+    try {
+      res = await fetch(`${FORGE}${p}`, init);
+      break;
+    } catch (err) {
+      if (i >= 4) throw err;
+      log(`Git host: ${String(err)} — retrying ${method} ${p}`);
+      await sleep(1000 * (i + 1));
+    }
+  }
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+};
+const prStatus = async (sha) => (await forge('GET', `/repos/liquid/config/commits/${sha}/status`)).body?.state;
 const glob = (p) => new RegExp(`^${p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
 
 function agentCall(agent, tool, a) {
@@ -57,6 +79,13 @@ let original;
 const opened = [];
 try {
   await signIn();
+  // earlier runs provoke refused calls on purpose; the safety rule "tool-denials" may have switched the agent's tools
+  // off — resetting a kill switch is a person's action (logged), done here explicitly so the run starts clean
+  const ks = (await api('GET', '/killswitch')).state ?? {};
+  if (ks.agents?.[AGENT] && ks.agents[AGENT].level !== 'normal') {
+    log(`kill switch of ${AGENT} was ${ks.agents[AGENT].level} (${ks.agents[AGENT].reason}): reset by the test operator`);
+    await api('PUT', `/agents/${AGENT}/killswitch`, { level: 'normal', reason: 'reset for the e2e run' });
+  }
   const st0 = await api('GET', '/liquid/config');
   check('config repository initialised from the running platform; main applied, no drift', st0.initialized && st0.inSync && st0.drift.length === 0, { head: st0.head?.slice(0, 12), files: st0.files.length });
   check('layout: gateway, safety, agents, policies, ontology, OWNERS', ['gateway/upstreams.yaml', 'gateway/allow-lists.yaml', 'safety/rules.yaml', `agents/${AGENT}.yaml`, 'policies/liquid/object.rego', 'policies/liquid/overlays.yaml', 'ontology/sofa/schema.yaml', 'OWNERS.yaml'].every((f) => st0.files.includes(f)));
@@ -95,38 +124,52 @@ try {
   check('agent proposal is validated immediately', prop.valid === true && prop.status === 'pending', { id: prop.id, approvers: prop.approvers });
   const p1 = await api('GET', `/liquid/proposals/${prop.id}`);
   check('proposal: author agent, one file, diff with the new line', p1.author.kind === 'agent' && p1.author.id === AGENT && p1.paths.join() === 'gateway/allow-lists.yaml' && p1.diff.includes(`+    - ${target}`));
+  const pr = (await forge('GET', `/repos/liquid/config/pulls/${p1.pr?.number}`)).body;
+  check('it is a pull request on the Git host with the required check liquid/validate = success', pr?.state === 'open' && (await prStatus(p1.head)) === 'success', { pr: p1.pr?.url });
+  const consoleDecide = await api('POST', `/liquid/proposals/${prop.id}/decide`, { decision: 'approve' }).then(() => 'decided', (e) => String(e));
+  check('the console no longer decides: review and merge happen on the Git host', /409|Git host/.test(consoleDecide), consoleDecide.slice(0, 100));
 
   // 3. invalid proposals cannot be approved; a broken policy is caught by opa check
   const bad = JSON.parse(agentCall(AGENT, 'config__propose_change', { title: 'broken allow-list', reason: 'typo test', changes: [{ path: 'gateway/allow-lists.yaml', content: 'allowedTools: [1\n' }] }).text);
   opened.push(bad.id);
-  const badApprove = await api('POST', `/liquid/proposals/${bad.id}/decide`, { decision: 'approve' }).then(() => 'approved', (e) => String(e));
-  check('an invalid proposal cannot be approved', bad.valid === false && /422|does not validate/.test(badApprove), badApprove.slice(0, 120));
-  await api('POST', `/liquid/proposals/${bad.id}/decide`, { decision: 'reject', comment: 'invalid' });
+  const badP = await api('GET', `/liquid/proposals/${bad.id}`);
+  await forge('POST', `/repos/liquid/config/pulls/${badP.pr.number}/reviews`, { event: 'APPROVED', body: 'looks fine (e2e)' });
+  const badMerge = await forge('POST', `/repos/liquid/config/pulls/${badP.pr.number}/merge`, { Do: 'merge' });
+  check('an invalid proposal cannot be merged: required check failed (branch protection)', bad.valid === false && (await prStatus(badP.head)) === 'failure' && badMerge.status >= 400, { status: badMerge.status });
+  await forge('PATCH', `/repos/liquid/config/pulls/${badP.pr.number}`, { state: 'closed' });
   const common = await api('GET', '/liquid/config/file?path=policies/liquid/common.rego');
   const regoBad = await api('POST', '/liquid/proposals', { title: 'Broken policy (e2e)', reason: 'checks that opa check runs before review', changes: [{ path: 'policies/liquid/common.rego', content: `${common.content}\nbroken if {\n` }] });
   opened.push(regoBad.id);
   const regoCheck = regoBad.validation.checks.find((c) => c.name.startsWith('policies'));
   check('a broken policy fails opa check before anyone reviews it', regoCheck && !regoCheck.ok, regoCheck?.errors?.[0]?.message?.split('\n')[0]);
-  await api('POST', `/liquid/proposals/${regoBad.id}/decide`, { decision: 'reject', comment: 'e2e' });
+  await forge('PATCH', `/repos/liquid/config/pulls/${regoBad.pr.number}`, { state: 'closed' });
 
   if (!args.has('--no-shots')) await shot(`/liquid/proposals/${prop.id}`, 'liquid-proposals', 1300);
 
-  // 4. approve → effective within one reconcile cycle
+  // 4. the reviewer approves and merges on the Git host → webhook → reconcile
   const t0 = Date.now();
-  const ok = await api('POST', `/liquid/proposals/${prop.id}/decide`, { decision: 'approve', comment: 'ok for read-only customer data' });
-  check('approved by the owner (Platform.Admin), merged into main', ok.status === 'approved' && !!ok.mergedAs, ok.mergedAs?.slice(0, 12));
+  const review = await forge('POST', `/repos/liquid/config/pulls/${p1.pr.number}/reviews`, { event: 'APPROVED', body: 'ok for this tool (e2e)' });
+  const merge = await forge('POST', `/repos/liquid/config/pulls/${p1.pr.number}/merge`, { Do: 'merge', merge_message_field: `${p1.title} (proposal ${p1.id})` });
+  check('the reviewer (team reviewers, CODEOWNERS) approves and merges on the Git host', review.status < 300 && merge.status < 300, { review: review.status, merge: merge.status });
+  const ok = await until('proposal marked approved by the webhook', async () => {
+    const x = await api('GET', `/liquid/proposals/${prop.id}`);
+    return x.status === 'approved' ? x : undefined;
+  }, 30_000, 1000);
+  check('the merge arrives as a webhook: proposal approved, decided by the reviewer', ok.decidedBy === 'reviewer', ok.decidedBy);
   await until('allow-list applied', async () => ((await api('GET', `/agents/${AGENT}/tools`)).allowedTools.includes(target) ? true : undefined), 70_000, 1000);
   await until('gateway lists the tool for the agent', async () => (agentTools(AGENT).includes(target) ? true : undefined), 60_000, 2000);
   check(`after approval the gateway offers ${target} to the agent (${Math.round((Date.now() - t0) / 1000)} s)`, agentTools(AGENT).includes(target));
   const status = JSON.parse(agentCall(AGENT, 'config__get_proposal', { id: prop.id }).text);
-  check('the agent sees the decision', status.status === 'approved' && status.decidedBy === env.BOOTSTRAP_ADMIN_EMAIL, status);
+  check('the agent sees the decision', status.status === 'approved' && status.decidedBy === 'reviewer', status);
 
   // 5. rejection leaves main unchanged
   const head = (await api('GET', '/liquid/config')).head;
   const rej = JSON.parse(agentCall(AGENT, 'config__propose_change', { title: `${AGENT} may call every tool`, reason: 'convenience', changes: [{ path: 'gateway/allow-lists.yaml', content: proposed.replace(`    - ${target}`, `    - "*"`) }] }).text);
   opened.push(rej.id);
-  await api('POST', `/liquid/proposals/${rej.id}/decide`, { decision: 'reject', comment: 'too broad' });
-  await sleep(1500);
+  const rejP = await api('GET', `/liquid/proposals/${rej.id}`);
+  await forge('POST', `/repos/liquid/config/issues/${rejP.pr.number}/comments`, { body: 'too broad (e2e)' });
+  await forge('PATCH', `/repos/liquid/config/pulls/${rejP.pr.number}`, { state: 'closed' });
+  await until('proposal marked rejected', async () => ((await api('GET', `/liquid/proposals/${rej.id}`)).status === 'rejected' ? true : undefined), 30_000, 1000);
   check('rejection leaves main unchanged', (await api('GET', '/liquid/config')).head === head && !(await api('GET', `/agents/${AGENT}/tools`)).allowedTools.includes('*'));
 
   // 6. ontology editor: draft → validate → proposal with diff graph (rejected afterwards: live apply is M8)
@@ -143,11 +186,16 @@ try {
   const badOp = await api('POST', `/liquid/ontology/drafts/${dr.id}/ops`, { ops: [{ op: 'add_link', from: 'Carrier', attribute: 'x', to: 'Nope' }] }).then(() => 'accepted', (e) => String(e));
   check('an invalid draft operation is rejected', /unknown class Nope/.test(badOp), badOp.slice(0, 80));
   if (!args.has('--no-shots')) await shot(`/liquid/ontology?draft=${dr.id}`, 'liquid-ontology-draft', 900);
+  // E4: a minor change needs the minor version (the editor's "Set <version>" button)
+  await api('POST', `/liquid/ontology/drafts/${dr.id}/ops`, { ops: [{ op: 'set_version', version: v.compat.suggestedVersion }] });
+  const v2 = await api('POST', `/liquid/ontology/drafts/${dr.id}/validate`);
+  check('E4: compatibility minor, the suggested version is set', v2.ok && v2.compat?.level === 'minor' && v2.compat.versionOk, v2.compat?.suggestedVersion);
   const op = await api('POST', `/liquid/ontology/drafts/${dr.id}/submit`, { title: 'Carrier for purchase orders', reason: 'Deliveries are late because of carriers, not suppliers; we need to see which carrier delivers.' });
   opened.push(op.id);
   check('submitted as a proposal: compiled, with ontology diff and owners', op.validation.ok && op.irDiff?.classes?.Carrier === 'added' && op.owners.length >= 1, { checks: op.validation.checks.map((c) => `${c.name}=${c.ok}`), owners: op.owners });
+  check('the ontology proposal is a pull request too', !!op.pr?.number, op.pr?.url);
   if (!args.has('--no-shots')) await shot(`/liquid/proposals/${op.id}`, 'liquid-proposal-ontology', 1700);
-  await api('POST', `/liquid/proposals/${op.id}/decide`, { decision: 'reject', comment: 'e2e example; applying ontology changes live is M8' });
+  await forge('PATCH', `/repos/liquid/config/pulls/${op.pr.number}`, { state: 'closed' });
 
   // 7. exit criterion: fresh gateway/safety stores + restart → same behaviour from the repository
   const want = { tools: (await api('GET', `/agents/${AGENT}/tools`)).allowedTools.slice().sort(), rules: (await api('GET', '/safety/rules')).rules.slice().sort((a, b) => a.id.localeCompare(b.id)) };

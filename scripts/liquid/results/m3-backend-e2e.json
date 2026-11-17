@@ -1,23 +1,24 @@
 {
-  "startedAt": "2026-11-16T17:21:54.753Z",
+  "startedAt": "2026-11-17T00:24:42.736Z",
   "checks": [
     {
       "name": "repair applied the new image and registered the owned upstream onto",
       "ok": true,
       "detail": [
-        "onto"
+        "onto",
+        "config"
       ]
     },
     {
       "name": "erp/crm now point at the ontology server",
       "ok": true,
-      "detail": "18:22:09 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp | 18:22:09 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp"
+      "detail": "01:24:50 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp | 01:24:50 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp"
     },
     {
-      "name": "the gateway lists 31 onto__ and 31 erp__/crm__ tools from the ontology server",
+      "name": "the gateway lists 32 onto__ and 31 erp__/crm__ tools from the ontology server",
       "ok": true,
       "detail": {
-        "onto": 31
+        "onto": 32
       }
     },
     {
@@ -41,14 +42,14 @@
       "detail": "325 chars"
     },
     {
-      "name": "exactly one event written (read-only and failed precondition write nothing)",
+      "name": "exactly one business change written (read-only and failed precondition write nothing)",
       "ok": true,
-      "detail": "1 new event(s)"
+      "detail": "1 change event(s), 2 approval(s)"
     },
     {
-      "name": "the event records the agent the gateway verified, the action and its changes",
+      "name": "the event records the agent the gateway verified, the action, its changes and who approved it",
       "ok": true,
-      "detail": "PurchaseOrderCreated|PO-4430|sofa-lara|create_purchase_order|1"
+      "detail": "PurchaseOrderCreated|PO-4430|sofa-lara|create_purchase_order|1|admin@example.local"
     },
     {
       "name": "KPI equals the mock after the same steps",
@@ -63,7 +64,7 @@
       "ok": true,
       "detail": {
         "events": 3,
-        "hash": "3de25de89ef0"
+        "hash": "35f532a7fbcf"
       }
     },
     {
@@ -75,8 +76,8 @@
       "name": "action events reach the lake (flush)",
       "ok": true,
       "detail": {
-        "flush": "{\"flushed\":3,\"hwm\":3003,\"waiting\":0}",
-        "hwm": 3003
+        "flush": "{\"flushed\":11,\"hwm\":1020,\"waiting\":0}",
+        "hwm": 1020
       }
     }
   ],
@@ -103,5 +104,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T17:22:15.665Z"
+  "finishedAt": "2026-11-17T00:24:57.929Z"
 }

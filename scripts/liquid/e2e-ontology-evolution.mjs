@@ -18,6 +18,19 @@ const check = (name, ok, detail) => {
 const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
 const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
+// ADR-0049: proposals are pull requests on the Git host; the reviewer approves and merges there (webhook → reconcile)
+const approve = async (id, comment) => {
+  const p = await api('GET', `/liquid/proposals/${id}`);
+  if (!p.pr) return api('POST', `/liquid/proposals/${id}/decide`, { decision: 'approve', comment });
+  const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
+  const headers = { authorization: `Basic ${Buffer.from(`reviewer:${secrets.forgejo_reviewer_password}`).toString('base64')}`, 'content-type': 'application/json' };
+  const call = async (path, body) => {
+    const r = await fetch(`http://localhost:3300/api/v1/repos/liquid/config${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    if (r.status >= 300) throw new Error(`Forgejo ${path} → ${r.status} ${await r.text()}`);
+  };
+  await call(`/pulls/${p.pr.number}/reviews`, { event: 'APPROVED', body: comment });
+  await call(`/pulls/${p.pr.number}/merge`, { Do: 'merge', merge_message_field: `${p.title} (proposal ${p.id})` });
+};
 const AGENT = 'sofa-lara'; // procurement: the role the new carrier actions are granted to
 const sql = (q) => docker('exec', 'cw-ext-liquid-ontology-db', 'psql', '-U', 'onto', '-d', 'onto', '-tAc', q).stdout.trim();
 const bump = (v, level) => {
@@ -90,7 +103,7 @@ try {
 
   // approve → live in one reconcile
   const t0 = Date.now();
-  await api('POST', `/liquid/proposals/${prop.id}/decide`, { decision: 'approve', comment: 'agreed with logistics' });
+  await approve(prop.id, 'agreed with logistics');
   const live1 = await until('ontology live', async () => {
     const o = await api('GET', '/liquid/ontology');
     return o.version === v1 ? o : undefined;
@@ -184,7 +197,7 @@ async function revertCarriers(current, base) {
   check('a breaking change without a migration note is invalid', !noNote.valid && noNote.compatibility?.level === 'major', noNote.checks.filter((c) => !c.ok).map((c) => c.name));
   const p = JSON.parse(tool('config__propose_change', { title: 'Remove carriers again (e2e)', reason: 'test of the breaking-change path', migration_note: 'Carrier objects stay in the event log; the projection is rebuilt without them.', changes: revert }).text);
   check('with a migration note it validates', p.valid, p.problems);
-  await api('POST', `/liquid/proposals/${p.id}/decide`, { decision: 'approve', comment: 'e2e revert' });
+  await approve(p.id, 'e2e revert');
   await until('reverted live', async () => ((await api('GET', '/liquid/ontology')).version === v2 ? true : undefined), 120_000, 2000);
   return v2;
 }

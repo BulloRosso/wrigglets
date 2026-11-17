@@ -1,35 +1,40 @@
 {
-  "startedAt": "2026-11-16T17:47:28.626Z",
+  "startedAt": "2026-11-17T00:25:02.260Z",
   "checks": [
     {
-      "name": "repair added OPA; all services running",
+      "name": "all services running, no OPA container (policy embedded)",
       "ok": true,
       "detail": [
-        "opa=running",
         "ontology-db=running",
-        "ontology-server=running"
+        "ontology-server=running",
+        "forgejo=running",
+        "ontology-compiler=running"
       ]
     },
     {
-      "name": "OPA polls the bundle from the control plane",
+      "name": "gateway and enterprise core load the same compiled policy (WASM) from the control plane",
       "ok": true,
       "detail": {
-        "revision": "85a21ebf69414335",
+        "revision": "33137dd81fcfac0c",
         "files": [
           "liquid/common.rego",
           "liquid/gateway.rego",
-          "liquid/object.rego",
-          "system/authz.rego"
+          "liquid/object.rego"
         ]
       }
     },
     {
-      "name": "erp/crm point at the ontology server with policy: opa",
+      "name": "the policy package needs a token",
       "ok": true,
-      "detail": "18:47:36 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 18:47:36 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+      "detail": 401
     },
     {
-      "name": "a read through gateway + OPA works",
+      "name": "erp/crm point at the ontology server with policy: opa",
+      "ok": true,
+      "detail": "01:25:09 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 01:25:09 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+    },
+    {
+      "name": "a read through gateway + embedded policy works",
       "ok": true,
       "detail": "881 chars"
     },
@@ -39,7 +44,7 @@
       "detail": "{\n \"factory\": \"F-NORTH\",\n \"from\": \"2026-10-06\",\n \"to\": \"2026-10-07\",\n \"workdays\""
     },
     {
-      "name": "an agent outside its role is denied by OPA although its allow-list was widened",
+      "name": "an agent outside its role is denied by the policy although its allow-list was widened",
       "ok": true,
       "detail": "Denied by policy: agent sofa-horst has no role that may run create_purchase_order"
     },
@@ -69,23 +74,14 @@
     {
       "name": "the approval request is recorded as an event",
       "ok": true,
-      "detail": "2 request(s)"
+      "detail": "3 request(s)"
     },
     {
-      "name": "OPA down ⇒ policy: opa calls are denied (fail closed)",
+      "name": "policy decisions are in the event log (gateway and core)",
       "ok": true,
-      "detail": "Denied by policy: OPA not reachable: TimeoutError: The operation was aborted due to timeout (fail cl"
-    },
-    {
-      "name": "OPA back ⇒ allowed again",
-      "ok": true
-    },
-    {
-      "name": "OPA reports its decisions to the control plane",
-      "ok": true,
-      "detail": "19 decisions, e.g. cancel_purchase_order is destructive: it needs an approved plan"
+      "detail": "11 decisions, e.g. policy: cancel_purchase_order is destructive: it needs an approved plan"
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T17:48:19.456Z"
+  "finishedAt": "2026-11-17T00:25:45.030Z"
 }

@@ -142,6 +142,56 @@ describe('config repository', () => {
     expect(await svc.reconcile()).toMatchObject({ unchanged: true });
   });
 
+  it('pending pull requests are settled from the Git host when a webhook was lost or the host was recreated', async () => {
+    await svc.init(seed, 'ada@example.local');
+    const host = new Map<number, { state: 'open' | 'closed'; merged: boolean; ref: string } | 'gone'>();
+    let next = 0;
+    let down = false;
+    svc.forge = {
+      push: async () => true,
+      fetch: async () => null,
+      openPr: async (o: { branch: string }) => {
+        next++;
+        host.set(next, { state: 'open', merged: false, ref: o.branch });
+        return { number: next, state: 'open', merged: false, html_url: '', head: { ref: o.branch, sha: '' }, title: '' };
+      },
+      status: async () => undefined,
+      prUrl: (n: number) => `http://host/pulls/${n}`,
+      pr: async (n: number) => {
+        if (down) throw Object.assign(new Error('fetch failed'), { status: 0 });
+        const h = host.get(n);
+        if (!h || h === 'gone') throw Object.assign(new Error('not found'), { status: 404 });
+        return { number: n, state: h.state, merged: h.merged, merged_by: h.merged ? { login: 'reviewer' } : null, html_url: '', head: { ref: h.ref, sha: '' }, title: '' };
+      },
+    } as unknown as Forge;
+    const allow = exportState(t.current())['gateway/allow-lists.yaml']!;
+    const mk = (t: string) => svc.propose({ title: `proposal ${t}`, reason: 'lost webhook test', changes: [{ path: 'gateway/allow-lists.yaml', content: allow.replace('- erp__*', `- erp__${t}`) }], author: { kind: 'agent', id: 'sofa-max' } });
+    const [closed, gone, reused, open] = [await mk('a'), await mk('b'), await mk('c'), await mk('d')];
+    host.set(closed.pr!.number, { state: 'closed', merged: false, ref: closed.branch });
+    host.set(gone.pr!.number, 'gone');
+    host.set(reused.pr!.number, { state: 'open', merged: false, ref: 'proposal/someone-else' });
+    down = true;
+    await svc.reconcile();
+    expect((await svc.get(closed.id)).status).toBe('pending'); // host unreachable: nothing settled
+    down = false;
+    await svc.reconcile();
+    const st = async (id: string) => (await svc.get(id)).status;
+    expect([await st(closed.id), await st(gone.id), await st(reused.id), await st(open.id)]).toEqual(['rejected', 'rejected', 'rejected', 'pending']);
+    expect((await svc.get(gone.id)).comment).toMatch(/no longer exists/);
+  });
+
+  it('a console edit in flight is not reverted by a reconcile (it is captured instead)', async () => {
+    await svc.init(seed, 'ada@example.local');
+    svc.beginEdit(); // the request started; the store changes before the capture
+    t.s.allowedTools['sofa-max'] = ['erp__get_kpi', 'crm__list_customers'];
+    expect(await svc.reconcile()).toMatchObject({ deferred: true });
+    expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'crm__list_customers']);
+    await svc.capture('ben@example.local', 'PUT /api/agents/sofa-max/tools');
+    svc.endEdit();
+    expect(await svc.reconcile()).toMatchObject({ unchanged: true });
+    expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'crm__list_customers']);
+  });
+
   it('an approved agent proposal changes the allow-list within one reconcile; rejection leaves main unchanged', async () => {
     await svc.init(seed, 'ada@example.local');
     const before = await svc.git.rev('main');

@@ -27,9 +27,11 @@ export const serviceSpec = z.object({
   local: z.boolean().default(false),
   command: z.array(z.string()).optional(),
   /** Environment; values may use {{secret:NAME}}, {{svc:NAME.url}}, {{svc:NAME.host}}, {{svc:NAME.port}}. */
-  env: z.record(z.string().regex(/^[A-Z_][A-Z0-9_]*$/), z.string()).default({}),
+  env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()).default({}),
   /** Port the service listens on inside the network (for {{svc:…}} and health). */
   port: z.number().int().min(1).max(65535).optional(),
+  /** Published on 127.0.0.1:<hostPort> → port (local UIs such as the Git host); never on other interfaces. */
+  hostPort: z.number().int().min(1024).max(65535).optional(),
   volumes: z.array(z.object({ name: z.string().regex(NAME), target: z.string().startsWith('/') })).default([]),
   healthcheck: healthcheck.optional(),
   dependsOn: z.array(z.string().regex(NAME)).default([]),
@@ -67,7 +69,17 @@ export const extensionManifest = z
     vaultSecrets: z.array(z.string().regex(SECRET)).default([]),
     upstreams: z.array(extensionUpstream).default([]),
     /** Named bootstrap steps, run in order after all services are healthy; implemented by the control plane. */
-    bootstrap: z.array(z.object({ id: z.string().regex(NAME), description: z.string().max(300), demoOnly: z.boolean().default(false) })).default([]),
+    bootstrap: z
+      .array(
+        z.object({
+          id: z.string().regex(NAME),
+          description: z.string().max(300),
+          demoOnly: z.boolean().default(false),
+          /** Runs before these services are started (e.g. creating a database and role); otherwise after all services. */
+          before: z.array(z.string().regex(NAME)).default([]),
+        }),
+      )
+      .default([]),
     /** Admin console pages the extension adds while installed. */
     uiRoutes: z.array(z.object({ label: z.string().max(40), path: z.string().startsWith('/') })).default([]),
   })

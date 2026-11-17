@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-16T22:59:18.405Z",
+  "startedAt": "2026-11-17T00:30:34.036Z",
   "checks": [
     {
       "name": "the example playbook is in the config repository and valid",
@@ -25,9 +25,9 @@
       "ok": true,
       "detail": [
         {
-          "runId": "pr-mwjv8by4-359d",
+          "runId": "pr-mwjyhtbj-bafd",
           "playbook": "third-party-upstream-vulnerability",
-          "workflowId": "PlaybookRun-pr-mwjv8by4-359d"
+          "workflowId": "PlaybookRun-pr-mwjyhtbj-bafd"
         }
       ]
     },
@@ -58,13 +58,13 @@
       "ok": true,
       "detail": {
         "overlays": "[\"ov-1\"]",
-        "held": "PurchaseOrderRelease-1df530c5-b04f-4a73-ba99-8b4a155cfbae,PurchaseOrderRelease-2aece12d-0ef4-4706-bf02-ea74878f0118,PurchaseOrderRelease-3f8b7b89-28bf-40ee-b915-ba667e1ff1dc,PurchaseOrderRelease-412f10d2-6745-42d6-b26d-a3e60e2a46fd,PurchaseOrderRelease-6e472465-c09a-4d80-a24a-da77e9a8940b"
+        "held": "ApprovalWorkflow-0ea11eb0-073b-439c-a4fb-6f032d3f95eb,ApprovalWorkflow-76d269cc-e218-4477-abdf-ec76302595da,ApprovalWorkflow-d3479e21-99d6-4bdf-be92-0126dd08988e,ApprovalWorkflow-e223c610-3854-4b23-bd79-a781078e0f5f,PurchaseOrderRelease-813ad6dc-95e4-4997-b5bd-9bb73ce2e483"
       }
     },
     {
       "name": "shadow replay reported on the last 7 days",
       "ok": true,
-      "detail": "replayed 3120 events: 16 action(s) would need approval or be blocked, 12 diverged"
+      "detail": "replayed 1131 events: 8 action(s) would need approval or be blocked, 5 diverged"
     },
     {
       "name": "the reconciler keeps the tightening (it was committed to the config repository)",
@@ -74,6 +74,13 @@
       "name": "alert, run start and every step are events in the event log",
       "ok": true,
       "detail": "AgentTaskRequested:1,AlertReceived:1,BusinessNotification:1,PlaybookRunStarted:1,PlaybookStepAwaitingApproval:1,PlaybookStepExecuted:6"
+    },
+    {
+      "name": "restore is an approval in the one inbox (ApprovalWorkflow, kind playbook-step)",
+      "ok": true,
+      "detail": [
+        "Vulnerable third-party upstream: restore (restore, loosen)"
+      ]
     },
     {
       "name": "after approval everything is back to baseline (upstreams, overlays, held workflows, repository)",
@@ -101,8 +108,13 @@
       "name": "a playbook that loosens automatically is rejected by validation",
       "ok": true,
       "detail": "steps.0.autonomy: gateway.upstream.enable loosens and must have autonomy \"human\" (tighten automatically, loosen only with a person)"
+    },
+    {
+      "name": "on the Git host the required check liquid/validate failed",
+      "ok": true,
+      "detail": "failure"
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T22:59:48.454Z"
+  "finishedAt": "2026-11-17T00:31:17.531Z"
 }

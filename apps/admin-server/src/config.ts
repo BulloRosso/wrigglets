@@ -115,6 +115,12 @@ const schema = z.object({
   LIQUID_PLAYBOOKS_DIR: z.string().default('/app/playbooks'),
   LIQUID_PLAYBOOK_TOKEN: z.string().optional(),
   LIQUID_ALERTS_TOKEN: z.string().optional(),
+  LIQUID_FORGEJO_DB_PASSWORD: z.string().optional(),
+  LIQUID_FORGEJO_SECRET_KEY: z.string().optional(),
+  LIQUID_FORGEJO_INTERNAL_TOKEN: z.string().optional(),
+  LIQUID_FORGEJO_BOT_PASSWORD: z.string().optional(),
+  LIQUID_FORGEJO_REVIEWER_PASSWORD: z.string().optional(),
+  LIQUID_FORGEJO_WEBHOOK_SECRET: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

@@ -106,6 +106,13 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
         next(err);
       }
     });
+    r.get('/liquid/approvals/:workflowId', async (req, res, next) => {
+      try {
+        res.json(await processes.approval(String(req.params.workflowId)));
+      } catch (err) {
+        next(err);
+      }
+    });
     r.post('/liquid/approvals/:workflowId/decide', async (req, res, next) => {
       try {
         const decision = req.body?.decision;

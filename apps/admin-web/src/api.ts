@@ -42,6 +42,17 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+export interface InboxItem {
+  id: string;
+  kind: 'action' | 'playbook-step' | 'wiki' | 'config' | 'plan';
+  subject: string;
+  requestedBy: string;
+  createdAt: string;
+  state: string;
+  decideHere: boolean;
+  link: string;
+  detail?: Record<string, unknown>;
+}
 export interface LiquidEvent {
   seq: number;
   event_id: string;
@@ -111,6 +122,8 @@ export interface ConfigProposal {
   irDiff?: IrDiff;
   compat?: Compatibility;
   migrationNote?: string;
+  /** Pull request on the Git host (ADR-0049): the review and the merge happen there. */
+  pr?: { number: number; url: string };
   decidedBy?: string;
   decidedAt?: string;
   comment?: string;
@@ -385,6 +398,7 @@ export const api = {
   uninstallExtension: (extId: string, purgeData: boolean) => apiFetch<ExtensionStatus>(`/api/extensions/${id(extId)}/uninstall`, { method: 'POST', json: { purgeData } }),
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
+  liquidInbox: () => apiFetch<InboxItem[]>('/api/liquid/inbox'),
   liquidEvents: (params: Record<string, string>) => apiFetch<{ events: LiquidEvent[]; types: Array<{ type: string; n: number }> }>(`/api/liquid/events?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   liquidPlaybooks: () => apiFetch<PlaybookList>('/api/liquid/playbooks'),
   liquidPlaybookRuns: () => apiFetch<PlaybookRunView[]>('/api/liquid/playbooks/runs'),

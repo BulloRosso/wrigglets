@@ -89,6 +89,9 @@ describe('install plan', () => {
   it('orders steps: preflight, secrets, volumes, services by dependency, bootstrap, upstreams', () => {
     expect(installSteps(m, { seedDemo: false }).map((s) => s.id)).toEqual(['preflight', 'secrets', 'volumes', 'service:db', 'service:server', 'retired', 'bootstrap:migrate', 'upstreams']);
     expect(installSteps(m, { seedDemo: true }).map((s) => s.id)).toContain('bootstrap:seed');
+    // a bootstrap step with `before` runs before the first service that needs it (e.g. a database and role)
+    const withBefore = { ...m, bootstrap: [...m.bootstrap, { id: 'create-db', description: 'db + role', demoOnly: false, before: ['server'] }] };
+    expect(installSteps(withBefore as typeof m, { seedDemo: false }).map((s) => s.id)).toEqual(['preflight', 'secrets', 'volumes', 'service:db', 'bootstrap:create-db', 'service:server', 'retired', 'bootstrap:migrate', 'upstreams']);
   });
 
   it('uninstalls upstreams first, services in reverse order, data only on purge', () => {

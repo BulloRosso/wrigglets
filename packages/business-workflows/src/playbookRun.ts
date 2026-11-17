@@ -1,4 +1,5 @@
-import { CancellationScope, condition, defineQuery, defineSignal, defineUpdate, proxyActivities, setHandler, upsertSearchAttributes, workflowInfo } from '@temporalio/workflow';
+import { CancellationScope, ParentClosePolicy, condition, defineQuery, defineSignal, proxyActivities, setHandler, startChild, upsertSearchAttributes, workflowInfo } from '@temporalio/workflow';
+import { ApprovalWorkflow } from './approval.js';
 import { directionOf, render, type BlastRadius, type Playbook } from '@cw/playbooks';
 import { BSA } from './common.js';
 
@@ -7,7 +8,8 @@ import { BSA } from './common.js';
  *   auto    → executed now
  *   propose → executed in "propose" mode: it creates something a person decides later (agent task, config proposal);
  *             the run does not wait
- *   human   → the run waits for a person's decision (update `decideStep`); approve → executed with approvedBy
+ *   human   → the run waits for a person's decision: a child ApprovalWorkflow (the one approval mechanism, ADR-0049,
+ *             listed in the inbox and mailed); approve → executed with approvedBy
  * Loosening steps are only possible as human steps (validator + control plane check again). Cancelling stops the run
  * before its next step and never loosens anything. Every step result is recorded as an event by the control plane.
  */
@@ -23,6 +25,8 @@ export interface StepResult {
   undo?: Record<string, unknown>;
   data?: Record<string, unknown>;
   approvedBy?: string;
+  /** The ApprovalWorkflow that decides this human step. */
+  approvalWorkflowId?: string;
   decidedBy?: string;
   comment?: string;
   at?: string;
@@ -52,14 +56,11 @@ export interface PlaybookActivities {
   recordRun(i: { runId: string; playbook: string; type: 'PlaybookStepAwaitingApproval' | 'PlaybookStepDecided' | 'PlaybookRunFinished'; data: Record<string, unknown> }): Promise<void>;
 }
 
-export interface StepDecision {
-  stepId: string;
-  decision: 'approve' | 'reject';
-  by: string;
-  comment?: string;
-}
+/** Workflow id of the approval of a human step (decided with the ApprovalWorkflow's `decide` update). */
+export const stepApprovalId = (runId: string, stepId: string) => `ApprovalWorkflow-${runId}-${stepId}`;
+export const STEP_APPROVAL_REMINDER_MS = 4 * 3_600_000;
+export const STEP_APPROVAL_EXPIRE_MS = 7 * 86_400_000;
 
-export const decideStepUpdate = defineUpdate<PlaybookRunState, [StepDecision]>('decideStep');
 export const cancelRunSignal = defineSignal<[{ by: string; reason?: string }]>('cancelRun');
 export const playbookRunQuery = defineQuery<PlaybookRunState>('playbookRun');
 
@@ -75,29 +76,11 @@ export async function PlaybookRun(input: PlaybookRunInput): Promise<PlaybookRunS
     blast: null,
     steps: input.playbook.steps.map((x) => ({ id: x.id, type: x.type, autonomy: x.autonomy, state: 'pending' })),
   };
-  const decisions = new Map<string, StepDecision>();
   let cancelled: { by: string; reason?: string } | undefined;
   setHandler(playbookRunQuery, () => s);
   setHandler(cancelRunSignal, (c) => {
     cancelled ??= c;
   });
-  setHandler(
-    decideStepUpdate,
-    (d) => {
-      decisions.set(d.stepId, d);
-      return s;
-    },
-    {
-      validator: (d) => {
-        const st = s.steps.find((x) => x.id === d.stepId);
-        if (!st) throw new Error(`unknown step ${d.stepId}`);
-        if (st.state !== 'awaiting_approval') throw new Error(`step ${d.stepId} is ${st.state}, not awaiting approval`);
-        if (decisions.has(d.stepId)) throw new Error(`step ${d.stepId} was already decided`);
-        if (!d.by) throw new Error('the deciding person is required');
-        if (d.decision !== 'approve' && d.decision !== 'reject') throw new Error('decision must be approve or reject');
-      },
-    },
-  );
   const publish = (state: string) => upsertSearchAttributes([{ key: BSA.BusinessState, value: state }]);
   publish('running');
 
@@ -121,21 +104,42 @@ export async function PlaybookRun(input: PlaybookRunInput): Promise<PlaybookRunS
     }
     let approvedBy: string | undefined;
     if (def.autonomy === 'human') {
+      const child = await startChild(ApprovalWorkflow, {
+        workflowId: stepApprovalId(input.runId, def.id),
+        parentClosePolicy: ParentClosePolicy.TERMINATE,
+        args: [
+          {
+            kind: 'playbook-step',
+            subject: `${input.playbook.title ?? input.playbook.id}: ${def.id} (${def.type}, ${directionOf(def.type)})`,
+            requestSeq: 0,
+            action: `playbook_${def.type.replace(/\./g, '_')}`,
+            args: rendered,
+            caller: { workflow: workflowInfo().workflowId },
+            reason: def.description ?? `step ${def.id} of run ${input.runId}`,
+            objects: [],
+            effect: { runId: input.runId, stepId: def.id, playbook: input.playbook.id },
+            reminderMs: STEP_APPROVAL_REMINDER_MS,
+            expireMs: STEP_APPROVAL_EXPIRE_MS,
+          },
+        ],
+      });
+      st.approvalWorkflowId = child.workflowId;
+      // visible as waiting only once the approval exists (the inbox and the console decide through it)
       st.state = 'awaiting_approval';
       s.state = 'awaiting_approval';
       publish('awaiting_approval');
-      await acts.recordRun({ runId: input.runId, playbook: input.playbook.id, type: 'PlaybookStepAwaitingApproval', data: { step: def.id, type: def.type, direction: directionOf(def.type) } });
-      await condition(() => decisions.has(def.id) || !!cancelled);
+      await acts.recordRun({ runId: input.runId, playbook: input.playbook.id, type: 'PlaybookStepAwaitingApproval', data: { step: def.id, type: def.type, direction: directionOf(def.type), approval: child.workflowId } });
+      const res = await Promise.race([child.result(), condition(() => !!cancelled).then(() => undefined)]);
       s.state = 'running';
       publish('running');
-      if (cancelled) {
+      if (cancelled || !res) {
         st.state = 'cancelled';
         break;
       }
-      const d = decisions.get(def.id)!;
-      Object.assign(st, { decidedBy: d.by, comment: d.comment });
-      await acts.recordRun({ runId: input.runId, playbook: input.playbook.id, type: 'PlaybookStepDecided', data: { step: def.id, decision: d.decision, by: d.by, comment: d.comment ?? null } });
-      if (d.decision === 'reject') {
+      const d = res.decision;
+      Object.assign(st, { decidedBy: d?.by, comment: d?.comment ?? (res.state === 'expired' ? 'the approval expired' : undefined) });
+      await acts.recordRun({ runId: input.runId, playbook: input.playbook.id, type: 'PlaybookStepDecided', data: { step: def.id, decision: d?.decision ?? res.state, by: d?.by ?? null, comment: d?.comment ?? null } });
+      if (!d || d.decision === 'reject') {
         st.state = 'skipped';
         continue;
       }

@@ -3,8 +3,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
 import { createHash } from 'node:crypto';
-import { canonical, compatibility, diffIr, type Compatibility, type IrDiff, type OntologyIr } from '@cw/ontology-ir';
+import { canonical, compatibility, diffIr, sourceHash, type Compatibility, type IrDiff, type OntologyIr } from '@cw/ontology-ir';
 import { GitRepo, type Author } from './git.js';
+import { codeowners, type Forge, type PullRequest } from './forge.js';
 import { DEFAULT_OWNERS, MANAGED_PREFIXES, README, ROOT_FILES, STORE_FILES, exportState, findSecrets, ownersFile, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
 
 /*
@@ -55,6 +56,8 @@ export interface Proposal {
   compat?: Compatibility;
   /** Required for a breaking (major) ontology change. */
   migrationNote?: string;
+  /** The pull request on the Git host (ADR-0049), when one is configured. */
+  pr?: { number: number; url: string };
   decidedBy?: string;
   decidedAt?: string;
   comment?: string;
@@ -66,6 +69,8 @@ interface Meta {
   applied: string | null;
   /** Seed files ever added (a later version adds new defaults once; files removed on purpose stay removed). */
   seeded?: string[];
+  /** The Git host was set up (repository pushed, protection, webhook): proposals go there (ADR-0049). */
+  forgeReady?: boolean;
   /** Hash of the ontology files last applied to the ontology server (M8). */
   ontologyHash?: Record<string, string>;
   lastReconcile: { at: string; head: string | null; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> } | null;
@@ -100,11 +105,20 @@ export class ConfigRepoService {
   private meta: Meta = { applied: null, lastReconcile: null, proposals: [] };
   private readonly metaFile: string;
   private chain: Promise<unknown> = Promise.resolve();
+  /** Console edits whose capture is still to come: a reconcile must not take them for drift and revert them. */
+  private editsInFlight = 0;
   private timer?: NodeJS.Timeout;
   /** Called after main changed through a proposal or a reconcile applied something (e.g. to rebuild the OPA bundle). */
   onApplied?: () => void;
+  /** The Git host (Forgejo, GitHub, Azure DevOps): proposals become pull requests, decisions happen there (ADR-0049). */
+  forge?: Forge;
+  /** URL of a proposal in the admin console (for commit statuses). */
+  consoleUrl = (id: string) => `http://localhost:8080/liquid/proposals/${id}`;
+
   /** A reconcile that changed something or failed (recorded as an event, ADR-0049). */
   onReconciled?: (r: { head: string; ok: boolean; changes: string[]; errors: Array<{ path: string; message: string }> }) => void;
+  /** Source-file hashes of the ontology the enterprise core runs now (IR.source.files), to detect a reset core. */
+  ontologyInForce?: (domain: string) => Promise<Record<string, string> | undefined>;
   /** Applies the ontology of a domain to the ontology server when its files changed (M8). Returns a change summary. */
   onOntology?: (domain: string, files: { 'schema.yaml': string; 'actions.yaml': string; 'bindings.yaml': string }, note?: string) => Promise<string | undefined>;
 
@@ -179,6 +193,13 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     if (leaked.length) throw new ConfigError(422, `refusing to commit: secret values found in ${leaked.join(', ')}`);
   }
 
+  beginEdit() {
+    this.editsInFlight++;
+  }
+  endEdit() {
+    this.editsInFlight = Math.max(0, this.editsInFlight - 1);
+  }
+
   /** Commit-on-edit: an admin console change of a store becomes a commit on main (author = the signed-in admin). */
   async capture(by: string, what: string): Promise<string | null> {
     if (!(await this.initialized())) return null;
@@ -195,6 +216,10 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       // the stores already have this state; only skip the apply if nothing else was pending
       if (head && this.meta.applied === main) this.meta.applied = head;
       await this.persist();
+      if (head && this.forge && !(await this.forge.push(this.git, 'refs/heads/main'))) {
+        // main moved on the host meanwhile (a merge): take the host's main, the next capture/reconcile settles it
+        await this.syncUnlocked();
+      }
       return head;
     });
   }
@@ -203,9 +228,16 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
   async reconcile(by = 'reconciler', force = false) {
     if (!(await this.initialized())) return { ok: false, skipped: 'repository not initialised' } as const;
     return this.serial(async () => {
+      if (this.forge) {
+        await this.syncUnlocked().catch(() => undefined);
+        await this.settleFromHost().catch(() => undefined);
+      }
       const head = (await this.git.rev('main'))!;
+      // a console edit is being captured: its store change is not drift; the next run sees it committed
+      if (this.editsInFlight > 0) return { ok: true, head, changes: [] as string[], unchanged: true, deferred: true };
       // applied and the stores still match main (e.g. not reset by an empty /data/admin) → nothing to do
-      if (!force && head === this.meta.applied && this.meta.lastReconcile?.ok !== false && (await this.driftAt(head)).length === 0 && (!this.onOntology || this.meta.ontologyHash)) return { ok: true, head, changes: [] as string[], unchanged: true };
+      if (!force && head === this.meta.applied && this.meta.lastReconcile?.ok !== false && (await this.driftAt(head)).length === 0 && (!this.onOntology || (this.meta.ontologyHash && (await this.ontologyMatches(head)))))
+        return { ok: true, head, changes: [] as string[], unchanged: true };
       const files = await this.git.files(head);
       const { state, errors } = parseState(files);
       const leaked = findSecrets(files, this.targets.secrets());
@@ -223,7 +255,13 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
           const of = ontologyFiles(files, d);
           if (!of) continue;
           const h = createHash('sha256').update(canonical(of)).digest('hex');
-          if (this.meta.ontologyHash?.[d] === h) continue;
+          // what the core runs is the truth (it may have been reset, e.g. after a reinstall): compare its source hashes
+          const inForce = await this.ontologyInForce?.(d).catch(() => undefined);
+          const same = inForce ? Object.entries(of).every(([n, t]) => inForce[n] === sourceHash(t)) : this.meta.ontologyHash?.[d] === h;
+          if (same) {
+            (this.meta.ontologyHash ??= {})[d] = h;
+            continue;
+          }
           try {
             const note = [...this.meta.proposals].reverse().find((p) => p.status === 'approved' && p.paths.some((x) => x.startsWith(`ontology/${d}/`)))?.migrationNote;
             const summary = await this.onOntology(d, of, note);
@@ -329,10 +367,154 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       const paths = await this.git.changedPaths(base, head);
       const p: Proposal = { id, title, reason, evidence: input.evidence?.slice(0, 8000), migrationNote: input.migrationNote?.trim().slice(0, 4000) || undefined, author: input.author, createdAt: new Date().toISOString(), base, branch, head, paths, status: 'pending', validation: { ok: false, at: '', checks: [] }, owners: [], changeId };
       await this.validateInto(p, head);
+      if (this.forge) await this.openPullRequest(p);
       this.meta.proposals.push(p);
       await this.persist();
       return p;
     });
+  }
+
+  /* ------------------------------------------------------------------------------------------ Git host (ADR-0049) */
+
+  private prBody(p: Proposal): string {
+    const who = p.author.kind === 'agent' ? `Agent \`${p.author.id}\`${p.author.user ? ` on behalf of ${p.author.user}` : ''}${p.author.task ? ` (task ${p.author.task})` : ''}` : p.author.id;
+    const checks = p.validation.checks.map((c) => `- ${c.ok ? '✅' : '❌'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`).join('\n');
+    return `${p.reason}\n\n**Proposed by:** ${who}\n${p.compat ? `**Ontology compatibility:** ${p.compat.level} (suggested version ${p.compat.suggestedVersion})\n` : ''}${p.migrationNote ? `**Migration note:** ${p.migrationNote}\n` : ''}\n**Validation (liquid/validate):**\n${checks}\n\n${p.evidence ? `<details><summary>Evidence</summary>\n\n${p.evidence.slice(0, 6000)}\n\n</details>\n\n` : ''}Review, diff graph and history: ${this.consoleUrl(p.id)}`;
+  }
+
+  private async openPullRequest(p: Proposal) {
+    const f = this.forge!;
+    if (!(await f.push(this.git, `refs/heads/${p.branch}`, `refs/heads/${p.branch}`, true))) throw new ConfigError(502, 'could not push the proposal branch to the Git host');
+    const pr = await f.openPr({ branch: p.branch, title: p.title, body: this.prBody(p) });
+    p.pr = { number: pr.number, url: f.prUrl(pr.number) };
+    await f.status(p.head, p.validation.ok, p.validation.ok ? 'valid' : `invalid: ${p.validation.checks.filter((c) => !c.ok).map((c) => c.name).join(', ')}`, this.consoleUrl(p.id));
+  }
+
+  /** Brings the local main in line with the host's main (the host is where merges happen). */
+  async sync() {
+    return this.serial(() => this.syncUnlocked());
+  }
+
+  private async syncUnlocked(): Promise<{ local: string | null; remote: string | null; action: string }> {
+    const f = this.forge;
+    if (!f) return { local: null, remote: null, action: 'no host' };
+    const local = await this.git.rev('main');
+    const remote = await f.fetch(this.git, 'main');
+    if (!remote || !local || remote === local) {
+      if (!remote && local) await f.push(this.git, 'refs/heads/main');
+      return { local, remote, action: remote ? 'in sync' : 'pushed' };
+    }
+    if (await this.git.isAncestor(local, remote)) {
+      await this.git.run(['update-ref', 'refs/heads/main', remote, local]);
+      return { local, remote, action: 'fast-forward from host' };
+    }
+    if (await this.git.isAncestor(remote, local)) {
+      await f.push(this.git, 'refs/heads/main');
+      return { local, remote, action: 'pushed to host' };
+    }
+    // diverged (should not happen: the host's main is protected, only the bot pushes): the host wins
+    await this.git.run(['update-ref', 'refs/heads/main', remote, local]);
+    return { local, remote, action: 'diverged: took the host' };
+  }
+
+  get forgeReady() {
+    return !!this.meta.forgeReady;
+  }
+
+  async markForgeReady() {
+    this.meta.forgeReady = true;
+    await this.persist();
+  }
+
+  /** CODEOWNERS for the host from OWNERS.yaml (committed to main by the bot). */
+  async writeCodeowners(org: string, team: string): Promise<string | null> {
+    return this.serial(async () => {
+      const main = (await this.git.rev('main'))!;
+      const owners = ownersFile.safeParse(YAML.parse((await this.git.file(main, 'OWNERS.yaml')) ?? DEFAULT_OWNERS));
+      if (!owners.success) return null;
+      const text = codeowners(owners.data, org, team);
+      if ((await this.git.file(main, '.forgejo/CODEOWNERS')) === text) return null;
+      const head = await this.git.commit({ ref: 'main', parent: main, changes: { '.forgejo/CODEOWNERS': text }, message: `CODEOWNERS from OWNERS.yaml\n\n${trailers({ 'Change-Id': randomUUID() })}`, author: SYSTEM });
+      if (head && this.meta.applied === main) this.meta.applied = head;
+      await this.persist();
+      if (head && this.forge) await this.forge.push(this.git, 'refs/heads/main');
+      return head;
+    });
+  }
+
+  /**
+   * Webhooks can be lost (the control plane restarting, the host dropping a delivery) and a proposal can outlive its
+   * pull request (the host recreated by a reinstall with purge). Each reconcile therefore compares the pending
+   * proposals with the host: merged → approved, closed → rejected, gone or the number now used by another branch →
+   * rejected with a note. A host that cannot be reached settles nothing (try again next run).
+   */
+  private async settleFromHost(): Promise<number> {
+    const f = this.forge;
+    if (!f) return 0;
+    let n = 0;
+    for (const p of this.meta.proposals.filter((x) => x.status === 'pending' && x.pr)) {
+      let pr: (PullRequest & { merge_commit_sha?: string }) | undefined;
+      try {
+        pr = await f.pr(p.pr!.number);
+      } catch (err) {
+        if ((err as { status?: number }).status !== 404) return n; // host unreachable or failing: settle nothing now
+      }
+      const at = new Date().toISOString();
+      if (!pr || pr.head.ref !== p.branch) Object.assign(p, { status: 'rejected', decidedBy: 'git host', decidedAt: at, comment: 'the pull request no longer exists on the Git host (recreated?); propose again' });
+      else if (pr.state === 'closed' && pr.merged) Object.assign(p, { status: 'approved', decidedBy: pr.merged_by?.login ?? 'git host', decidedAt: at, mergedAs: pr.merge_commit_sha });
+      else if (pr.state === 'closed') Object.assign(p, { status: 'rejected', decidedBy: 'git host', decidedAt: at, comment: 'the pull request was closed on the Git host' });
+      else continue;
+      n++;
+    }
+    if (n) await this.persist();
+    return n;
+  }
+
+  /** Webhook from the host: merges to main are reconciled; pull requests opened on the host become proposals. */
+  async onHostEvent(event: string, body: Record<string, unknown>): Promise<string> {
+    const f = this.forge;
+    if (!f) return 'no host';
+    if (event === 'push' && body.ref === 'refs/heads/main') {
+      const r = await this.reconcile('git host');
+      return `main → reconcile ${r.ok ? 'ok' : 'failed'}`;
+    }
+    if (event === 'pull_request') {
+      const pr = body.pull_request as PullRequest & { merge_commit_sha?: string; body?: string; user?: { login: string } };
+      const action = String(body.action ?? '');
+      const sender = (body.sender as { login?: string } | undefined)?.login ?? pr.user?.login ?? 'unknown';
+      return this.serial(async () => {
+        // the branch carries the unique proposal id; PR numbers restart when the Git host is recreated (reinstall)
+        let p = this.meta.proposals.find((x) => x.branch === pr.head.ref) ?? this.meta.proposals.find((x) => x.pr?.number === pr.number && x.status === 'pending');
+        if (!p && ['opened', 'reopened', 'synchronized'].includes(action)) {
+          // opened by a person on the host: becomes a proposal, validated like the others
+          const head = await f.fetch(this.git, pr.head.ref);
+          const base = (await this.git.rev('main'))!;
+          if (!head) return 'branch not found';
+          const id = `cp-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
+          p = { id, title: pr.title, reason: String(pr.body ?? '').slice(0, 4000) || pr.title, author: { kind: 'person', id: sender }, createdAt: new Date().toISOString(), base, branch: pr.head.ref, head, paths: await this.git.changedPaths(base, head), status: 'pending', validation: { ok: false, at: '', checks: [] }, owners: [], changeId: randomUUID(), pr: { number: pr.number, url: f.prUrl(pr.number) } };
+          await this.validateInto(p, head);
+          this.meta.proposals.push(p);
+          await f.status(head, p.validation.ok, p.validation.ok ? 'valid' : 'invalid', this.consoleUrl(p.id));
+          await this.persist();
+          return `proposal ${id} from pull request ${pr.number}`;
+        }
+        if (!p) return 'unknown pull request';
+        if (action === 'synchronized') {
+          const head = await f.fetch(this.git, pr.head.ref);
+          if (head && head !== p.head) {
+            p.head = head;
+            p.paths = await this.git.changedPaths(p.base, head);
+            await this.validateInto(p, head);
+            await f.status(head, p.validation.ok, p.validation.ok ? 'valid' : 'invalid', this.consoleUrl(p.id));
+          }
+        } else if (action === 'closed') {
+          Object.assign(p, pr.merged ? { status: 'approved', decidedBy: pr.merged_by?.login ?? sender, decidedAt: new Date().toISOString(), mergedAs: pr.merge_commit_sha } : { status: 'rejected', decidedBy: sender, decidedAt: new Date().toISOString() });
+        }
+        await this.persist();
+        return `pull request ${pr.number} ${action}`;
+      });
+    }
+    return `ignored ${event}`;
   }
 
   /** Validation of a revision (proposal head or merge result): layout + schemas, secrets, ontology compile + diff, Rego. */
@@ -415,6 +597,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       const p = this.meta.proposals.find((x) => x.id === id);
       if (!p) throw new ConfigError(404, `no proposal ${id}`);
       await this.validateInto(p, p.head);
+      if (this.forge && p.pr) await this.forge.status(p.head, p.validation.ok, p.validation.ok ? 'valid' : 'invalid', this.consoleUrl(p.id)).catch(() => undefined);
       await this.persist();
       return p;
     });
@@ -426,6 +609,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       const p = this.meta.proposals.find((x) => x.id === id);
       if (!p) throw new ConfigError(404, `no proposal ${id}`);
       if (p.status !== 'pending' && p.status !== 'conflict') throw new ConfigError(409, `proposal ${id} is already ${p.status}`);
+      if (this.forge && p.pr) throw new ConfigError(409, `this proposal is reviewed on the Git host: ${p.pr.url}`);
       const email = person.email.toLowerCase();
       if (decision === 'reject') {
         Object.assign(p, { status: 'rejected', decidedBy: email, decidedAt: new Date().toISOString(), comment });
@@ -474,6 +658,19 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
     });
     if (out.status === 'approved') await this.reconcile(out.decidedBy ?? 'reconciler');
     return out;
+  }
+
+  /** Does the core run the ontology of `rev`? (true without the in-force hook) */
+  private async ontologyMatches(rev: string): Promise<boolean> {
+    if (!this.ontologyInForce) return true;
+    const files = await this.git.files(rev, 'ontology/');
+    for (const d of domainsOf(Object.keys(files))) {
+      const of = ontologyFiles(files, d);
+      if (!of) continue;
+      const inForce = await this.ontologyInForce(d).catch(() => undefined);
+      if (inForce && !Object.entries(of).every(([n, t]) => inForce[n] === sourceHash(t))) return false;
+    }
+    return true;
   }
 
   /** Sections of the desired state where the stores differ from main (compared after schema parsing). */

@@ -40,7 +40,7 @@
   <rect x="280" y="96" width="290" height="190" rx="12" class="cp"/>
   <text x="300" y="124" class="h">Ontology server</text>
   <circle cx="310" cy="150" r="10" class="bd"/><text x="310" y="154" class="num">1</text>
-  <text x="328" y="154" class="d">validate, OPA, run, one transaction:</text>
+  <text x="328" y="154" class="d">validate, policy, run, one transaction:</text>
   <text x="328" y="172" class="mono">event PurchaseOrderCreated</text>
   <text x="328" y="188" class="lbl">+ projection row PO-4430</text>
   <text x="300" y="220" class="lbl">ontology: create_purchase_order</text>
@@ -53,10 +53,10 @@
 
   <!-- worker -->
   <rect x="620" y="96" width="250" height="190" rx="12" class="wf"/>
-  <text x="640" y="124" class="h">business-worker</text>
+  <text x="640" y="124" class="h">worker in the enterprise core</text>
   <circle cx="650" cy="150" r="10" class="bd"/><text x="650" y="154" class="num">2</text>
   <text x="668" y="154" class="d">dispatcher reads events</text>
-  <text x="668" y="170" class="lbl">in seq order, cursor on disk</text>
+  <text x="668" y="170" class="lbl">in seq order, cursor in the database</text>
   <circle cx="650" cy="196" r="10" class="bd"/><text x="650" y="200" class="num">3</text>
   <text x="668" y="200" class="d">start workflow, id from event:</text>
   <text x="668" y="216" class="mono">PurchaseOrderRelease-&lt;eventId&gt;</text>

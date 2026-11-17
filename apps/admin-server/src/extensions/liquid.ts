@@ -30,6 +30,13 @@ export const liquidManifest: ExtensionManifestInput = {
     { name: 'compiler_token', bytes: 32 },
     { name: 'playbook_token', bytes: 32 },
     { name: 'alerts_token', bytes: 32 },
+    // the Git host of the config repository (ADR-0049)
+    { name: 'forgejo_db_password', bytes: 24 },
+    { name: 'forgejo_secret_key', bytes: 32 },
+    { name: 'forgejo_internal_token', bytes: 48 },
+    { name: 'forgejo_bot_password', bytes: 24 },
+    { name: 'forgejo_reviewer_password', bytes: 18 },
+    { name: 'forgejo_webhook_secret', bytes: 32 },
   ],
   services: [
     {
@@ -76,6 +83,38 @@ export const liquidManifest: ExtensionManifestInput = {
       memoryMb: 1024,
     },
     {
+      name: 'forgejo',
+      description: 'Git host of the config repository: pull requests, CODEOWNERS, branch protection, required check liquid/validate (local; GitHub or Azure DevOps in an enterprise)',
+      image: 'codeberg.org/forgejo/forgejo:15@sha256:5d050e6d623e540923ff54b1c0c7acf41c3f9174a6c7ad515cc0c63d703fcd22',
+      port: 3000,
+      hostPort: 3300,
+      dependsOn: ['ontology-db'],
+      env: {
+        FORGEJO__database__DB_TYPE: 'postgres',
+        FORGEJO__database__HOST: '{{svc:ontology-db.host}}:{{svc:ontology-db.port}}',
+        FORGEJO__database__NAME: 'forgejo',
+        FORGEJO__database__USER: 'forgejo',
+        FORGEJO__database__PASSWD: '{{secret:forgejo_db_password}}',
+        FORGEJO__server__ROOT_URL: 'http://localhost:3300/',
+        FORGEJO__server__HTTP_PORT: '3000',
+        FORGEJO__server__DISABLE_SSH: 'true',
+        FORGEJO__server__OFFLINE_MODE: 'true',
+        FORGEJO__security__INSTALL_LOCK: 'true',
+        FORGEJO__security__SECRET_KEY: '{{secret:forgejo_secret_key}}',
+        FORGEJO__security__INTERNAL_TOKEN: '{{secret:forgejo_internal_token}}',
+        FORGEJO__service__DISABLE_REGISTRATION: 'true',
+        FORGEJO__service__REQUIRE_SIGNIN_VIEW: 'true',
+        FORGEJO__webhook__ALLOWED_HOST_LIST: 'private,loopback',
+        FORGEJO__repository__DEFAULT_BRANCH: 'main',
+        FORGEJO__actions__ENABLED: 'false',
+        FORGEJO__mailer__ENABLED: 'false',
+        FORGEJO__log__LEVEL: 'Warn',
+      },
+      volumes: [{ name: 'forgejo-data', target: '/data' }],
+      healthcheck: { test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/healthz'], intervalSec: 5, timeoutSec: 4, retries: 60, startPeriodSec: 10 },
+      memoryMb: 512,
+    },
+    {
       name: 'ontology-compiler',
       description: 'LinkML compiler as a service (ontology → IR) and policy checker (opa check/test) for drafts and config proposals',
       image: 'coworking/ontology-compiler:local',
@@ -92,6 +131,10 @@ export const liquidManifest: ExtensionManifestInput = {
     { id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true },
     // the desired state in Git (ADR-0046): first commit = the running platform (handler injected by main.ts)
     { id: 'config-repo', description: 'Config repository: bootstrap from the running platform (gateway, safety, agents, policies, ontology)' },
+    // the Git host (ADR-0049): database and role in the shared Liquid Postgres before Forgejo starts; then accounts,
+    // repository, branch protection with the required check, webhook, CODEOWNERS (handlers injected by main.ts)
+    { id: 'forgejo-db', description: 'Database and role of the Git host in the shared Liquid Postgres', before: ['forgejo'] },
+    { id: 'forgejo-setup', description: 'Git host: bot and reviewer accounts, repository liquid/config, branch protection, webhook, CODEOWNERS' },
   ],
   // New ontology tools for agents; the parity groups erp/crm are re-pointed by scripts/liquid/setup.mjs (not owned).
   upstreams: [{ name: 'onto', description: 'Ontology actions of the sofa company (Liquid Enterprise): the only write path for business data', service: 'ontology-server', path: '/onto/mcp', tokenSecret: 'ontology_mcp_token', policy: 'opa' },
@@ -99,6 +142,7 @@ export const liquidManifest: ExtensionManifestInput = {
   ],
   uiRoutes: [
     { label: 'Overview', path: '/liquid' },
+    { label: 'Approvals', path: '/liquid/approvals' },
     { label: 'Ontology', path: '/liquid/ontology' },
     { label: 'Policies', path: '/liquid/policies' },
     { label: 'Business processes', path: '/liquid/processes' },
@@ -129,9 +173,9 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
 };
 
 /** Overlay mode (docker-compose.liquid.yml): the services run from compose, secrets come from the environment. */
-export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_POLICY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string; LIQUID_PLAYBOOK_TOKEN?: string; LIQUID_ALERTS_TOKEN?: string }): OverlayOptions {
+export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_POLICY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string; LIQUID_PLAYBOOK_TOKEN?: string; LIQUID_ALERTS_TOKEN?: string; LIQUID_FORGEJO_DB_PASSWORD?: string; LIQUID_FORGEJO_SECRET_KEY?: string; LIQUID_FORGEJO_INTERNAL_TOKEN?: string; LIQUID_FORGEJO_BOT_PASSWORD?: string; LIQUID_FORGEJO_REVIEWER_PASSWORD?: string; LIQUID_FORGEJO_WEBHOOK_SECRET?: string }): OverlayOptions {
   return {
     active: !!env.LIQUID_OVERLAY,
-    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, policy_token: env.LIQUID_POLICY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN, playbook_token: env.LIQUID_PLAYBOOK_TOKEN, alerts_token: env.LIQUID_ALERTS_TOKEN },
+    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, policy_token: env.LIQUID_POLICY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN, playbook_token: env.LIQUID_PLAYBOOK_TOKEN, alerts_token: env.LIQUID_ALERTS_TOKEN, forgejo_db_password: env.LIQUID_FORGEJO_DB_PASSWORD, forgejo_secret_key: env.LIQUID_FORGEJO_SECRET_KEY, forgejo_internal_token: env.LIQUID_FORGEJO_INTERNAL_TOKEN, forgejo_bot_password: env.LIQUID_FORGEJO_BOT_PASSWORD, forgejo_reviewer_password: env.LIQUID_FORGEJO_REVIEWER_PASSWORD, forgejo_webhook_secret: env.LIQUID_FORGEJO_WEBHOOK_SECRET },
   };
 }

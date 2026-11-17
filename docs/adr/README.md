@@ -48,8 +48,9 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0041](0041-ontology-linkml-ir-generators.md) | Ontology in LinkML, compiled to an IR, every layer generated from the IR | Accepted |
 | [0042](0042-ontology-editor-react-flow.md) | Ontology editor in the admin console with React Flow | Accepted |
 | [0043](0043-ontology-server-action-pipeline.md) | Ontology server, action pipeline, event-sourced projection | Accepted |
-| [0044](0044-policy-as-code-opa.md) | Policy as code with OPA at two enforcement points | Accepted |
-| [0045](0045-business-workflows-temporal.md) | Holdable business workflows in a separate Temporal namespace | Accepted |
-| [0046](0046-config-repository-proposals.md) | Desired state in a config repository; proposals and reconciler | Accepted |
+| [0044](0044-policy-as-code-opa.md) | Policy as code with OPA at two enforcement points | Accepted (engine embedded: 0049) |
+| [0045](0045-business-workflows-temporal.md) | Holdable business workflows in a separate Temporal namespace | Accepted (worker in the core: 0049) |
+| [0046](0046-config-repository-proposals.md) | Desired state in a config repository; proposals and reconciler | Accepted (review on the Git host: 0049) |
 | [0047](0047-playbooks-tighten-only.md) | Playbooks, autonomy tiers and the tighten-only rule | Accepted |
 | [0048](0048-ontology-evolution-runtime.md) | Ontology evolution: runtime interpretation, compatibility, live migration | Accepted |
+| [0049](0049-liquid-simplification.md) | Simplification: event log as truth, embedded policy, enterprise core, Git host, one approval mechanism | Accepted |

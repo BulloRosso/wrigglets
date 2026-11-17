@@ -113,6 +113,7 @@ function Detail({ pid }: { pid: string }) {
                 ...(p.migrationNote ? ([['Migration note', p.migrationNote]] as Array<[string, React.ReactNode]>) : []),
                 ['Approvers', p.owners.map((o) => `${o.owners.join(' or ')} (${o.for})`).join('; ') || '—'],
                 ['Base', <code>{p.base.slice(0, 12)}</code>],
+                ...(p.pr ? ([['Pull request', <a href={p.pr.url} target="_blank" rel="noreferrer">#{p.pr.number}</a>]] as Array<[string, React.ReactNode]>) : []),
                 ...(p.decidedBy ? ([['Decided', <>{p.decidedBy} · <RelativeTime iso={p.decidedAt!} />{p.comment ? ` · “${p.comment}”` : ''}</>]] as Array<[string, React.ReactNode]>) : []),
                 ...(p.mergedAs ? ([['Merged as', <code>{p.mergedAs.slice(0, 12)}</code>]] as Array<[string, React.ReactNode]>) : []),
               ]}
@@ -140,7 +141,12 @@ function Detail({ pid }: { pid: string }) {
                 </Box>
               ))}
             </Box>
-            {open && (
+            {open && p.pr && (
+              <Alert severity="info" action={<Button size="small" href={p.pr.url} target="_blank" rel="noreferrer">Review in Forgejo</Button>}>
+                Pull request #{p.pr.number} on the Git host: reviewers approve and merge there (CODEOWNERS, branch protection, required check <code>liquid/validate</code> {p.validation.ok ? 'passed' : 'failed'}). The merge is applied within one reconcile.
+              </Alert>
+            )}
+            {open && !p.pr && (
               <>
                 {!p.validation.ok && <Alert severity="error">Not valid: it cannot be approved. The proposer has to fix it and propose again.</Alert>}
                 <TextField size="small" label="Comment" value={comment} onChange={(e) => setComment(e.target.value)} />

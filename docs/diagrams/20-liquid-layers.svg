@@ -49,7 +49,7 @@
   <!-- gateway -->
   <rect x="320" y="222" width="530" height="64" rx="10" class="gov"/>
   <text x="340" y="248" class="h">MCP gateway</text>
-  <text x="340" y="270" class="d">only tool path · allow-lists · kill switch · audit · OPA (coarse, M4)</text>
+  <text x="340" y="270" class="d">only tool path · allow-lists · kill switch · audit · embedded policy (WASM)</text>
   <path d="M445,188 L445,220" class="ln" marker-end="url(#a)"/>
   <path d="M165,188 L165,330" class="ln" marker-end="url(#a)"/>
   <text x="174" y="262" class="lbl">REST + OIDC (SDK)</text>
@@ -59,7 +59,7 @@
   <!-- ontology server -->
   <rect x="40" y="332" width="810" height="112" rx="10" class="core"/>
   <text x="60" y="360" class="h">Ontology server — the only write path (M3)</text>
-  <text x="60" y="384" class="d">validate (generated zod) → load objects → preconditions → OPA object policy (M4) → handler → one transaction:</text>
+  <text x="60" y="384" class="d">validate (generated zod) → load objects → preconditions → object policy (embedded WASM) → handler → one transaction:</text>
   <text x="60" y="402" class="d">append events + update projection → start/signal workflows (outbox). Read-only actions never write.</text>
   <text x="60" y="426" class="d">MCP tools /onto, /erp, /crm and REST /objects, /actions — all generated from the ontology.</text>
   <path d="M585,286 L585,330" class="ln" marker-end="url(#a)"/>
@@ -69,8 +69,8 @@
   <rect x="40" y="478" width="390" height="118" rx="10" class="core"/>
   <text x="60" y="506" class="h">Ontology (M2)</text>
   <text x="60" y="528" class="d">LinkML schema + actions.yaml + bindings.yaml</text>
-  <text x="60" y="548" class="d">→ compiler → IR → generators: types, SQL,</text>
-  <text x="60" y="566" class="d">MCP tools, OPA data, DQ tests, SDK</text>
+  <text x="60" y="548" class="d">→ compiler → IR, interpreted at runtime: tools, SQL,</text>
+  <text x="60" y="566" class="d">policy data, DQ checks; generated: types, SDK</text>
   <text x="60" y="584" class="d">edited in the React Flow editor (E1–E4)</text>
 
   <rect x="460" y="478" width="390" height="118" rx="10" class="core"/>

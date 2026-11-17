@@ -45,6 +45,15 @@ const runOf = async (runId) => (await api('GET', '/liquid/playbooks/runs')).find
 
 try {
   await s.signIn(ADMIN, env.BOOTSTRAP_ADMIN_EMAIL, env.BOOTSTRAP_ADMIN_PASSWORD);
+  // leftovers of an aborted earlier run: cancel open runs and undo by hand (the console path a person would take)
+  for (const r of await api('GET', '/liquid/playbooks/runs')) {
+    if (!['running', 'awaiting_approval'].includes(r.state)) continue;
+    await api('POST', `/liquid/playbooks/runs/${r.runId}/cancel`, { reason: 'e2e pre-clean' }).catch(() => undefined);
+    await api('POST', '/liquid/processes/release', { ref: r.runId }).catch(() => undefined);
+  }
+  for (const o of (await api('GET', '/liquid/policy')).overlays.filter((x) => x.source?.startsWith('playbook:'))) await api('DELETE', `/liquid/policy/overlays/${o.id}`);
+  const up0 = (await api('GET', '/gateway')).upstreams.find((u) => u.name === UP);
+  if (up0 && !up0.enabled) await api('PUT', `/gateway/upstreams/${UP}`, { ...up0, enabled: true });
   const pbs = await api('GET', '/liquid/playbooks');
   check('the example playbook is in the config repository and valid', pbs.playbooks.some((p) => p.id === 'third-party-upstream-vulnerability') && pbs.invalid.length === 0, Object.values(pbs.sources));
 
@@ -83,6 +92,8 @@ try {
   check('alert, run start and every step are events in the event log', /AlertReceived:1/.test(types) && /PlaybookRunStarted:1/.test(types) && /PlaybookStepExecuted:6/.test(types) && /PlaybookStepAwaitingApproval:1/.test(types), types);
   if (!args.has('--no-shots')) await shot('/liquid/playbooks', 'liquid-playbooks', 1500);
 
+  const inbox = await api('GET', '/liquid/inbox');
+  check('restore is an approval in the one inbox (ApprovalWorkflow, kind playbook-step)', inbox.some((i) => i.kind === 'playbook-step' && i.detail?.effect?.runId === runId && i.detail?.effect?.stepId === 'restore'), inbox.filter((i) => i.kind === 'playbook-step').map((i) => i.subject));
   // 2. a person approves restore → baseline
   await api('POST', `/liquid/playbooks/runs/${runId}/steps/restore/decide`, { decision: 'approve', comment: 'connector patched (e2e)' });
   const done = await until('run completed', async () => {
@@ -123,7 +134,14 @@ try {
     changes: [{ path: 'playbooks/auto-restore.yaml', content: 'id: auto-restore\nversion: 1\ntrigger: { kind: alert, match: { source: vuln-feed } }\nsteps:\n  - { id: reopen, type: gateway.upstream.enable, autonomy: auto, with: { upstream: erp } }\n' }],
   });
   check('a playbook that loosens automatically is rejected by validation', !bad.validation.ok && JSON.stringify(bad.validation.checks).includes('must have autonomy'), bad.validation.checks.find((c) => !c.ok)?.errors?.[0]?.message);
-  await api('POST', `/liquid/proposals/${bad.id}/decide`, { decision: 'reject', comment: 'e2e' });
+  // proposals are pull requests on the Git host (ADR-0049): the invalid one is closed there (its check failed)
+  const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
+  const auth = `Basic ${Buffer.from(`reviewer:${secrets.forgejo_reviewer_password}`).toString('base64')}`;
+  if (bad.pr) {
+    const st = await (await fetch(`http://localhost:3300/api/v1/repos/liquid/config/commits/${bad.head}/status`, { headers: { authorization: auth } })).json();
+    check('on the Git host the required check liquid/validate failed', st.state === 'failure', st.state);
+    await fetch(`http://localhost:3300/api/v1/repos/liquid/config/pulls/${bad.pr.number}`, { method: 'PATCH', headers: { authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify({ state: 'closed' }) });
+  } else await api('POST', `/liquid/proposals/${bad.id}/decide`, { decision: 'reject', comment: 'e2e' });
   result.ok = true;
 } catch (err) {
   result.ok = false;

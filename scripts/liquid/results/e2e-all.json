@@ -1,0 +1,37 @@
+{
+  "startedAt": "2026-11-17T00:29:25.349Z",
+  "suites": [
+    {
+      "name": "M6 config repository (Git host)",
+      "script": "e2e-config.mjs",
+      "ok": true,
+      "seconds": 69,
+      "checks": {
+        "ok": 25,
+        "total": 25
+      }
+    },
+    {
+      "name": "M7 playbooks",
+      "script": "e2e-playbooks.mjs",
+      "ok": true,
+      "seconds": 44,
+      "checks": {
+        "ok": 18,
+        "total": 18
+      }
+    },
+    {
+      "name": "M8 ontology evolution",
+      "script": "e2e-ontology-evolution.mjs",
+      "ok": true,
+      "seconds": 34,
+      "checks": {
+        "ok": 19,
+        "total": 19
+      }
+    }
+  ],
+  "finishedAt": "2026-11-17T00:31:51.908Z",
+  "ok": true
+}

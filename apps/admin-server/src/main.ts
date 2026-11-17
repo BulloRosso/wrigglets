@@ -33,6 +33,9 @@ import { storeTargets } from './liquid/targets.js';
 import { readTree } from './liquid/seed.js';
 import { PlaybookService } from './liquid/playbooks.js';
 import { EventFeed } from './liquid/eventFeed.js';
+import { Forge, ForgeError } from './liquid/forge.js';
+import { ApprovalService } from './liquid/approvals.js';
+import pg from 'pg';
 
 /**
  * Control plane process of the "temporal" container:
@@ -156,7 +159,20 @@ async function main() {
     async () => JSON.stringify(await ontologyCall(liquidCtx, 'GET', '/internal/opa/data')),
   );
   await configRepo.load();
+  // the Git host of the config repository (ADR-0049): Forgejo as an extension service
+  const FORGE = { org: 'liquid', repo: 'config', bot: 'liquid-bot', reviewer: 'reviewer', team: 'reviewers' };
+  const forge = new Forge({
+    baseUrl: () => extensions.url(LIQUID_ID, 'forgejo'),
+    publicUrl: 'http://localhost:3300',
+    bot: { user: FORGE.bot, password: () => extensions.secret(LIQUID_ID, 'forgejo_bot_password') },
+    owner: FORGE.org,
+    repo: FORGE.repo,
+    webhookSecret: () => extensions.secret(LIQUID_ID, 'forgejo_webhook_secret'),
+  });
+  configRepo.consoleUrl = (id) => `${config.PUBLIC_URL.replace(/\/$/, '')}/liquid/proposals/${id}`;
+  if (configRepo.forgeReady) configRepo.forge = forge;
   // ontology versions (ADR-0048): a changed ontology in main is compiled and applied to the running ontology server
+  configRepo.ontologyInForce = async () => (await ontologyCall<{ source?: { files?: Record<string, string> } }>(liquidCtx, 'GET', '/internal/ontology')).source?.files;
   configRepo.onOntology = async (domain, files, note) => {
     const out = await compilerCall<{ ok: boolean; ir?: unknown; errors?: Array<{ path: string; message: string }> }>('/compile', { files });
     if (!out.ok || !out.ir) throw new Error(`ontology ${domain} does not compile: ${(out.errors ?? []).map((e) => `${e.path}: ${e.message}`).join('; ')}`);
@@ -181,6 +197,62 @@ async function main() {
         const r = await configRepo.init(await seedConfig(), 'install@liquid.local');
         ctx.log(r.created ? `config repository created at ${r.head.slice(0, 12)}` : `config repository exists (main ${r.head.slice(0, 12)})`);
       },
+      // the Git host's database and role in the shared Liquid Postgres (one instance, a schema/role per consumer)
+      'forgejo-db': async (ctx) => {
+        const client = new pg.Client({ host: ctx.host('ontology-db'), port: 5432, user: 'onto', password: ctx.secret('ontology_db_password'), database: 'onto' });
+        for (let i = 0; ; i++) {
+          try {
+            await client.connect();
+            break;
+          } catch (err) {
+            if (i > 30) throw err;
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        }
+        try {
+          const pw = ctx.secret('forgejo_db_password').replace(/'/g, "''");
+          const role = await client.query("SELECT 1 FROM pg_roles WHERE rolname = 'forgejo'");
+          await client.query(role.rows.length ? `ALTER ROLE forgejo WITH LOGIN PASSWORD '${pw}'` : `CREATE ROLE forgejo WITH LOGIN PASSWORD '${pw}'`);
+          const db = await client.query("SELECT 1 FROM pg_database WHERE datname = 'forgejo'");
+          if (!db.rows.length) await client.query('CREATE DATABASE forgejo OWNER forgejo');
+          ctx.log('database forgejo and role ready');
+        } finally {
+          await client.end();
+        }
+      },
+      'forgejo-setup': async (ctx) => {
+        for (let i = 0; !(await forge.ready()); i++) {
+          if (i > 60) throw new Error('the Git host did not become ready');
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        const bot = ctx.secret('forgejo_bot_password');
+        const created = await ctx.exec('forgejo', ['forgejo', 'admin', 'user', 'create', '--admin', '--username', FORGE.bot, '--email', 'bot@liquid.local', '--password', bot, '--must-change-password=false'], 'git');
+        if (created.code !== 0 && !/already exists/i.test(created.output)) throw new Error(`bot account: ${created.output.trim().slice(0, 300)}`);
+        await ctx.exec('forgejo', ['forgejo', 'admin', 'user', 'change-password', '--username', FORGE.bot, '--password', bot, '--must-change-password=false'], 'git');
+        const ok = (p: Promise<unknown>) => p.catch((err: unknown) => (err instanceof ForgeError && (err.status === 409 || err.status === 422) ? undefined : Promise.reject(err)));
+        const reviewer = { username: FORGE.reviewer, email: 'reviewer@liquid.local', full_name: 'Config reviewer', password: ctx.secret('forgejo_reviewer_password'), must_change_password: false };
+        await ok(forge.api('POST', '/admin/users', reviewer));
+        await forge.api('PATCH', `/admin/users/${FORGE.reviewer}`, { login_name: FORGE.reviewer, source_id: 0, password: reviewer.password, must_change_password: false });
+        await ok(forge.api('POST', '/orgs', { username: FORGE.org, visibility: 'private', full_name: 'Liquid Enterprise' }));
+        const teams = await forge.api<Array<{ id: number; name: string }>>('GET', `/orgs/${FORGE.org}/teams`);
+        const team = teams.find((t) => t.name === FORGE.team) ?? (await forge.api<{ id: number }>('POST', `/orgs/${FORGE.org}/teams`, { name: FORGE.team, permission: 'write', includes_all_repositories: true, units: ['repo.code', 'repo.pulls', 'repo.issues'] }));
+        await forge.api('PUT', `/teams/${team.id}/members/${FORGE.reviewer}`);
+        await ok(forge.api('POST', `/orgs/${FORGE.org}/repos`, { name: FORGE.repo, private: true, default_branch: 'main', auto_init: false, description: 'Desired state of the platform (Liquid Enterprise)' }));
+        configRepo.forge = forge;
+        const s = await configRepo.sync();
+        ctx.log(`repository ${FORGE.org}/${FORGE.repo}: ${s.action}`);
+        await configRepo.writeCodeowners(FORGE.org, FORGE.team);
+        const protection = { rule_name: 'main', branch_name: 'main', enable_push: true, enable_push_whitelist: true, push_whitelist_usernames: [FORGE.bot], required_approvals: 1, enable_status_check: true, status_check_contexts: ['liquid/validate'], block_on_rejected_reviews: true, dismiss_stale_approvals: true, block_on_outdated_branch: false };
+        const existing = await forge.api<Array<{ rule_name?: string; branch_name?: string }>>('GET', `${forge.repoPath}/branch_protections`);
+        if (existing.some((b) => (b.rule_name ?? b.branch_name) === 'main')) await forge.api('PATCH', `${forge.repoPath}/branch_protections/main`, protection);
+        else await forge.api('POST', `${forge.repoPath}/branch_protections`, protection);
+        const hookUrl = 'http://temporal:8080/internal/liquid/forgejo';
+        const hooks = await forge.api<Array<{ id: number; config: { url: string } }>>('GET', `${forge.repoPath}/hooks`);
+        for (const h of hooks.filter((x) => x.config.url === hookUrl)) await forge.api('DELETE', `${forge.repoPath}/hooks/${h.id}`);
+        await forge.api('POST', `${forge.repoPath}/hooks`, { type: 'forgejo', active: true, events: ['push', 'pull_request'], config: { url: hookUrl, content_type: 'json', secret: ctx.secret('forgejo_webhook_secret') } });
+        await configRepo.markForgeReady();
+        ctx.log(`Git host ready: http://localhost:3300/${FORGE.org}/${FORGE.repo} (reviewer account "${FORGE.reviewer}")`);
+      },
     },
     liquidOverlay(config),
   );
@@ -193,7 +265,10 @@ async function main() {
       .catch((err) => logger.warn({ err: String(err) }, 'could not initialise the config repository'));
   }
   // owned upstreams (onto, config) are registered by the extension, not through the console: record them after each operation
-  extensions.onOperationDone = (id, kind, who) => (id === LIQUID_ID ? configRepo.capture(who, `extension ${id} ${kind}`) : undefined);
+  extensions.onOperationDone = (id, kind, who) =>
+    id === LIQUID_ID && kind !== 'uninstall'
+      ? configRepo.capture(who, `extension ${id} ${kind}`).then(() => configRepo.reconcile('extension operation')) // a fresh core gets main's ontology at once
+      : undefined;
   configRepo.start(60_000, () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID));
   // Playbooks (ADR-0047): one sensing path, runs in the business worker, steps executed here
   const liquidProcesses = new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined));
@@ -209,6 +284,14 @@ async function main() {
     processes: liquidProcesses,
     killSwitch,
     capture: (who, what) => configRepo.capture(who, what),
+    editing: async (fn) => {
+      configRepo.beginEdit();
+      try {
+        return await fn();
+      } finally {
+        configRepo.endEdit();
+      }
+    },
     propose: async (p) => {
       const out = await configRepo.propose({ title: p.title, reason: p.reason, changes: p.changes, author: { kind: 'agent', id: p.author } });
       return { id: out.id, valid: out.validation.ok };
@@ -235,6 +318,29 @@ async function main() {
   });
   await eventFeed.load();
   eventFeed.start();
+  // one approval mechanism (ADR-0049): ApprovalWorkflows + pull requests + plan approvals in one inbox, mailed
+  const mailService = new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined);
+  const wikiAdmin = async (method: string, p: string, body?: unknown) => {
+    const res = await fetch(`${config.WIKI_URL}/admin${p}`, { method, headers: { authorization: `Bearer ${config.WIKI_ADMIN_TOKEN}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`wiki ${method} ${p}: HTTP ${res.status}`);
+    return res.json() as Promise<unknown>;
+  };
+  const approvals = new ApprovalService({
+    client: () => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined),
+    publicUrl: config.PUBLIC_URL.replace(/\/$/, ''),
+    wiki: config.WIKI_URL && config.WIKI_ADMIN_TOKEN ? { list: async () => (await wikiAdmin('GET', '/proposals?status=pending')) as never, decide: (id, decision, who, comment) => wikiAdmin('POST', `/proposals/${encodeURIComponent(id)}/decide`, { decision, comment, by: who }) } : undefined,
+    configProposals: () => configRepo.list(),
+    plans: async () =>
+      (await temporal.tasks("ExecutionStatus = 'Running' AND TaskStatus = 'awaiting_approval'", 50)).map((t) => ({ taskId: t.taskId, agentId: t.agentId, title: `Plan of ${t.agentId}: ${t.title}`, requestedBy: t.requestedBy, createdAt: t.startTime, link: `${config.PUBLIC_URL.replace(/\/$/, '')}/agents/${t.agentId}` })),
+    approvers: async () => (await oauth.users()).filter((u) => !u.disabled && u.platformRoles.includes('Platform.Admin')).map((u) => u.email),
+    mail: async (m) => void (await mailService.send({ agentId: 'liquid', agentName: 'Liquid Enterprise', kind: 'approval_requested', to: m.to, subject: m.subject, html: m.html })),
+    dataDir: config.DATA_DIR,
+    log: logger,
+  });
+  await approvals.load();
+  approvals.start(() => extensions.isInstalled(LIQUID_ID) && !!temporal.client);
+  // one sensing path (ADR-0049): Signals observations are events, playbooks subscribe (trigger kind signal)
+  signals.onObservation = (o) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'signal', data: o }, 'signals-hub') : undefined);
   safety.onTrip = (t) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'safety_metric', data: t }, 'safety-rules') : undefined);
   gateway.policyProvider = () => (extensions.isInstalled(LIQUID_ID) ? { url: 'http://temporal:8080/internal/liquid/policy' } : undefined);
   const avatars = new AvatarService({
@@ -249,7 +355,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

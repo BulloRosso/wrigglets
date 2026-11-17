@@ -52,11 +52,16 @@ try {
 
   const swap = spawnSync(process.execPath, [path.join(root, 'scripts/liquid/setup.mjs')], { encoding: 'utf8' });
   check('erp/crm now point at the ontology server', swap.status === 0, swap.stdout.trim().split('\n').slice(0, 2).join(' | ') || swap.stderr);
+  // expected counts from the ontology in force: every action under onto, the mock's groups under erp/crm (31 tools;
+  // actions added later, e.g. release_purchase_order in M5, have no group)
+  const live = await api('GET', '/liquid/ontology');
+  const nOnto = live.actions.length + live.actions.reduce((n, a) => n + (a.aliases?.length ?? 0), 0);
+  const nGroups = live.actions.filter((a) => a.mcpGroup).length;
   const tools = await until('gateway lists the ontology tools', async () => {
     const t = (await api('GET', '/gateway')).tools.map((x) => x.name);
-    return t.filter((n) => n.startsWith('onto__')).length === 31 && t.filter((n) => /^(erp|crm)__/.test(n)).length === 31 ? t : undefined;
+    return t.filter((n) => n.startsWith('onto__')).length === nOnto && t.filter((n) => /^(erp|crm)__/.test(n)).length === nGroups ? t : undefined;
   }, 120_000, 5000);
-  check('the gateway lists 31 onto__ and 31 erp__/crm__ tools from the ontology server', true, { onto: tools.filter((n) => n.startsWith('onto__')).length });
+  check(`the gateway lists ${nOnto} onto__ and ${nGroups} erp__/crm__ tools from the ontology server`, nGroups === 31, { onto: tools.filter((n) => n.startsWith('onto__')).length });
 
   // same steps against the mock (in-process) and the ontology server (via the gateway, as the agent)
   await api('POST', '/liquid/sim/reset');
@@ -71,16 +76,32 @@ try {
     ['erp__get_kpi', {}],
   ];
   const answers = [];
+  // since M4 an agent's payment-critical write outside an approved task waits for four eyes: the parity is checked on
+  // the governed path — a person approves in the inbox, the action runs, its answer is compared with the mock's
+  const throughApproval = async (r, args) => {
+    if (!/^Pending approval \(four eyes\)/.test(r.text)) return r;
+    const canon = (o) => JSON.stringify(Object.fromEntries(Object.entries(o ?? {}).sort(([a], [b]) => a.localeCompare(b))));
+    const item = await until('approval in the inbox', async () => (await api('GET', '/liquid/inbox')).find((i) => i.kind === 'action' && i.state === 'pending' && canon(i.detail?.args) === canon(args)), 30_000, 1000);
+    await api('POST', `/liquid/approvals/${encodeURIComponent(item.id)}/decide`, { decision: 'approve', comment: 'e2e parity' });
+    const done = await until('approval executed', async () => {
+      const p = await api('GET', '/liquid/processes');
+      return p.recent.find((x) => x.workflowId === item.id);
+    }, 60_000, 1000);
+    const st = await api('GET', `/liquid/approvals/${encodeURIComponent(item.id)}`).catch(() => undefined);
+    approvals.push(item.id);
+    return { text: st?.result ?? '', isError: st?.state !== 'executed', approved: true, state: st?.state ?? done.status };
+  };
+  const approvals = [];
   for (const [tool, args] of steps) {
-    const viaGateway = agentCall(tool, args);
+    const viaGateway = await throughApproval(agentCall(tool, args), args);
     const viaMock = mockCall(tool.replace(/^(erp|crm)__/, ''), args);
     answers.push({ tool, equal: viaGateway.text === viaMock.text, isError: viaGateway.isError });
     check(`${tool} through the gateway answers like the mock`, viaGateway.text === viaMock.text && viaGateway.isError === viaMock.isError, viaGateway.isError ? viaGateway.text.slice(0, 80) : `${viaGateway.text.length} chars`);
   }
-  const written = Number(psql('SELECT count(*) FROM events')) - before;
-  check('exactly one event written (read-only and failed precondition write nothing)', written === 1, `${written} new event(s)`);
-  const ev = psql("SELECT type || '|' || object_id || '|' || coalesce(actor_agent,'') || '|' || coalesce(action,'') || '|' || jsonb_array_length(payload->'changes') FROM events ORDER BY seq DESC LIMIT 1");
-  check('the event records the agent the gateway verified, the action and its changes', ev === `PurchaseOrderCreated|PO-4430|${AGENT}|create_purchase_order|1`, ev);
+  const written = Number(psql(`SELECT count(*) FROM events WHERE seq > ${before} AND payload ? 'changes' AND action IS NOT NULL`));
+  check('exactly one business change written (read-only and failed precondition write nothing)', written === 1, `${written} change event(s), ${approvals.length} approval(s)`);
+  const ev = psql(`SELECT type || '|' || object_id || '|' || coalesce(actor_agent,'') || '|' || coalesce(action,'') || '|' || jsonb_array_length(payload->'changes') || '|' || coalesce(payload->>'approvedBy','') FROM events WHERE seq > ${before} AND type = 'PurchaseOrderCreated' ORDER BY seq DESC LIMIT 1`);
+  check('the event records the agent the gateway verified, the action, its changes and who approved it', ev === `PurchaseOrderCreated|PO-4430|${AGENT}|create_purchase_order|1|${env.BOOTSTRAP_ADMIN_EMAIL}`, ev);
   const kpi = await api('GET', '/liquid/sim/kpi');
   check('KPI equals the mock after the same steps', JSON.stringify(kpi) === JSON.stringify(mockControl.kpi()), { lateOrders: kpi.lateOrders, cost: kpi.costOfMeasuresEur });
 

@@ -21,6 +21,12 @@ services:
       LIQUID_COMPILER_TOKEN: ${LIQUID_COMPILER_TOKEN:?run scripts/stack.mjs env to add LIQUID_COMPILER_TOKEN}
       LIQUID_PLAYBOOK_TOKEN: ${LIQUID_PLAYBOOK_TOKEN:?run scripts/stack.mjs env to add LIQUID_PLAYBOOK_TOKEN}
       LIQUID_ALERTS_TOKEN: ${LIQUID_ALERTS_TOKEN:?run scripts/stack.mjs env to add LIQUID_ALERTS_TOKEN}
+      LIQUID_FORGEJO_DB_PASSWORD: ${LIQUID_FORGEJO_DB_PASSWORD:?run scripts/stack.mjs env}
+      LIQUID_FORGEJO_SECRET_KEY: ${LIQUID_FORGEJO_SECRET_KEY:?run scripts/stack.mjs env}
+      LIQUID_FORGEJO_INTERNAL_TOKEN: ${LIQUID_FORGEJO_INTERNAL_TOKEN:?run scripts/stack.mjs env}
+      LIQUID_FORGEJO_BOT_PASSWORD: ${LIQUID_FORGEJO_BOT_PASSWORD:?run scripts/stack.mjs env}
+      LIQUID_FORGEJO_REVIEWER_PASSWORD: ${LIQUID_FORGEJO_REVIEWER_PASSWORD:?run scripts/stack.mjs env}
+      LIQUID_FORGEJO_WEBHOOK_SECRET: ${LIQUID_FORGEJO_WEBHOOK_SECRET:?run scripts/stack.mjs env}
 
   ontology-db:
     image: postgres:17.6-alpine
@@ -74,6 +80,40 @@ services:
       retries: 30
     networks: [coworking]
 
+  # Git host of the config repository (ADR-0049). Its database and role are created in ontology-db by the control plane
+  # (console install); in overlay mode the built-in review stays in use until the host is set up.
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:15@sha256:5d050e6d623e540923ff54b1c0c7acf41c3f9174a6c7ad515cc0c63d703fcd22
+    container_name: cw-liquid-forgejo
+    hostname: forgejo
+    restart: unless-stopped
+    ports: ["127.0.0.1:3300:3000"]
+    volumes:
+      - liquid-forgejo-data:/data
+    environment:
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: ontology-db:5432
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: forgejo
+      FORGEJO__database__PASSWD: ${LIQUID_FORGEJO_DB_PASSWORD:?}
+      FORGEJO__server__ROOT_URL: http://localhost:3300/
+      FORGEJO__server__HTTP_PORT: "3000"
+      FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__server__OFFLINE_MODE: "true"
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__security__SECRET_KEY: ${LIQUID_FORGEJO_SECRET_KEY:?}
+      FORGEJO__security__INTERNAL_TOKEN: ${LIQUID_FORGEJO_INTERNAL_TOKEN:?}
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__webhook__ALLOWED_HOST_LIST: private,loopback
+      FORGEJO__repository__DEFAULT_BRANCH: main
+      FORGEJO__actions__ENABLED: "false"
+      FORGEJO__mailer__ENABLED: "false"
+      FORGEJO__log__LEVEL: Warn
+    depends_on:
+      ontology-db: { condition: service_healthy }
+    networks: [coworking]
+
   # Ontology compiler as a service + policy checker (ADR-0041, ADR-0046): drafts and config proposals are validated here.
   ontology-compiler:
     build: { context: ., dockerfile: infra/docker/ontology-compiler.Dockerfile }
@@ -91,5 +131,6 @@ services:
     networks: [coworking]
 
 volumes:
+  liquid-forgejo-data:
   liquid-ontology-db-data:
   liquid-lake-data:

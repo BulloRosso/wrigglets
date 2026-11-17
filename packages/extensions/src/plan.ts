@@ -17,9 +17,13 @@ export function installSteps(m: ExtensionManifest, opts: { seedDemo: boolean }):
     { id: 'preflight', label: 'Check images and Docker' },
     { id: 'secrets', label: 'Generate secrets' },
     { id: 'volumes', label: 'Create data volumes' },
-    ...dependencyOrder(m.services).map((s) => ({ id: `service:${s.name}`, label: `Start ${s.name}` })),
+    ...dependencyOrder(m.services).flatMap((s) => [
+      // bootstrap steps that must run before this service starts (once, before the first service that needs them)
+      ...m.bootstrap.filter((b) => b.before.includes(s.name) && (!b.demoOnly || opts.seedDemo) && dependencyOrder(m.services).find((x) => b.before.includes(x.name))?.name === s.name).map((b) => ({ id: `bootstrap:${b.id}`, label: b.description })),
+      { id: `service:${s.name}`, label: `Start ${s.name}` },
+    ]),
     { id: 'retired', label: 'Remove containers of services this version no longer has' },
-    ...m.bootstrap.filter((b) => !b.demoOnly || opts.seedDemo).map((b) => ({ id: `bootstrap:${b.id}`, label: b.description })),
+    ...m.bootstrap.filter((b) => !b.before.length && (!b.demoOnly || opts.seedDemo)).map((b) => ({ id: `bootstrap:${b.id}`, label: b.description })),
     ...(m.upstreams.length ? [{ id: 'upstreams', label: `Register gateway upstreams (${m.upstreams.map((u) => u.name).join(', ')})` }] : []),
   ];
 }

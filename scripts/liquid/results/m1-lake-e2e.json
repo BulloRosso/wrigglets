@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-16T16:16:51.080Z",
+  "startedAt": "2026-11-17T00:24:21.592Z",
   "checks": [
     {
       "name": "installed and available",
@@ -10,7 +10,15 @@
         "volumes=done",
         "service:ontology-db=done",
         "service:ontology-server=done",
-        "bootstrap:seed-sofa=done"
+        "bootstrap:forgejo-db=done",
+        "service:forgejo=done",
+        "service:ontology-compiler=done",
+        "retired=done",
+        "bootstrap:business-namespace=done",
+        "bootstrap:seed-sofa=done",
+        "bootstrap:config-repo=done",
+        "bootstrap:forgejo-setup=done",
+        "upstreams=done"
       ]
     },
     {
@@ -18,7 +26,9 @@
       "ok": true,
       "detail": [
         "ontology-db=running",
-        "ontology-server=running"
+        "ontology-server=running",
+        "forgejo=running",
+        "ontology-compiler=running"
       ]
     },
     {
@@ -60,13 +70,13 @@
       "ok": true,
       "detail": {
         "first": {
-          "flushed": 1000,
-          "hwm": 3000,
+          "flushed": 1009,
+          "hwm": 1009,
           "waiting": 0
         },
         "second": {
           "flushed": 0,
-          "hwm": 3000,
+          "hwm": 1009,
           "waiting": 0
         },
         "rows": {
@@ -100,29 +110,29 @@
         "erp_purchase_orders": 1,
         "erp_suppliers": 1,
         "erp_workers": 1,
-        "events": 3
+        "events": 2
       }
     },
     {
       "name": "lake data files are Parquet on the volume",
       "ok": true,
-      "detail": "17 parquet files under /lake"
+      "detail": "16 parquet files under /lake"
     },
     {
       "name": "DuckLake catalog lives in Postgres schema lake_catalog",
       "ok": true,
-      "detail": "46 catalog tables"
+      "detail": "29 catalog tables"
     }
   ],
   "lake": {
-    "hwm": 3000,
-    "snapshots": 9,
-    "lastSnapshotAt": "2026-11-16 16:17:08.72947+00",
+    "hwm": 1009,
+    "snapshots": 7,
+    "lastSnapshotAt": "2026-11-17 00:24:26.847276+00",
     "extracts": [
       {
         "id": "sofa-T0",
         "source": "sofa-company mock (scripts/sofa-company/mock-mcp.mjs), initial state",
-        "at": "2026-11-16 16:11:28.675+00",
+        "at": "2026-11-17 00:24:09.007+00",
         "tables": {
           "erp_factories": 2,
           "erp_machines": 6,
@@ -143,10 +153,10 @@
       }
     ],
     "lastFlush": {
-      "at": "2026-11-16T16:17:08.963Z",
+      "at": "2026-11-17T00:24:27.056Z",
       "result": {
         "flushed": 0,
-        "hwm": 3000,
+        "hwm": 1009,
         "waiting": 0
       }
     },
@@ -167,11 +177,11 @@
       "erp_purchase_orders": 1,
       "erp_suppliers": 1,
       "erp_workers": 1,
-      "events": 3
+      "events": 2
     },
     "eventLog": {
-      "count": 3000,
-      "maxSeq": 3000
+      "count": 1009,
+      "maxSeq": 1009
     },
     "counts": {
       "crm_campaigns": 1,
@@ -189,9 +199,9 @@
       "erp_purchase_orders": 4,
       "erp_suppliers": 7,
       "erp_workers": 4,
-      "events": 3000
+      "events": 1009
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-16T16:17:10.022Z"
+  "finishedAt": "2026-11-17T00:24:33.782Z"
 }

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
-  <title>Policy as code: two enforcement points, one bundle</title>
+  <title>Policy as code: two enforcement points, one embedded package</title>
   <style>
     .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
     .st { font-size: 13px; fill: #5b6777; }
@@ -26,8 +26,8 @@
     <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
   </defs>
   <rect width="1200" height="640" fill="#ffffff"/>
-  <text x="40" y="44" class="t">Policy as code (M4): two enforcement points, one bundle, fail closed</text>
-  <text x="40" y="68" class="st">The gateway decides with the call (agent, role, step); the ontology server decides with the objects (criticality, data class, owner, status).</text>
+  <text x="40" y="44" class="t">Policy as code: two enforcement points, one embedded WASM package, fail closed</text>
+  <text x="40" y="68" class="st">The gateway decides with the call (agent, role, step); the enterprise core decides with the objects (criticality, data class, owner, status).</text>
 
   <!-- agent -->
   <rect x="40" y="110" width="180" height="96" rx="10" class="ag"/>
@@ -42,7 +42,7 @@
   <circle cx="300" cy="150" r="10" class="bd"/><text x="300" y="154" class="num">1</text>
   <text x="318" y="154" class="d">allow-list, kill switch, limits (as before)</text>
   <circle cx="300" cy="180" r="10" class="bd"/><text x="300" y="184" class="num">2</text>
-  <text x="318" y="184" class="d">upstream has policy: opa →</text>
+  <text x="318" y="184" class="d">upstream has a policy →</text>
   <text x="318" y="200" class="mono">liquid.gateway.decision</text>
   <text x="318" y="220" class="lbl">role may write? read-only in plan step?</text>
   <text x="318" y="236" class="lbl">destructive only with approved plan?</text>
@@ -50,11 +50,11 @@
   <circle cx="300" cy="278" r="10" class="bd"/><text x="300" y="282" class="num">3</text>
   <text x="318" y="282" class="d">plan-step rule, then the call with</text>
   <text x="318" y="298" class="mono">_agent _task _requestedBy _step</text>
-  <text x="290" y="330" class="lbl">deny or OPA unreachable → "Denied by policy"</text>
+  <text x="290" y="330" class="lbl">deny or no package → "Denied by policy"</text>
 
   <!-- ontology server -->
   <rect x="270" y="380" width="300" height="220" rx="12" class="cp"/>
-  <text x="290" y="408" class="h">Ontology server (action pipeline)</text>
+  <text x="290" y="408" class="h">Enterprise core (action pipeline)</text>
   <circle cx="300" cy="434" r="10" class="bd"/><text x="300" y="438" class="num">4</text>
   <text x="318" y="438" class="d">validate input, resolve touched objects</text>
   <circle cx="300" cy="464" r="10" class="bd"/><text x="300" y="468" class="num">5</text>
@@ -71,45 +71,54 @@
   <path d="M420,346 L420,378" class="ln" marker-end="url(#a)"/>
   <text x="430" y="368" class="lbl">erp/crm/onto upstream</text>
 
-  <!-- OPA -->
-  <rect x="640" y="250" width="240" height="190" rx="12" class="opa"/>
-  <text x="660" y="278" class="h">OPA 1.22 (extension)</text>
-  <text x="660" y="300" class="d">authentication: token</text>
-  <text x="660" y="318" class="d">authorization: only the two</text>
-  <text x="660" y="334" class="d">decision paths + health</text>
-  <text x="660" y="358" class="d">no bundle → no authz policy</text>
-  <text x="660" y="374" class="d">→ everything denied</text>
-  <text x="660" y="400" class="lbl">polls every 5–10 s (ETag)</text>
-  <text x="660" y="416" class="lbl">reports decisions every 5–10 s</text>
-  <path d="M572,200 L638,300" class="lnr" marker-end="url(#r)"/>
-  <path d="M572,470 L638,390" class="lnr" marker-end="url(#r)"/>
-  <text x="586" y="236" class="lbl">query</text>
-  <text x="586" y="456" class="lbl">query</text>
+  <!-- compiler -->
+  <rect x="640" y="440" width="240" height="160" rx="12" class="opa"/>
+  <text x="660" y="468" class="h">ontology-compiler</text>
+  <text x="660" y="490" class="mono">POST /build-wasm</text>
+  <text x="660" y="510" class="d">Rego of the applied revision</text>
+  <text x="660" y="526" class="d">→ one WASM module</text>
+  <text x="660" y="550" class="d">opa check + opa test</text>
+  <text x="660" y="566" class="d">for every proposal</text>
+  <path d="M882,520 L938,520 L938,400" class="ln" marker-end="url(#a)"/>
+
+  <!-- embedded engine -->
+  <rect x="640" y="200" width="240" height="200" rx="12" class="opa"/>
+  <text x="660" y="228" class="h">embedded engine</text>
+  <text x="660" y="248" class="mono">@cw/policy-wasm</text>
+  <text x="660" y="272" class="d">in the gateway and in the</text>
+  <text x="660" y="288" class="d">enterprise core (no OPA service)</text>
+  <text x="660" y="312" class="d">no package loaded → denied</text>
+  <text x="660" y="328" class="d">refresh fails → last good one</text>
+  <text x="660" y="352" class="lbl">polls every 5 s (ETag)</text>
+  <text x="660" y="368" class="lbl">denials → PolicyDecision events</text>
+  <text x="660" y="384" class="lbl">host builtins: time.now_ns, parse</text>
+  <path d="M638,260 L572,200" class="lnr" marker-end="url(#r)"/>
+  <path d="M638,370 L572,470" class="lnr" marker-end="url(#r)"/>
+  <text x="586" y="222" class="lbl">decide</text>
+  <text x="586" y="440" class="lbl">decide</text>
 
   <!-- control plane -->
   <rect x="940" y="96" width="220" height="300" rx="12" class="db"/>
   <text x="958" y="124" class="h">Control plane</text>
-  <text x="958" y="146" class="h2">bundle.tar.gz</text>
-  <text x="958" y="166" class="mono">liquid/*.rego</text>
-  <text x="958" y="182" class="mono">system/authz.rego</text>
-  <text x="958" y="198" class="mono">data.json:</text>
-  <text x="970" y="214" class="mono">liquid.ontology (generated)</text>
-  <text x="970" y="230" class="mono">liquid.roles (roles.json)</text>
-  <text x="970" y="246" class="mono">liquid.overlays</text>
-  <text x="970" y="262" class="mono">system.authz.query_token</text>
-  <text x="958" y="290" class="h2">decision log sink</text>
-  <text x="958" y="308" class="d">→ Policies page</text>
-  <text x="958" y="334" class="h2">gateway config</text>
-  <text x="958" y="352" class="d">opa url + token ref</text>
-  <text x="958" y="368" class="d">(Key Vault)</text>
-  <path d="M938,300 L882,330" class="lnb" marker-end="url(#b)"/>
-  <path d="M882,410 L938,360" class="ln" marker-end="url(#a)"/>
+  <text x="958" y="146" class="h2">policy package</text>
+  <text x="958" y="164" class="mono">/internal/liquid/policy</text>
+  <text x="958" y="186" class="mono">policy.wasm</text>
+  <text x="958" y="202" class="mono">data:</text>
+  <text x="970" y="218" class="mono">liquid.ontology (IR in force)</text>
+  <text x="970" y="234" class="mono">liquid.roles (roles.json)</text>
+  <text x="970" y="250" class="mono">liquid.overlays</text>
+  <text x="958" y="276" class="d">token: gateway token or</text>
+  <text x="958" y="292" class="d">the extension's policy_token</text>
+  <text x="958" y="318" class="h2">Policies page</text>
+  <text x="958" y="336" class="d">revision, consumers,</text>
+  <text x="958" y="352" class="d">overlays, recent denials</text>
+  <path d="M938,250 L882,280" class="lnb" marker-end="url(#b)"/>
 
   <!-- people / sources -->
   <rect x="940" y="430" width="220" height="170" rx="12" class="usr"/>
   <text x="958" y="458" class="h">Sources of policy</text>
   <text x="958" y="482" class="mono">policies/liquid/ (Git)</text>
-  <text x="958" y="500" class="d">Rego + roles, opa test in CI</text>
+  <text x="958" y="500" class="d">Rego + roles, opa test in checks</text>
   <text x="958" y="526" class="mono">ontology annotations</text>
   <text x="958" y="544" class="d">criticality, data class, owner</text>
   <text x="958" y="570" class="h2">overlays</text>

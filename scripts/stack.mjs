@@ -49,6 +49,12 @@ const laterSecrets = () => ({
   LIQUID_COMPILER_TOKEN: secret(32),
   LIQUID_PLAYBOOK_TOKEN: secret(32),
   LIQUID_POLICY_TOKEN: secret(32),
+  LIQUID_FORGEJO_DB_PASSWORD: secret(24),
+  LIQUID_FORGEJO_SECRET_KEY: secret(32),
+  LIQUID_FORGEJO_INTERNAL_TOKEN: secret(48),
+  LIQUID_FORGEJO_BOT_PASSWORD: secret(24),
+  LIQUID_FORGEJO_REVIEWER_PASSWORD: secret(18),
+  LIQUID_FORGEJO_WEBHOOK_SECRET: secret(32),
   LIQUID_ALERTS_TOKEN: secret(32),
   // LiteLLM requires keys starting with "sk-"
   CW_LITELLM_MASTER_KEY: `sk-${secret(32)}`,

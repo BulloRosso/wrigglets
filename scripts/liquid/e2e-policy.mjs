@@ -4,7 +4,8 @@
 //   - an agent outside its role is denied by OPA even when its allow-list is widened;
 //   - an overlay denying an action takes effect within 30 s without restarting anything, and removing it restores;
 //   - four eyes at the ontology server for an agent write on a payment-critical object outside an approved task;
-//   - OPA down => every policy: opa call is denied (fail closed); back up => allowed again.
+//   - since ADR-0049 the policy is embedded: the gateway and the enterprise core evaluate the same package (Rego → WASM)
+//     in-process; the package endpoint needs a token; denials are events in the event log.
 // Screenshot of the Policies page for the docs. Leaves erp/crm on the mock afterwards (--keep-onto to keep them).
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -42,12 +43,17 @@ try {
     if (x.phase === 'failed') throw new Error(JSON.stringify(x.operation.steps.filter((y) => y.error)));
     return x.phase === 'installed' && x.operation?.finishedAt && x.available ? x : undefined;
   }, 300_000, 3000);
-  check('repair added OPA; all services running', st.services.every((x) => x.state === 'running') && st.services.some((x) => x.name === 'opa'), st.services.map((x) => `${x.name}=${x.state}`));
-  const pol = await until('OPA fetched its bundle', async () => {
+  check('all services running, no OPA container (policy embedded)', st.services.every((x) => x.state === 'running') && !st.services.some((x) => x.name === 'opa'), st.services.map((x) => `${x.name}=${x.state}`));
+  // agents that earlier runs pushed over the tool-denial threshold get their kill switch reset (a person's action)
+  const ks = (await api('GET', '/killswitch')).state ?? {};
+  for (const a of ['sofa-max', 'sofa-horst', 'sofa-lara']) if (ks.agents?.[a] && ks.agents[a].level !== 'normal') await api('PUT', `/agents/${a}/killswitch`, { level: 'normal', reason: 'reset for the e2e run' });
+  const pol = await until('gateway and core loaded the policy package', async () => {
     const p = await api('GET', '/liquid/policy');
-    return p.lastFetchByOpa ? p : undefined;
+    return p.consumers?.gateway && p.consumers?.core && p.consumers.gateway.revision === p.bundle?.revision ? p : undefined;
   }, 90_000, 3000);
-  check('OPA polls the bundle from the control plane', !!pol.lastFetchByOpa, { revision: pol.bundle?.revision, files: pol.bundle?.files });
+  check('gateway and enterprise core load the same compiled policy (WASM) from the control plane', pol.bundle.engine === 'wasm' && pol.consumers.core.revision === pol.bundle.revision, { revision: pol.bundle.revision, files: pol.bundle.files });
+  const anon = await fetch(`${ADMIN}/internal/liquid/policy`);
+  check('the policy package needs a token', anon.status === 401, anon.status);
 
   const swap = spawnSync(process.execPath, [path.join(root, 'scripts/liquid/setup.mjs'), '--opa'], { encoding: 'utf8' });
   check('erp/crm point at the ontology server with policy: opa', swap.status === 0 && /policy: opa/.test(swap.stdout), swap.stdout.trim().split('\n').slice(0, 2).join(' | ') || swap.stderr);
@@ -56,7 +62,7 @@ try {
 
   // 1. allowed calls still work (reads for everyone; Lara's write as in her role)
   const read = agentCall('sofa-horst', 'erp__list_suppliers', { sku: 'BEAM-PINE-80' });
-  check('a read through gateway + OPA works', !read.isError, `${read.text.length} chars`);
+  check('a read through gateway + embedded policy works', !read.isError, `${read.text.length} chars`);
   const write = agentCall('sofa-max', 'erp__request_overtime', { factory: 'F-NORTH', from: '2026-10-06', to: '2026-10-07' });
   check("a write in the agent's role works (production → request_overtime)", !write.isError, write.text.slice(0, 80));
 
@@ -66,7 +72,7 @@ try {
   await api('PUT', '/agents/sofa-horst/tools', { allowedTools: [...before, 'erp__create_purchase_order'] });
   await sleep(3000);
   const outside = agentCall('sofa-horst', 'erp__create_purchase_order', { supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 2000 });
-  check('an agent outside its role is denied by OPA although its allow-list was widened', outside.isError && /Denied by policy: .*no role that may run create_purchase_order/.test(outside.text), outside.text.slice(0, 120));
+  check('an agent outside its role is denied by the policy although its allow-list was widened', outside.isError && /Denied by policy: .*no role that may run create_purchase_order/.test(outside.text), outside.text.slice(0, 120));
   await api('PUT', '/agents/sofa-horst/tools', { allowedTools: before });
   restoreTools = undefined;
 
@@ -95,17 +101,10 @@ try {
   const pending = docker('exec', 'cw-ext-liquid-ontology-db', 'psql', '-U', 'onto', '-d', 'onto', '-tAc', "SELECT count(*) FROM events WHERE type = 'ActionApprovalRequested' AND actor_agent = 'sofa-lara'").stdout.trim();
   check('the approval request is recorded as an event', Number(pending) >= 1, `${pending} request(s)`);
 
-  // 5. fail closed: OPA down => denied; up => allowed
-  docker('stop', 'cw-ext-liquid-opa');
-  const down = agentCall('sofa-horst', 'erp__list_suppliers', {});
-  check('OPA down ⇒ policy: opa calls are denied (fail closed)', down.isError && /not reachable|fail closed/.test(down.text), down.text.slice(0, 100));
-  docker('start', 'cw-ext-liquid-opa');
-  const up = await until('OPA back', async () => (agentCall('sofa-horst', 'erp__list_suppliers', {}).isError ? undefined : true), 60_000, 3000);
-  check('OPA back ⇒ allowed again', up);
-
-  await sleep(12_000); // decision logs are reported every 5–10 s
+  // 5. decisions are events: the gateway's denials (forwarded) and the core's object-level denials
+  await sleep(8000); // the event feed forwards the gateway's audit every 5 s
   const decisions = (await api('GET', '/liquid/policy')).decisions;
-  check('OPA reports its decisions to the control plane', decisions.length > 0, `${decisions.length} decisions, e.g. ${decisions.find((d) => d.allow === false)?.reason ?? ''}`.slice(0, 140));
+  check('policy decisions are in the event log (gateway and core)', decisions.some((d) => d.allow === false), `${decisions.length} decisions, e.g. ${decisions.find((d) => d.allow === false)?.reason ?? ''}`.slice(0, 140));
 
   if (!args.has('--no-shots')) {
     await api('POST', '/liquid/policy/overlays', { effect: 'require_four_eyes', reason: 'Example: supplier data under review', match: { classes: ['Supplier'] }, source: 'admin (docs example)' }).then(async (o) => {
@@ -128,7 +127,6 @@ try {
 } finally {
   if (restoreTools) await api('PUT', '/agents/sofa-horst/tools', { allowedTools: restoreTools }).catch(() => undefined);
   if (overlayId) await api('DELETE', `/liquid/policy/overlays/${overlayId}`).catch(() => undefined);
-  docker('start', 'cw-ext-liquid-opa');
   if (!args.has('--keep-onto')) spawnSync(process.execPath, [path.join(root, 'scripts/liquid/setup.mjs'), '--restore'], { encoding: 'utf8' });
   result.finishedAt = new Date().toISOString();
   mkdirSync(path.join(root, 'scripts/liquid/results'), { recursive: true });

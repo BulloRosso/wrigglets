@@ -44,6 +44,8 @@ export interface BootstrapContext {
   url(service: string): string;
   host(service: string): string;
   log(msg: string, data?: Record<string, unknown>): void;
+  /** Runs a command in a service container of the extension (Docker runtime only). */
+  exec(service: string, cmd: string[], user?: string): Promise<{ code: number; output: string }>;
 }
 export type BootstrapHandler = (ctx: BootstrapContext) => Promise<void>;
 
@@ -372,6 +374,10 @@ export class ExtensionService {
         return v;
       },
       url: (service) => this.url(id, service),
+      exec: async (service, cmd, user) => {
+        if (!this.runtime) throw new Error('no container runtime');
+        return this.runtime.exec(id, service, cmd, user);
+      },
       host: (service) => service,
       log: (msg, data) => logger.info({ extension: id, ...data }, msg),
     };
@@ -474,7 +480,9 @@ export class ExtensionService {
       return;
     }
     if (step.id === 'volumes') {
-      for (const v of new Set(m.services.flatMap((s) => s.volumes.map((x) => x.name)))) await rt.removeVolume(id, v);
+      // declared volumes and those of services an earlier version had (labelled for this extension)
+      const all = new Set([...m.services.flatMap((s) => s.volumes.map((x) => x.name)), ...((await rt.listVolumes?.(id).catch(() => [])) ?? [])]);
+      for (const v of all) await rt.removeVolume(id, v);
       return;
     }
     if (step.id === 'secrets') {

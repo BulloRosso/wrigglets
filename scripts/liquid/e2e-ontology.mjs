@@ -4,6 +4,7 @@
 // every class. Screenshots for docs/liquid-enterprise.md.
 //
 //   node scripts/liquid/e2e-ontology.mjs [--no-shots]
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
@@ -32,9 +33,18 @@ try {
   check('repair picked up the new images and is available', st.available, st.operation.steps.map((x) => `${x.id}=${x.state}`));
   check('the Ontology page is offered to the nav', st.uiRoutes.some((r) => r.path === '/liquid/ontology'), st.uiRoutes);
 
-  const ir = await until('ontology served', () => api('GET', '/liquid/ontology'), 60_000);
-  check('the ontology server serves the committed IR (same hash)', ir.hash === committed.hash, `${ir.name}@${ir.version} ${ir.hash.slice(0, 12)}`);
-  check('IR has the sofa company: 19 classes, 31 actions', ir.classes.length === 19 && ir.actions.length === 31, { classes: ir.classes.length, actions: ir.actions.length, links: ir.links.length });
+  let ir = await until('ontology served', () => api('GET', '/liquid/ontology'), 60_000);
+  // since ADR-0049 the ontology in force is the one of the config repository's main (applied by the reconciler); after
+  // test runs its version may be higher than the built-in one, with the same structure
+  const main = Object.fromEntries(await Promise.all(['schema.yaml', 'actions.yaml', 'bindings.yaml'].map(async (f) => [f, (await api('GET', `/liquid/config/file?path=ontology/sofa/${f}`)).content])));
+  const sha = (t) => createHash('sha256').update(t.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+  ir = await until('the core runs main\'s ontology', async () => {
+    const x = await api('GET', '/liquid/ontology');
+    return Object.entries(main).every(([f, t]) => x.source.files[f] === sha(t)) ? x : undefined;
+  }, 90_000, 3000).catch(() => ir);
+  check('the enterprise core runs the ontology of the config repository (source hashes of main)', Object.entries(main).every(([f, t]) => ir.source.files[f] === sha(t)), `${ir.name}@${ir.version} ${ir.hash.slice(0, 12)}`);
+  const names = (x) => JSON.stringify([x.classes.map((c) => c.name).sort(), x.actions.map((a) => a.name).sort()]);
+  check('same classes and actions as the built-in sofa ontology', names(ir) === names(committed), { classes: ir.classes.length, actions: ir.actions.length, links: ir.links.length, builtIn: committed.version });
 
   if (!args.has('--no-shots')) {
     const { Shots } = await import('../sofa-company/shots.mjs');

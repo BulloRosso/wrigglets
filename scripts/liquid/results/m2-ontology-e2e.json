@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-16T16:54:43.026Z",
+  "startedAt": "2026-11-17T00:24:33.828Z",
   "checks": [
     {
       "name": "repair picked up the new images and is available",
@@ -10,7 +10,15 @@
         "volumes=done",
         "service:ontology-db=done",
         "service:ontology-server=done",
-        "bootstrap:seed-sofa=done"
+        "bootstrap:forgejo-db=done",
+        "service:forgejo=done",
+        "service:ontology-compiler=done",
+        "retired=done",
+        "bootstrap:business-namespace=done",
+        "bootstrap:seed-sofa=done",
+        "bootstrap:config-repo=done",
+        "bootstrap:forgejo-setup=done",
+        "upstreams=done"
       ]
     },
     {
@@ -22,23 +30,48 @@
           "path": "/liquid"
         },
         {
+          "label": "Approvals",
+          "path": "/liquid/approvals"
+        },
+        {
           "label": "Ontology",
           "path": "/liquid/ontology"
+        },
+        {
+          "label": "Policies",
+          "path": "/liquid/policies"
+        },
+        {
+          "label": "Business processes",
+          "path": "/liquid/processes"
+        },
+        {
+          "label": "Proposals",
+          "path": "/liquid/proposals"
+        },
+        {
+          "label": "Playbooks",
+          "path": "/liquid/playbooks"
+        },
+        {
+          "label": "Event log",
+          "path": "/liquid/events"
         }
       ]
     },
     {
-      "name": "the ontology server serves the committed IR (same hash)",
+      "name": "the enterprise core runs the ontology of the config repository (source hashes of main)",
       "ok": true,
-      "detail": "sofa@0.1.0 47c5052c5079"
+      "detail": "sofa@4.0.0 ade916c11206"
     },
     {
-      "name": "IR has the sofa company: 19 classes, 31 actions",
+      "name": "same classes and actions as the built-in sofa ontology",
       "ok": true,
       "detail": {
         "classes": 19,
-        "actions": 31,
-        "links": 21
+        "actions": 32,
+        "links": 21,
+        "builtIn": "0.1.0"
       }
     },
     {
@@ -57,5 +90,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T16:54:51.769Z"
+  "finishedAt": "2026-11-17T00:24:42.671Z"
 }

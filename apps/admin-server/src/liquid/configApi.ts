@@ -37,10 +37,15 @@ const str = (v: unknown, max = 4000) => (typeof v === 'string' && v.trim() ? v.t
 const CAPTURE = /^\/(gateway\/upstreams|agents(\/[^/]+(\/(tools|ai|entra))?)?|safety\/rules|liquid\/policy\/overlays)(\/|$)/;
 export function captureEdits(ext: ExtensionService, repo: ConfigRepoService, by: (req: Request) => string, logger?: LiquidConfigDeps['logger']): RequestHandler {
   return (req, res, next) => {
-    if (req.method !== 'GET' && req.method !== 'HEAD' && CAPTURE.test(req.path)) {
-      res.on('finish', () => {
-        if (res.statusCode >= 400 || !ext.isInstalled(LIQUID_ID)) return;
-        void repo.capture(by(req), `${req.method} /api${req.path}`).catch((err: Error) => logger?.warn({ err: err.message, path: req.path }, 'config repository: capture failed'));
+    if (req.method !== 'GET' && req.method !== 'HEAD' && CAPTURE.test(req.path) && ext.isInstalled(LIQUID_ID)) {
+      // registered before the handler changes the store: a reconcile meanwhile defers instead of reverting the edit
+      repo.beginEdit();
+      res.on('close', () => {
+        if (res.statusCode >= 400) return void repo.endEdit();
+        void repo
+          .capture(by(req), `${req.method} /api${req.path}`)
+          .catch((err: Error) => logger?.warn({ err: err.message, path: req.path }, 'config repository: capture failed'))
+          .finally(() => repo.endEdit());
       });
     }
     next();
@@ -167,6 +172,25 @@ export function liquidConfigRouter(ext: ExtensionService, d: LiquidConfigDeps, b
       await d.drafts.save(dr);
       await d.audit?.write({ by: by(req), action: 'liquid.proposal.create', target: p.id, details: { draft: dr.id, paths: p.paths, valid: p.validation.ok } });
       res.status(201).json(p);
+    }),
+  );
+  return r;
+}
+
+/** POST /internal/liquid/forgejo — webhooks of the Git host (signed with the extension's webhook secret). */
+export function liquidForgeRouter(ext: ExtensionService, repo: ConfigRepoService, logger?: LiquidConfigDeps['logger']): Router {
+  const r = Router();
+  r.post(
+    '/liquid/forgejo',
+    express.raw({ type: () => true, limit: '5mb' }),
+    h(async (req, res) => {
+      const body = req.body as Buffer;
+      const sig = req.header('x-forgejo-signature') ?? req.header('x-gitea-signature');
+      if (!ext.isInstalled(LIQUID_ID) || !repo.forge || !repo.forge.verify(body, sig)) return void res.status(401).json({ error: 'unauthorized' });
+      const event = req.header('x-forgejo-event') ?? req.header('x-gitea-event') ?? '';
+      // answer at once; the host does not wait for a reconcile
+      res.status(202).json({ ok: true });
+      void repo.onHostEvent(event, JSON.parse(body.toString('utf8')) as Record<string, unknown>).catch((err: Error) => logger?.warn({ err: err.message, event }, 'git host webhook failed'));
     }),
   );
   return r;

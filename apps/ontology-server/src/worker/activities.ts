@@ -1,5 +1,5 @@
 import { ApplicationFailure } from '@temporalio/common';
-import type { BusinessActivities, PlaybookActivities } from '@cw/business-workflows';
+import type { ApprovalEffects, BusinessActivities, PlaybookActivities } from '@cw/business-workflows';
 import type { EventStore, Lake } from '@cw/lake';
 import { identifierIn } from '../runtime.js';
 import { OntologyService } from '../service.js';
@@ -32,7 +32,7 @@ export function coreActivities(o: { svc: OntologyService; store: EventStore; lak
 }
 
 /** Playbook activities: the control plane assesses the blast radius and executes the steps (it owns gateway, overlays, kill switch). */
-export function playbookActivities(o: { controlPlaneUrl: string; token: string; fetchImpl?: typeof fetch }): PlaybookActivities {
+export function playbookActivities(o: { controlPlaneUrl: string; token: string; fetchImpl?: typeof fetch }): PlaybookActivities & ApprovalEffects {
   const f = o.fetchImpl ?? fetch;
   const base = o.controlPlaneUrl.replace(/\/$/, '');
   const post = async <T>(path: string, body: unknown): Promise<T> => {
@@ -45,5 +45,7 @@ export function playbookActivities(o: { controlPlaneUrl: string; token: string; 
     assessBlast: ({ trigger }) => post('/internal/liquid/playbooks/assess', { trigger }),
     executeStep: (i) => post('/internal/liquid/playbooks/execute', i),
     recordRun: async (i) => void (await post('/internal/liquid/playbooks/record', i)),
+    // decisions of approvals that live outside the ontology (wiki proposals) are applied by the control plane
+    applyDecision: (i) => post('/internal/liquid/approvals/apply', i),
   };
 }

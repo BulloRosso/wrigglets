@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import YAML from 'yaml';
 import type { Client } from '@temporalio/client';
-import { BUSINESS_TASK_QUEUE, cancelRunSignal, decideStepUpdate, playbookRunQuery, type PlaybookRunState, type StepResult } from '@cw/business-workflows';
+import { BUSINESS_TASK_QUEUE, cancelRunSignal, decideUpdate, playbookRunQuery, stepApprovalId, type PlaybookRunState, type StepResult } from '@cw/business-workflows';
 import { blastRadius, checkStep, directionOf, durationMs, matching, validatePlaybook, type BlastRadius, type Playbook, type SensedEvent } from '@cw/playbooks';
 import type { KillLevel, UpstreamServer } from '@cw/shared';
 import type { Overlay, OverlayInput } from '../extensions/liquidPolicy.js';
@@ -29,6 +29,8 @@ export interface PlaybookDeps {
   killSwitch: { effective(agentId: string): { level: KillLevel }; get(): { global: { level: KillLevel } }; setAgent(agentId: string, level: KillLevel, reason: string | undefined, by: string): Promise<void>; setGlobal(level: KillLevel, reason: string | undefined, by: string): Promise<void> };
   /** Records store changes in the config repository (author = the playbook run). */
   capture: (by: string, what: string) => Promise<unknown>;
+  /** Marks a store change whose capture is still to come, so a reconcile meanwhile does not revert it (ADR-0046). */
+  editing?: <T>(fn: () => Promise<T>) => Promise<T>;
   propose: (p: { title: string; reason: string; changes: Array<{ path: string; content: string | null }>; author: string }) => Promise<{ id: string; valid: boolean }>;
   shadowReplay: (body: { windowMs: number; candidate?: Record<string, unknown> }) => Promise<Record<string, unknown>>;
   audit?: { write(e: { by: string; action: string; target: string; details?: Record<string, unknown> }): Promise<void> };
@@ -156,7 +158,7 @@ export class PlaybookService {
     if (!check.ok) out = { ok: false, summary: check.error };
     else {
       try {
-        out = await this.run(r, check.with, by);
+        out = this.d.editing ? await this.d.editing(() => this.run(r, check.with, by)) : await this.run(r, check.with, by);
       } catch (err) {
         out = { ok: false, summary: (err as Error).message };
       }
@@ -316,7 +318,8 @@ export class PlaybookService {
 
   async decide(runId: string, stepId: string, decision: 'approve' | 'reject', by: string, comment?: string) {
     try {
-      return await this.c().workflow.getHandle(`PlaybookRun-${runId}`).executeUpdate(decideStepUpdate, { args: [{ stepId, decision, by, comment }] });
+      // a human step is an ApprovalWorkflow (the one approval mechanism, ADR-0049)
+      return await this.c().workflow.getHandle(stepApprovalId(runId, stepId)).executeUpdate(decideUpdate, { args: [{ decision, by, comment }] });
     } catch (err) {
       const e = err as Error & { cause?: Error };
       throw new PlaybookError(409, e.cause?.message ?? e.message);

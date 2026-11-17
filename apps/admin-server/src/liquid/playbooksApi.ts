@@ -6,6 +6,7 @@ import { requireExtension } from '../extensions/api.js';
 import { LIQUID_ID } from '../extensions/liquid.js';
 import type { ExtensionService } from '../extensions/service.js';
 import { PlaybookError, type PlaybookService } from './playbooks.js';
+import type { ApprovalService } from './approvals.js';
 
 /* Playbook routes (ADR-0047): console (Platform.Admin), external alerts, and the callbacks of the business worker. */
 
@@ -29,8 +30,13 @@ const alertBody = z
   })
   .catchall(z.union([z.string().max(500), z.number(), z.boolean()]));
 
-export function playbooksRouter(ext: ExtensionService, svc: PlaybookService, by: (req: Request) => string, audit?: Audit): Router {
+export function playbooksRouter(ext: ExtensionService, svc: PlaybookService, by: (req: Request) => string, audit?: Audit, approvals?: ApprovalService): Router {
   const r = Router();
+  /** The one inbox (ADR-0049): every pending decision of a person — approvals, pull requests, plan approvals. */
+  if (approvals) {
+    r.use('/liquid/inbox', requireExtension(ext, LIQUID_ID));
+    r.get('/liquid/inbox', h(async (_req, res) => res.json(await approvals.inbox())));
+  }
   r.use('/liquid/playbooks', requireExtension(ext, LIQUID_ID));
   r.get('/liquid/playbooks', h(async (_req, res) => res.json(await svc.load())));
   r.get('/liquid/playbooks/runs', h(async (_req, res) => res.json(await svc.runs())));
@@ -71,7 +77,7 @@ const bearerOk = (req: Request, want: string | undefined) => {
   return !!want && Buffer.byteLength(got) === Buffer.byteLength(want) && timingSafeEqual(Buffer.from(got), Buffer.from(want));
 };
 
-export function playbooksInternalRouter(ext: ExtensionService, svc: PlaybookService): Router {
+export function playbooksInternalRouter(ext: ExtensionService, svc: PlaybookService, approvals?: ApprovalService): Router {
   const r = Router();
   const auth =
     (secret: string): RequestHandler =>
@@ -89,6 +95,8 @@ export function playbooksInternalRouter(ext: ExtensionService, svc: PlaybookServ
   const json = express.json({ limit: '2mb' });
   r.post('/liquid/playbooks/assess', auth('playbook_token'), json, h(async (req, res) => res.json(await svc.assess((req.body?.trigger ?? {}) as Record<string, unknown>))));
   r.post('/liquid/playbooks/execute', auth('playbook_token'), json, h(async (req, res) => res.json(await svc.execute(req.body))));
+  if (approvals)
+    r.post('/liquid/approvals/apply', auth('playbook_token'), json, h(async (req, res) => res.json(await approvals.apply(req.body))));
   r.post(
     '/liquid/playbooks/record',
     auth('playbook_token'),

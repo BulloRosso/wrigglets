@@ -68,7 +68,7 @@
   <!-- executor -->
   <rect x="550" y="430" width="300" height="150" rx="12" class="cp"/>
   <text x="570" y="458" class="h">Control plane executes steps</text>
-  <text x="570" y="482" class="lbl">gateway upstreams · OPA overlays · holds</text>
+  <text x="570" y="482" class="lbl">gateway upstreams · policy overlays · holds</text>
   <text x="570" y="500" class="lbl">kill switch · allow-lists (Entra stand-in)</text>
   <text x="570" y="518" class="lbl">config proposals · agent task requests</text>
   <text x="570" y="544" class="lbl">ontology server: shadow replay</text>

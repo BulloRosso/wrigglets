@@ -8,7 +8,7 @@ and an append-only event log, a LinkML ontology that is compiled into every laye
 path, policy as code, holdable business workflows, a config repository with reviewed proposals, and playbooks that
 tighten automatically and loosen only with a human decision.
 
-- Decision record: [ADR-0038](adr/0038-liquid-enterprise-extension.md) (and ADR-0039 … ADR-0049, one per milestone).
+- Decision record: [ADR-0038](adr/0038-liquid-enterprise-extension.md) (and ADR-0039 … ADR-0049, one per milestone and one for the simplification).
 - Implementation plan: [liquid-enterprise-extension.md](liquid-enterprise-extension.md).
 - Why LinkML, and how a requirement travels from data to ontology to logic and UI: [link-ml.md](link-ml.md).
 
@@ -39,11 +39,12 @@ tighten automatically and loosen only with a human decision.
 |---|---|---|
 | Data lake and event log | raw, immutable data in open table formats; append-only events | Postgres event log + DuckLake (catalog in Postgres, Parquet files), written and queried with DuckDB 2 |
 | Ontology and actions | object types, links, typed actions; the **only write path** | LinkML schema + `actions.yaml` + `bindings.yaml` → compiler → ontology server |
-| Policy | who may run which action on which object | OPA at the MCP gateway and the ontology server |
+| Policy | who may run which action on which object | Rego compiled to WASM, embedded in the MCP gateway and the enterprise core |
 | Orchestration | long-running business processes, playbook runs, replays | Temporal, namespace `business` |
 | Agents | work on tasks with skills and memory | existing agent containers via the MCP gateway |
 | UIs | many small, generated apps | generated TypeScript SDK + app registry |
-| Control loop | sense → decide → act with autonomy tiers | config repository + playbooks + shadow replay |
+| Control loop | sense → decide → act with autonomy tiers | config repository on a Git host (Forgejo) + playbooks + shadow replay |
+| Approvals | every decision of a person, in one inbox | `ApprovalWorkflow` (Temporal) + pull requests on the Git host |
 
 The rules that hold everywhere (plan §1.3): nothing above the ontology binds to physical tables; actions are the only
 write path; raw data is immutable and the projection can be rebuilt from events; one source compiled everywhere; fail
@@ -92,8 +93,17 @@ What gets created:
 | secrets | `DATA_DIR/admin/extensions-secrets.json` (0600) | upstream credentials also in Key Vault as `ext-liquid-<secret>` |
 | state | `DATA_DIR/admin/extensions.json` | phase, steps of the last operation, owned upstreams |
 
-Services so far: `ontology-db` (Postgres 17.6: event log, lake catalog, later the projection) and `ontology-server`
-(event log owner and lake writer, from M3 the only write path). The list grows with each milestone.
+Services (after the simplification, [ADR-0049](adr/0049-liquid-simplification.md)):
+
+| Service | Role |
+|---|---|
+| `ontology-db` | Postgres 17.6, the one database of the extension: event log, projection, lake catalog, dispatch cursor, Forgejo's database |
+| `ontology-server` | the **enterprise core**: only write path, event log owner, lake writer, embedded policy engine, and the business worker (Temporal worker + event dispatcher) |
+| `ontology-compiler` | LinkML → IR compiler and Rego → WASM builder, as an HTTP service |
+| `forgejo` | the Git host of the config repository (pull requests, review, branch protection); web UI on `127.0.0.1:3300` only |
+
+An install of a newer manifest removes the containers of services that were retired (OPA and business-worker before
+ADR-0049), so an upgrade needs no manual cleanup.
 
 **Compose overlay** (development and CI): the same services under the same names, secrets from `.env`.
 
@@ -130,6 +140,23 @@ rejects `UPDATE`, `DELETE` and `TRUNCATE` for every role: corrections are new ev
 | `action`, `actor_agent`, `actor_user`, `task_id`, `workflow_id` | who and what caused it (filled by the action pipeline, M3) |
 | `payload` | jsonb |
 | `occurred_at`, `recorded_at`, `ontology_version` | when it happened, when it was stored, under which ontology version |
+
+**One source of truth** ([ADR-0049](adr/0049-liquid-simplification.md)). While Liquid is installed, the platform's other
+audit trails are forwarded into the log as event types:
+
+| Event type | From |
+|---|---|
+| `AdminAction` | the admin console's audit log (who changed what) |
+| `GatewayToolCall`, `PolicyDecision` | the MCP gateway's tool calls and the embedded policy's denials |
+| `AgentAppAction` | the agents' application audit |
+| `ConfigReconciled` | each reconcile run of the config repository |
+| `SafetyRuleTripped`, `AlertReceived`, `SignalObserved` | sensing: everything a playbook can react to |
+
+Forwarding polls with persisted cursors and deterministic event ids: a restart or a re-sent entry never appends twice.
+The original files stay as each component's local buffer and keep working without Liquid. **Liquid enterprise → Event
+log** queries all of it by type, actor and payload text:
+
+![Event log page: admin actions, playbook steps and business events in one list](images/liquid/liquid-events.png)
 
 ### Lake (raw zone)
 
@@ -230,12 +257,12 @@ sofa@0.1.0 (<hash>) — do not edit`):
 
 | Artefact | File | Used by |
 |---|---|---|
-| zod schemas + TS types per enum, class, action input | `packages/ontology-sofa/src/generated/types.ts` | ontology server (validation, M3), SDK |
-| MCP tool definitions | `…/src/generated/mcp-tools.ts` | ontology server `/onto/mcp`, `/erp/mcp`, `/crm/mcp` (M3) |
-| data-quality checks | `…/src/generated/dq.ts` | projection checks (M3), ontology validation (E2) |
+| zod schemas + TS types per enum, class, action input | `packages/ontology-sofa/src/generated/types.ts` | domain code, SDK |
 | SDK client | `…/src/generated/sdk.ts` | UIs (M9) |
-| projection DDL | `packages/ontology-sofa/generated/projection.sql` | projection in `ontology-db` (M3) |
-| OPA data + Rego test skeleton | `…/generated/opa/` | policy bundle (M4) |
+
+Everything else is computed from the IR in force at runtime by the same pure generator functions (ADR-0048, ADR-0049):
+MCP tool definitions, input validation, data-quality checks, projection DDL, the policy data document, and the OPA
+test fixtures (`scripts/liquid/opa-fixtures.mjs`, used by `check.mjs`).
 
 **Changing the ontology** (until proposals exist, M6): edit the YAML, then
 
@@ -265,8 +292,8 @@ new code, so it goes live without a build or restart:
 2. A `major` change needs a **migration note**.
 3. After approval the reconciler compiles `main` and applies the IR to the running ontology server: additive changes
    alter the projection in place, breaking changes (and classes that come back with history in the event log) rebuild
-   it from the events. The gateway refreshes its tool list immediately; OPA learns the new actions with its next
-   bundle poll; new events carry the new `ontology_version`. `GET /api/liquid/ontology/versions` lists what was
+   it from the events. The gateway refreshes its tool list immediately; the embedded policy engines get the new
+   actions with their next package poll (5 s); new events carry the new `ontology_version`. `GET /api/liquid/ontology/versions` lists what was
    applied, `GET /api/liquid/ontology/sdk` returns the TypeScript SDK of the version in force.
 
 **Actions without code.** The domain code implements the ontology it was written for. Actions that a newer version
@@ -321,25 +348,28 @@ Deprecated actions and former names (aliases) are struck through.
 
 ## Policies
 
-Decision record: [ADR-0044](adr/0044-policy-as-code-opa.md).
+Decision records: [ADR-0044](adr/0044-policy-as-code-opa.md), embedded engine [ADR-0049](adr/0049-liquid-simplification.md).
 
 <img src="diagrams/25-liquid-policy.svg" alt="Policy as code: two enforcement points, one bundle" width="100%">
 
-Authorization rules are code in `policies/liquid/` (Rego, tested with `opa test` in `scripts/liquid/check.mjs`) and are
-enforced by OPA, a service of the extension, at two points:
+Authorization rules are code in `policies/liquid/` (Rego, tested with `opa test` in `scripts/liquid/check.mjs`). The
+compiler service builds the applied revision into a **WASM module**; the control plane serves module and data
+(ontology, roles, overlays) at `/internal/liquid/policy` with an ETag, and both enforcement points embed it
+(`@cw/policy-wasm`, polled every 5 s). There is no OPA container:
 
 | Point | When | Decides with | Rules |
 |---|---|---|---|
 | **Gateway** | every call to an upstream with `policy: opa`, after the allow-list | agent, role, tool/action, task step, kill switch | role may write the action (`roles.json`, independent of allow-lists); read-only in plan steps; destructive actions only in an approved plan; overlays |
 | **Ontology server** | every action | the objects it touches: criticality, data class, owner, status | agent writes on payment-critical objects outside an approved task need **four eyes**; overlays per class |
 
-Both fail closed: OPA not configured, not reachable, wrong token, no bundle loaded or no decision all mean **denied**.
+Both fail closed: no policy package configured or loaded, a failed fetch before the first load, a module that does not
+load, or no decision all mean **denied**. A package that cannot be refreshed keeps the last good one.
 
 **Obligations:** `require_four_eyes` — the action is not run; an `ActionApprovalRequested` event is recorded and the agent is
 told that a person must approve; the request becomes an approval workflow (see [Business workflows](#business-workflows)). `require_step_up` — denied in the prototype.
 
 **Overlays** tighten without code changes: Liquid enterprise → **Policies** → *Add overlay* (effect deny / four eyes /
-step-up, matching actions, classes, upstreams or agents, optional expiry). OPA picks it up within about 10 seconds.
+step-up, matching actions, classes, upstreams or agents, optional expiry). Both engines pick it up within about 5 seconds.
 Removing an overlay loosens the policy: only a person can do it, and it is audited. From M7 playbooks add overlays
 automatically.
 
@@ -356,8 +386,8 @@ Decision record: [ADR-0045](adr/0045-business-workflows-temporal.md).
 <img src="diagrams/26-liquid-business-workflows.svg" alt="Business workflows: events start holdable processes" width="100%">
 
 Long-running business processes run as Temporal workflows in their own namespace **`business`** on the platform's
-Temporal, executed by the extension service **business-worker**. They are started by committed events, not by code
-calling code: the ontology declares it.
+Temporal, executed by the worker inside the **enterprise core** (`ontology-server`; until ADR-0049 a service of its own).
+They are started by committed events, not by code calling code: the ontology declares it.
 
 ```yaml
 # ontology/sofa/actions.yaml
@@ -370,7 +400,7 @@ cancel_purchase_order:
 | Workflow | Started by | Steps |
 |---|---|---|
 | `PurchaseOrderRelease` | `PurchaseOrderCreated` | release window → wait while held → `release_purchase_order` → wait until the ETA → received / late (notification) / cancelled |
-| `ApprovalWorkflow` | `ActionApprovalRequested` (four eyes, ADR-0044) | wait for a decision (reminder, expiry) → on approval run the action with `approvedBy` |
+| `ApprovalWorkflow` | `ActionApprovalRequested` (four eyes), a playbook's human step, a wiki proposal | wait for a decision (reminder, expiry, withdraw) → apply the effect: run the action with `approvedBy`, continue the playbook run, or decide the wiki proposal |
 | `lakeFlush` | schedule `lake-flush`, every minute | flush the event log into the lake (replaces the ontology server's own timer) |
 
 **Every step that changes data is an ontology action** through the ontology server: validated, policy-checked, an
@@ -382,29 +412,33 @@ event. A refused action is a result of the workflow (e.g. the order was cancelle
 `BusinessState = held`. *Release* lifts that hold (by its ref) everywhere; several holds can stack. Holding is
 tightening and needs no approval; it never skips or runs a step. From M7 playbooks hold by object automatically.
 
-**Approvals.** Pending four-eyes requests appear as cards with the action, its input and the touched objects.
-*Approve and run* executes the action with the signed-in person as `approvedBy`; OPA accepts that as the second pair of
-eyes only if it is neither the agent nor the requesting user. One decision per request; it expires after 7 days.
+**Approvals** (one inbox, ADR-0049). Every decision a person takes inside Liquid is an `ApprovalWorkflow`, listed on
+**Liquid enterprise → Approvals** together with config pull requests and agent plan approvals (as links to where they are
+decided). Each new item is mailed once with a deep link (`/liquid/approvals?focus=<id>`). For a four-eyes request,
+*Approve* runs the action with the signed-in person as `approvedBy`; the policy accepts that as the second pair of eyes
+only if it is neither the agent nor the requesting user. One decision per request; it expires after 7 days.
 
-**Durability.** The dispatcher reads the event log in order and remembers its position (`/data/dispatch-cursor.json`
-in the volume `business-worker-data`). Workflow ids are derived from event ids, so a restart never starts a process
+![Approvals: a config pull request, a playbook's restore step and four-eyes requests in one inbox](images/liquid/liquid-approvals.png)
+
+**Durability.** The dispatcher reads the event log in order and remembers its position in the table `dispatch_cursor`
+of `ontology-db`. Workflow ids are derived from event ids, so a restart never starts a process
 twice; holds and timers live in Temporal and survive worker restarts. Temporal UI → namespace `business` shows the
 histories.
 
-**Demo timing** (env of business-worker): `SIM_TODAY` (2026-10-05), `MS_PER_SIM_DAY` (20 s per simulated day),
+**Demo timing** (env of ontology-server): `SIM_TODAY` (2026-10-05), `MS_PER_SIM_DAY` (20 s per simulated day),
 `RELEASE_AFTER_MS` (30 s), `APPROVAL_REMINDER_MS` (4 h), `APPROVAL_EXPIRE_MS` (7 d), `LAKE_FLUSH_EVERY` (1m).
 
 ![Business processes page: a hold on Supplier:S-NORDHOLZ, a pending approval, running processes](images/liquid/liquid-processes.png)
 
 ## Config repository and proposals
 
-Decision record: [ADR-0046](adr/0046-config-repository-proposals.md).
+Decision records: [ADR-0046](adr/0046-config-repository-proposals.md), Git host [ADR-0049](adr/0049-liquid-simplification.md).
 
 <img src="diagrams/27-liquid-config-repo.svg" alt="Config repository: proposals, review, reconciler" width="100%">
 
 While Liquid is installed, the platform's desired state lives in a Git repository owned by the control plane
-(`/data/liquid/config.git`, outside `/data/admin`). Branch **`main`** is applied by the **reconciler** every 60 seconds
-and right after each approval.
+(`/data/liquid/config.git`, outside `/data/admin`), mirrored to the extension's Git host **Forgejo** as `liquid/config`.
+Branch **`main`** is applied by the **reconciler** every 60 seconds and right after each merge (webhook).
 
 ```
 gateway/upstreams.yaml   gateway/allow-lists.yaml   gateway/limits.yaml
@@ -419,15 +453,31 @@ playbooks/               OWNERS.yaml
 | Who | How | Lands as |
 |---|---|---|
 | Admin in the console | any change of upstreams, allow-lists, agents, safety rules, overlays | a commit on `main`, author = the admin |
-| Agent | MCP upstream `config`: `config__read`, `config__propose_change`, `config__get_proposal` | a proposal (branch) |
-| Person in the ontology editor | *Edit as draft*, then *Submit* | a proposal (branch) |
+| Agent | MCP upstream `config`: `config__read`, `config__validate`, `config__propose_change`, `config__get_proposal` | a proposal = branch + pull request |
+| Person in the ontology editor | *Edit as draft*, then *Submit* | a proposal = branch + pull request |
+| Person on the Git host | a pull request against `main` | a proposal, validated like the others |
 
 **Proposals** are validated when they are created: layout and schemas, no secret values, ontology compile with a
-structural diff, `opa check` + `opa test` for policies. An invalid proposal cannot be approved. Liquid enterprise →
-**Proposals** shows reason, evidence, checks, approvers, the text diff and, for ontology changes, the diff graph.
-*Approve and apply* needs a person who is an owner of every touched path (`OWNERS.yaml` on `main`; the ontology's
-class `owner` annotations are resolved through its `teams`) and who is not the requester. The proposal is validated
-again on top of the current `main`, merged with `Approved-By`, and applied. *Reject* leaves `main` unchanged.
+structural diff and compatibility class, `opa check` + `opa test` for policies. The result is the required commit status
+**`liquid/validate`** of the pull request. Review happens **on the Git host**:
+
+- `CODEOWNERS` (generated from `OWNERS.yaml`) requests the team `reviewers`; branch protection on `main` needs one
+  approval and a green `liquid/validate`, and only the bot `liquid-bot` may push. An invalid proposal cannot be merged.
+- Merge → signed webhook → the proposal is marked approved (decided by the merging reviewer) and reconciled at once.
+  Closing the pull request rejects it. The console shows the link and no longer decides (409 with the link).
+- Webhooks can be lost (control plane restarting) and pull requests can disappear (Git host recreated by a reinstall
+  with purge): every reconcile also settles pending proposals from the host's state.
+- Console edits stay direct commits on `main`, pushed by the bot; if the host is down they are pushed when it is back.
+
+| Pull request on the Git host | Changed files |
+|---|---|
+| ![Pull request: validation status, required check, reviewers](images/liquid/forgejo-pull-request.png) | ![The diff of the proposal](images/liquid/forgejo-pull-request-files.png) |
+
+Liquid enterprise → **Proposals** still shows reason, evidence, checks, owners, the text diff and, for ontology changes,
+the diff graph, with the link to the pull request. The Git host's web UI is only bound to `127.0.0.1:3300`; the
+`reviewer` account's password is the extension secret `forgejo_reviewer_password` (`DATA_DIR/admin/extensions-secrets.json`).
+In overlay mode without the Git host the console's own review (*Approve and apply*, owners from `OWNERS.yaml`, not the
+requester) is used.
 
 **Giving an agent the config tools:** add `config__*` (or only `config__read` and `config__get_proposal`) to its
 allow-list. Proposing changes nothing by itself.
@@ -484,7 +534,8 @@ The **tighten-only rule** is checked three times: when a playbook is proposed (a
 and cannot be approved), when `main` is reconciled, and by the control plane before each step.
 
 **A run** is a durable workflow. `auto` steps run at once, `propose` steps create a request a person decides later
-(the run continues), `human` steps wait on the Playbooks page. **Restore** reverts what this run tightened, newest
+(the run continues), `human` steps are child `ApprovalWorkflow`s and wait in the Approvals inbox (and on the
+Playbooks page). **Restore** reverts what this run tightened, newest
 first: re-enables the upstream, removes the overlay, releases the hold, lowers the kill switch. **Cancel** stops the run
 and loosens nothing; cleaning up is then a person's console work. Tightening is committed to the config repository,
 so the reconciler does not undo it. Every step, decision and the end of a run are events; with `record_incident` the
@@ -498,8 +549,12 @@ candidate would have blocked or sent to four eyes, which results diverge, and th
 candidate give the same report (it carries a hash). With the current configuration the last week replays with zero
 divergence.
 
-**Safety rules** keep working as before (ADR-0022): the safety engine evaluates them and raises the kill switch. Each
-trip is now also a `SafetyRuleTripped` event that playbooks can react to.
+**Safety rules** keep working as before (ADR-0022): the safety engine evaluates them and raises the kill switch at once
+(enforcement stays in-process, a security default). Each trip is also a `SafetyRuleTripped` event that playbooks can
+react to; signals observations become `SignalObserved` events the same way.
+
+**Edits and the reconciler.** A playbook step or console edit changes a store first and commits it right after; while
+that is in flight the reconciler defers instead of taking the change for drift.
 
 ![Playbooks page: a run waiting for restore, the example playbook](images/liquid/liquid-playbooks.png)
 
@@ -532,8 +587,15 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
   without `dryRun` to swap. **Data quality:** `GET /api/liquid/projection/dq`.
 - **Switch the sofa agents' backend:** `node scripts/liquid/setup.mjs` (ontology server) / `--restore` (mock).
 - **Business workflows:** histories in Temporal UI → namespace `business`; worker logs
-  `docker logs cw-ext-liquid-business-worker`. The dispatcher position is in `/data/dispatch-cursor.json` of the worker
-  (deleting it makes the worker start at the current end of the log; earlier events are not dispatched again).
+  `docker logs cw-ext-liquid-ontology-server`. The dispatcher position is the row in `dispatch_cursor`
+  (`SELECT * FROM dispatch_cursor`; deleting it makes the worker start at the current end of the log).
+- **Policy engine:** `GET /api/liquid/policy` shows the package revision, which consumers fetched it when, overlays and
+  recent denials; the gateway and the core log `policy package loaded <revision>`.
+- **Git host:** `http://localhost:3300` (only from this machine), user `reviewer`. If it is down, proposals cannot be
+  opened or merged; the reconciler keeps applying the local `main`. *Repair* on the Extensions page re-runs the
+  bootstrap (accounts, repository, branch protection, webhook) idempotently.
+- **Complete runtime test:** `node scripts/liquid/e2e-all.mjs` runs every milestone's end-to-end check in order
+  (`--from <suite>` to continue, `--shots` to refresh the screenshots); results in `scripts/liquid/results/`.
 - *(planned)* Replaying a window, restoring after a playbook run, rotating the ontology DB credentials.
 
 ## Results D1–D3
@@ -914,6 +976,35 @@ Verified
 
 Open
 - Applying ontology changes needs no image build; changing domain behaviour (complex actions) still does.
+
+### Simplification — event log as truth, embedded policy, enterprise core, Git host, one inbox (2026-11-17)
+
+Done
+- [ADR-0049](adr/0049-liquid-simplification.md). Six items of the simplification review, with the user's choices
+  (DuckLake stays, Forgejo with the wiki kept, WASM in gateway and core, shared Postgres for Liquid only).
+- Event log as the one store: admin audit, gateway tool calls and policy decisions, agent app audit, reconcile runs,
+  safety trips, alerts and observations are events; Event log page.
+- `@cw/policy-wasm`; compiler `POST /build-wasm`; policy package served by the control plane; OPA container removed.
+- Business worker merged into the ontology server (enterprise core); cursor in the database; install step `retired`.
+- Only SDK and types generated; OPA test fixtures computed from the IR.
+- Forgejo 15.0.11 LTS as a service (database in `ontology-db`, loopback port), bootstrap of accounts, repository,
+  CODEOWNERS, branch protection, webhook; proposals as pull requests with commit status; settling from the host.
+- One approval mechanism (`ApprovalWorkflow` kinds action / playbook-step / wiki, withdraw), inbox page, mails with
+  deep links.
+
+Verified
+- `node scripts/liquid/check.mjs` green (build, typecheck, all unit tests, `opa test` 31/31, generated files).
+- **Complete runtime test** `node scripts/liquid/e2e-all.mjs` on a fresh install: M0b 11/11, M1 10/10, M2 7/7,
+  M3 13/13, M4 14/14, M5 19/19, M6 25/25, M7 18/18, M8 19/19 (136 checks).
+- Found on the way: a reconcile could revert a console edit or a playbook step whose capture was still in flight (now
+  deferred, with a regression test); Forgejo's PR numbers restart after a reinstall (proposals matched by branch);
+  Key Vault soft-delete blocked a reinstall (recover, then set); a lost webhook left proposals pending (settled from
+  the host each reconcile, unit test); a fresh core ran the built-in ontology while `main` held a newer one (reconcile
+  after each extension operation).
+
+Deviations
+- Plan approvals stay with the agent app (its approver policy); the safety engine still enforces in-process; the wiki
+  keeps its own review page (mirrored into the inbox); overlay mode keeps the console review.
 
 ### Later
 

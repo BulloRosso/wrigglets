@@ -16,7 +16,7 @@ import { overlayInput, type Overlay } from '../extensions/liquidPolicy.js';
  *   playbooks/*.yaml         OWNERS.yaml   README.md
  */
 
-export const MANAGED_PREFIXES = ['gateway/', 'safety/', 'agents/', 'policies/liquid/', 'ontology/', 'playbooks/'] as const;
+export const MANAGED_PREFIXES = ['gateway/', 'safety/', 'agents/', 'policies/liquid/', 'ontology/', 'playbooks/', '.forgejo/'] as const;
 export const ROOT_FILES = ['OWNERS.yaml', 'README.md'] as const;
 /** Files generated from the admin stores (export) — everything else is edited only through proposals. */
 export const STORE_FILES = (p: string) => p.startsWith('gateway/') || p.startsWith('safety/') || p.startsWith('agents/') || p === 'policies/liquid/overlays.yaml';

@@ -1,22 +1,10 @@
 {
-  "startedAt": "2026-11-16T22:14:57.978Z",
+  "startedAt": "2026-11-17T00:31:17.585Z",
   "checks": [
-    {
-      "name": "a breaking change without a migration note is invalid",
-      "ok": true,
-      "detail": [
-        "ontology sofa: compatibility major"
-      ]
-    },
-    {
-      "name": "with a migration note it validates",
-      "ok": true,
-      "detail": []
-    },
     {
       "name": "the running ontology",
       "ok": true,
-      "detail": "sofa@2.0.0, 19 classes, 32 actions"
+      "detail": "sofa@4.0.0, 19 classes, 32 actions"
     },
     {
       "name": "config__validate: compiles, compatibility minor, existing data fits, policy tests pass",
@@ -42,8 +30,8 @@
       "name": "the agent proposes the extension; validated, compatibility minor",
       "ok": true,
       "detail": {
-        "id": "cp-mwjtnirb-524f",
-        "version": "2.1.0"
+        "id": "cp-mwjyipq6-b353",
+        "version": "4.1.0"
       }
     },
     {
@@ -51,15 +39,15 @@
       "ok": true
     },
     {
-      "name": "live in 1 s: ontology 2.1.0, class Carrier, actions present",
+      "name": "live in 4 s: ontology 4.1.0, class Carrier, actions present",
       "ok": true
     },
     {
-      "name": "the version is recorded (minor, migrated in place)",
+      "name": "the version is recorded as minor",
       "ok": true,
       "detail": [
-        "2.1.0:minor",
-        "2.0.0:major"
+        "4.1.0:minor",
+        "4.0.0:patch"
       ]
     },
     {
@@ -83,7 +71,7 @@
     {
       "name": "the agent creates a carrier through the new tool",
       "ok": true,
-      "detail": "{\n  \"id\": \"CA-002\",\n  \"name\": \"Nordfracht Logistik\"\n}"
+      "detail": "{\n  \"id\": \"CA-001\",\n  \"name\": \"Nordfracht Logistik\"\n}"
     },
     {
       "name": "assign_carrier links a purchase order",
@@ -102,7 +90,7 @@
       "name": "the projection is still exactly the event log replayed",
       "ok": true,
       "detail": {
-        "events": 30
+        "events": 21
       }
     },
     {
@@ -121,7 +109,7 @@
       "name": "the breaking change went live by rebuilding the projection",
       "ok": true,
       "detail": {
-        "version": "3.0.0",
+        "version": "5.0.0",
         "note": "Carrier objects stay in the event log; the projection is rebuilt without them."
       }
     },
@@ -135,5 +123,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T22:15:34.428Z"
+  "finishedAt": "2026-11-17T00:31:51.835Z"
 }

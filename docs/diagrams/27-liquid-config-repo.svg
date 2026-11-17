@@ -26,8 +26,8 @@
     <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c62828"/></marker>
   </defs>
   <rect width="1200" height="620" fill="#ffffff"/>
-  <text x="40" y="44" class="t">Config repository (M6): desired state in Git, reviewed proposals, a reconciler</text>
-  <text x="40" y="68" class="st">Agents and the ontology editor propose; owners approve; the reconciler applies main to the stores. No secrets in Git.</text>
+  <text x="40" y="44" class="t">Config repository: desired state in Git, pull requests on Forgejo, a reconciler</text>
+  <text x="40" y="68" class="st">Agents, the ontology editor and people on the Git host propose; reviewers approve and merge on Forgejo; the reconciler applies main. No secrets in Git.</text>
 
   <!-- sources -->
   <rect x="40" y="100" width="230" height="84" rx="10" class="ag"/>
@@ -45,28 +45,28 @@
 
   <!-- proposal + validation -->
   <rect x="320" y="100" width="300" height="190" rx="12" class="cp"/>
-  <text x="340" y="128" class="h">Proposal = branch proposal/&lt;id&gt;</text>
+  <text x="340" y="128" class="h">Proposal = branch + pull request</text>
   <circle cx="350" cy="154" r="10" class="bd"/><text x="350" y="158" class="num">1</text>
-  <text x="368" y="158" class="d">validated at once (invalid ⇒ no approve)</text>
+  <text x="368" y="158" class="d">validated → commit status liquid/validate</text>
   <rect x="340" y="172" width="125" height="22" rx="5" class="chk"/><text x="348" y="187" class="lbl">layout + schemas</text>
   <rect x="475" y="172" width="125" height="22" rx="5" class="chk"/><text x="483" y="187" class="lbl">no secret values</text>
   <rect x="340" y="200" width="125" height="22" rx="5" class="chk"/><text x="348" y="215" class="lbl">ontology compile</text>
   <rect x="475" y="200" width="125" height="22" rx="5" class="chk"/><text x="483" y="215" class="lbl">opa check + test</text>
   <circle cx="350" cy="248" r="10" class="bd"/><text x="350" y="252" class="num">2</text>
-  <text x="368" y="252" class="d">review: text diff + ontology diff graph</text>
+  <text x="368" y="252" class="d">console: text diff + ontology diff graph</text>
   <text x="340" y="276" class="lbl">validators run in the ontology-compiler service</text>
 
   <!-- review -->
   <rect x="320" y="320" width="300" height="120" rx="12" class="usr"/>
-  <text x="340" y="348" class="h">Owner decides (Proposals page)</text>
+  <text x="340" y="348" class="h">Reviewer decides on Forgejo</text>
   <circle cx="350" cy="372" r="10" class="bd"/><text x="350" y="376" class="num">3</text>
-  <text x="368" y="376" class="d">owner of every touched path (OWNERS.yaml,</text>
-  <text x="368" y="392" class="d">class owner → team), not the requester</text>
-  <text x="340" y="420" class="lbl">re-validated on top of main, conflicts reported</text>
+  <text x="368" y="376" class="d">CODEOWNERS (from OWNERS.yaml) → team</text>
+  <text x="368" y="392" class="d">reviewers; 1 approval + green check</text>
+  <text x="340" y="420" class="lbl">merge → signed webhook → reconcile; lost ones settled</text>
 
   <!-- git -->
   <rect x="670" y="100" width="230" height="340" rx="12" class="git"/>
-  <text x="690" y="128" class="h">config.git — main</text>
+  <text x="690" y="128" class="h">liquid/config — main</text>
   <text x="690" y="154" class="mono">gateway/upstreams.yaml</text>
   <text x="690" y="172" class="mono">gateway/allow-lists.yaml</text>
   <text x="690" y="190" class="mono">gateway/limits.yaml</text>
@@ -76,9 +76,9 @@
   <text x="690" y="262" class="mono">  overlays.yaml</text>
   <text x="690" y="280" class="mono">ontology/sofa/*.yaml</text>
   <text x="690" y="298" class="mono">playbooks/  OWNERS.yaml</text>
-  <text x="690" y="330" class="lbl">merge commit with trailers:</text>
-  <text x="690" y="348" class="mono">Requested-By  Agent</text>
-  <text x="690" y="366" class="mono">Approved-By   Change-Id</text>
+  <text x="690" y="330" class="lbl">merge on Forgejo; the proposal</text>
+  <text x="690" y="348" class="lbl">records the reviewer as</text>
+  <text x="690" y="366" class="lbl">decidedBy (only the bot pushes)</text>
   <text x="690" y="398" class="lbl">credentials only as Key Vault</text>
   <text x="690" y="414" class="lbl">references (secretRef)</text>
 
@@ -98,7 +98,7 @@
   <text x="970" y="370" class="lbl">gateway.json → gateway push</text>
   <text x="970" y="388" class="lbl">safety-rules.json</text>
   <text x="970" y="406" class="lbl">agents.json (spec part)</text>
-  <text x="970" y="424" class="lbl">overlays → OPA bundle</text>
+  <text x="970" y="424" class="lbl">overlays → policy package</text>
 
   <path d="M270,140 L316,140" class="ln" marker-end="url(#a)"/>
   <path d="M270,240 L292,240 L292,150 L316,150" class="ln" marker-end="url(#a)"/>

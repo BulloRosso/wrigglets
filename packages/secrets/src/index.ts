@@ -53,7 +53,17 @@ export class SecretStore {
   }
 
   async set(name: string, value: string, opts: { contentType?: string; tags?: Record<string, string> } = {}): Promise<void> {
-    await this.client.setSecret(name, value, opts);
+    try {
+      await this.client.setSecret(name, value, opts);
+    } catch (err) {
+      // soft delete: a removed secret blocks its name until it is recovered or purged (e.g. reinstalling an extension
+      // after "uninstall with delete data"); recover it, then write the new value as a new version
+      const e = err as { code?: string; message?: string; statusCode?: number };
+      if (!(e.statusCode === 409 || /ObjectIsDeletedButRecoverable|deleted entity already exists/i.test(`${e.code ?? ''} ${e.message ?? ''}`))) throw err;
+      const poller = await this.client.beginRecoverDeletedSecret(name);
+      await poller.pollUntilDone();
+      await this.client.setSecret(name, value, opts);
+    }
     this.cache.delete(name);
   }
 

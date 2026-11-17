@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-16T22:57:13.679Z",
+  "startedAt": "2026-11-17T00:25:45.075Z",
   "checks": [
     {
       "name": "repair: all services running (business worker inside the enterprise core)",
@@ -7,6 +7,7 @@
       "detail": [
         "ontology-db=running",
         "ontology-server=running",
+        "forgejo=running",
         "ontology-compiler=running"
       ]
     },
@@ -17,23 +18,23 @@
     {
       "name": "processes API answers (namespace business reachable)",
       "ok": true,
-      "detail": "0 running"
+      "detail": "4 running"
     },
     {
       "name": "create_purchase_order starts one PurchaseOrderRelease per order",
       "ok": true,
       "detail": [
-        "PurchaseOrderRelease-6e472465-c09a-4d80-a24a-da77e9a8940b",
-        "PurchaseOrderRelease-2aece12d-0ef4-4706-bf02-ea74878f0118",
-        "PurchaseOrderRelease-412f10d2-6745-42d6-b26d-a3e60e2a46fd"
+        "PurchaseOrderRelease-86ba1f5b-2765-4d9e-8062-e85056f0d710",
+        "PurchaseOrderRelease-742d9547-e265-466d-ae09-6209f446b906",
+        "PurchaseOrderRelease-766600ff-6276-41e7-b3e6-6d9169a28362"
       ]
     },
     {
       "name": "hold on Supplier:S-NORDHOLZ reaches exactly its workflows",
       "ok": true,
       "detail": [
-        "PurchaseOrderRelease-2aece12d-0ef4-4706-bf02-ea74878f0118",
-        "PurchaseOrderRelease-6e472465-c09a-4d80-a24a-da77e9a8940b"
+        "PurchaseOrderRelease-742d9547-e265-466d-ae09-6209f446b906",
+        "PurchaseOrderRelease-86ba1f5b-2765-4d9e-8062-e85056f0d710"
       ]
     },
     {
@@ -56,7 +57,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "23:57:59 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
+      "detail": "01:26:29 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
     },
     {
       "name": "payment-critical write outside an approved task waits for four eyes",
@@ -67,7 +68,7 @@
       "name": "the request became an ApprovalWorkflow",
       "ok": true,
       "detail": {
-        "workflowId": "ApprovalWorkflow-b7d6d912-d601-4147-8aae-b595df1a9eae",
+        "workflowId": "ApprovalWorkflow-59405eaf-be61-467b-9503-82a909dc6c56",
         "objects": [
           "Supplier:S-BALTIC",
           "Material:BEAM-PINE-80"
@@ -85,7 +86,7 @@
     {
       "name": "events after the restart are dispatched",
       "ok": true,
-      "detail": "PurchaseOrderRelease-1df530c5-b04f-4a73-ba99-8b4a155cfbae"
+      "detail": "PurchaseOrderRelease-80711a68-58ee-41da-8752-ff0fb3ec7f23"
     },
     {
       "name": "approval accepted (decided by the signed-in person)",
@@ -114,8 +115,8 @@
       "name": "release reaches the held workflows",
       "ok": true,
       "detail": [
-        "PurchaseOrderRelease-2aece12d-0ef4-4706-bf02-ea74878f0118",
-        "PurchaseOrderRelease-6e472465-c09a-4d80-a24a-da77e9a8940b"
+        "PurchaseOrderRelease-742d9547-e265-466d-ae09-6209f446b906",
+        "PurchaseOrderRelease-86ba1f5b-2765-4d9e-8062-e85056f0d710"
       ]
     },
     {
@@ -130,15 +131,15 @@
       "name": "lake-flush schedule flushes the event log into the lake",
       "ok": true,
       "detail": {
-        "at": "2026-11-16T22:59:00.211Z",
+        "at": "2026-11-17T00:27:00.254Z",
         "result": {
-          "flushed": 7,
-          "hwm": 3109,
+          "flushed": 11,
+          "hwm": 1077,
           "waiting": 0
         }
       }
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-16T22:59:11.759Z"
+  "finishedAt": "2026-11-17T00:27:07.576Z"
 }

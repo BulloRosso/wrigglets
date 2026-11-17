@@ -7,7 +7,8 @@ import type { Client } from '@temporalio/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { validatePlaybook, type Playbook } from '@cw/playbooks';
 import { BSA } from '../src/common.js';
-import { cancelRunSignal, decideStepUpdate, playbookRunQuery, type PlaybookActivities, type PlaybookRunState } from '../src/playbookRun.js';
+import { cancelRunSignal, playbookRunQuery, stepApprovalId, type PlaybookActivities, type PlaybookRunState } from '../src/playbookRun.js';
+import { approvalStateQuery, decideUpdate } from '../src/approval.js';
 
 const QUEUE = 'playbook-test';
 const example = validatePlaybook(YAML.parse(readFileSync(fileURLToPath(new URL('../../../playbooks/third-party-upstream-vulnerability.yaml', import.meta.url)), 'utf8'))).playbook as Playbook;
@@ -17,7 +18,11 @@ let client: Client;
 const executed: Array<{ id: string; type: string; with: Record<string, unknown>; approvedBy?: string; prior: Array<{ id: string; undo?: unknown }> }> = [];
 const recorded: string[] = [];
 
-const activities: PlaybookActivities = {
+const activities: PlaybookActivities & { notify(): Promise<void>; applyDecision(): Promise<{ ok: boolean; result: string }> } = {
+  async notify() {},
+  async applyDecision() {
+    return { ok: true, result: 'n/a' };
+  },
   async assessBlast() {
     return { upstream: 'erp', tools: ['erp__create_purchase_order'], actions: ['create_purchase_order'], writeActions: ['create_purchase_order'], classes: ['PurchaseOrder', 'Supplier'], objects: ['Supplier:S-NORDHOLZ'], workflows: ['PurchaseOrderRelease-1'] };
   },
@@ -61,7 +66,7 @@ describe('PlaybookRun', () => {
       expect(executed.find((e) => e.id === 'tighten-policy')!.with).toMatchObject({ actions: ['create_purchase_order'], obligation: 'require_four_eyes', reason: 'Vulnerability in upstream erp: CVE-2026-1' });
       expect(executed.find((e) => e.id === 'hold-workflows')!.with).toMatchObject({ objects: ['Supplier:S-NORDHOLZ'], ref: 'run-1' });
       expect(executed.some((e) => e.type === 'restore')).toBe(false);
-      await h.executeUpdate(decideStepUpdate, { args: [{ stepId: 'restore', decision: 'approve', by: 'ada@x', comment: 'patched' }] });
+      await client.workflow.getHandle(stepApprovalId(h.workflowId, 'restore')).executeUpdate(decideUpdate, { args: [{ decision: 'approve', by: 'ada@x', comment: 'patched' }] });
       const done = await h.result();
       expect(done.state).toBe('completed');
       const restore = executed.find((e) => e.type === 'restore')!;
@@ -87,8 +92,10 @@ describe('PlaybookRun', () => {
     await withWorker(async () => {
       const h = await start('run-3');
       await until('run-3', (s) => s.state === 'awaiting_approval');
-      await expect(h.executeUpdate(decideStepUpdate, { args: [{ stepId: 'replay', decision: 'approve', by: 'ada@x' }] })).rejects.toThrow();
-      await h.executeUpdate(decideStepUpdate, { args: [{ stepId: 'restore', decision: 'reject', by: 'ada@x' }] });
+      // the human step is an ApprovalWorkflow (the one approval mechanism): listed, with its subject and the step
+      const ap = await client.workflow.getHandle(stepApprovalId(h.workflowId, 'restore')).query(approvalStateQuery);
+      expect(ap).toMatchObject({ kind: 'playbook-step', state: 'pending', request: { effect: { runId: 'run-3', stepId: 'restore' } } });
+      await client.workflow.getHandle(stepApprovalId(h.workflowId, 'restore')).executeUpdate(decideUpdate, { args: [{ decision: 'reject', by: 'ada@x' }] });
       const s = await h.result();
       expect(s.steps.find((x) => x.id === 'restore')!.state).toBe('skipped');
       expect(executed.some((e) => e.type === 'restore')).toBe(false);
@@ -104,7 +111,7 @@ describe('PlaybookRun', () => {
     // worker gone; a new one picks the run up where it was
     const n = executed.length;
     await withWorker(async () => {
-      await h.executeUpdate(decideStepUpdate, { args: [{ stepId: 'restore', decision: 'approve', by: 'ben@x' }] });
+      await client.workflow.getHandle(stepApprovalId(h.workflowId, 'restore')).executeUpdate(decideUpdate, { args: [{ decision: 'approve', by: 'ben@x' }] });
       expect((await h.result()).state).toBe('completed');
     });
     expect(executed.slice(n).map((e) => e.type)).toEqual(['restore']);

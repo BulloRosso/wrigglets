@@ -31,6 +31,8 @@ export interface ExtensionRuntime {
   pullImage(ref: string): Promise<void>;
   ensureVolume(ext: string, vol: string): Promise<void>;
   removeVolume(ext: string, vol: string): Promise<void>;
+  /** Short names of every data volume labelled for the extension (also of services it no longer has). */
+  listVolumes?(ext: string): Promise<string[]>;
   /** All containers labelled as belonging to the extension. */
   list(ext: string): Promise<ManagedContainer[]>;
   /** (Re-)creates and starts the service's container. */
@@ -38,6 +40,8 @@ export interface ExtensionRuntime {
   start(ext: string, service: string): Promise<void>;
   remove(ext: string, service: string): Promise<void>;
   logs(ext: string, service: string, tail: number): Promise<string>;
+  /** Runs a command in the service's container (bootstrap of third-party services, e.g. an admin CLI). */
+  exec(ext: string, service: string, cmd: string[], user?: string): Promise<{ code: number; output: string }>;
 }
 
 export function parseState(status: string, running: boolean): ServiceState {
@@ -99,6 +103,12 @@ export class DockerExtensionRuntime implements ExtensionRuntime {
     if (!vols.Volumes?.some((v) => v.Name === name)) await this.docker.createVolume({ Name: name, Labels: { [LABEL_ROLE]: ROLE_VOLUME, [LABEL_EXTENSION]: ext } });
   }
 
+  async listVolumes(ext: string): Promise<string[]> {
+    const vols = await this.docker.listVolumes({ filters: JSON.stringify({ label: [`${LABEL_ROLE}=${ROLE_VOLUME}`, `${LABEL_EXTENSION}=${ext}`] }) });
+    const prefix = volumeName(ext, '');
+    return (vols.Volumes ?? []).map((v) => v.Name).filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length));
+  }
+
   async removeVolume(ext: string, vol: string) {
     await this.docker
       .getVolume(volumeName(ext, vol))
@@ -133,7 +143,9 @@ export class DockerExtensionRuntime implements ExtensionRuntime {
       Env: Object.entries(env).map(([k, v]) => `${k}=${v}`),
       Labels: { [LABEL_ROLE]: ROLE_CONTAINER, [LABEL_EXTENSION]: ext, [LABEL_SERVICE]: svc.name, [LABEL_SPEC]: fingerprint },
       Healthcheck: h ? { Test: h.test, Interval: h.intervalSec * 1e9, Timeout: h.timeoutSec * 1e9, Retries: h.retries, StartPeriod: h.startPeriodSec * 1e9 } : undefined,
+      ExposedPorts: svc.hostPort && svc.port ? { [`${svc.port}/tcp`]: {} } : undefined,
       HostConfig: {
+        PortBindings: svc.hostPort && svc.port ? { [`${svc.port}/tcp`]: [{ HostIp: '127.0.0.1', HostPort: String(svc.hostPort) }] } : undefined,
         Mounts: svc.volumes.map((v) => ({ Type: 'volume' as const, Source: volumeName(ext, v.name), Target: v.target })),
         NetworkMode: this.network,
         RestartPolicy: { Name: 'unless-stopped' },
@@ -143,6 +155,28 @@ export class DockerExtensionRuntime implements ExtensionRuntime {
       NetworkingConfig: { EndpointsConfig: { [this.network]: { Aliases: [svc.name] } } },
     });
     await container.start();
+  }
+
+  async exec(ext: string, service: string, cmd: string[], user?: string) {
+    const c = this.docker.getContainer(containerName(ext, service));
+    const x = await c.exec({ Cmd: cmd, User: user, AttachStdout: true, AttachStderr: true });
+    const stream = await x.start({ hijack: true, stdin: false });
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (b: Buffer) => chunks.push(b));
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+    // demultiplex the 8-byte frame headers
+    const buf = Buffer.concat(chunks);
+    const out: string[] = [];
+    for (let i = 0; i + 8 <= buf.length; ) {
+      const len = buf.readUInt32BE(i + 4);
+      out.push(buf.subarray(i + 8, i + 8 + len).toString('utf8'));
+      i += 8 + len;
+    }
+    const info = await x.inspect();
+    return { code: info.ExitCode ?? 0, output: out.join('') };
   }
 
   async start(ext: string, service: string) {

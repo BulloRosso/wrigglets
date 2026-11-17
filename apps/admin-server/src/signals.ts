@@ -181,9 +181,13 @@ export class SignalsControlService {
     return { status: res.status, json: await res.json().catch(() => ({})) };
   }
 
+  /** Every observation of the hub (Liquid Enterprise records it as an event and lets playbooks subscribe, ADR-0049). */
+  onObservation?: (o: Record<string, unknown> & { agentId: string }) => Promise<unknown> | undefined;
+
   /** Observation from the hub → agent. Refused (and kept in the hub's outbox) while the agent is paused or stopped. */
   async forwardObservation(input: unknown): Promise<{ status: number; json: unknown }> {
     const { agentId, ...observation } = forwardObservationBody.parse(input);
+    await this.onObservation?.({ agentId, ...(observation as Record<string, unknown>) })?.catch?.(() => undefined);
     const level = this.killSwitch.effective(agentId).level;
     if (level === 'paused' || level === 'stopped') throw new SignalsError(503, `agent ${agentId} is ${level}`);
     return this.callAgent(agentId, 'POST', '/observe', observation);

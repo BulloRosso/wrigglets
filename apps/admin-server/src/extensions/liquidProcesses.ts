@@ -88,6 +88,18 @@ export class LiquidProcesses {
     return { ref, workflows: released.sort() };
   }
 
+  /** An approval's state: the result when it is closed, otherwise the live state. */
+  async approval(workflowId: string): Promise<ApprovalState> {
+    const h = this.c().workflow.getHandle(workflowId);
+    try {
+      const d = await h.describe();
+      if (d.status.name !== 'RUNNING') return (await h.result()) as ApprovalState;
+      return await h.query(approvalStateQuery);
+    } catch (err) {
+      throw new HttpError(404, (err as Error).message);
+    }
+  }
+
   async decide(workflowId: string, decision: 'approve' | 'reject', by: string, comment?: string) {
     try {
       return await this.c().workflow.getHandle(workflowId).executeUpdate(decideUpdate, { args: [{ decision, by, comment }] });

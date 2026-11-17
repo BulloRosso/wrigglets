@@ -43,7 +43,6 @@ async function snap(name, url, opts = {}) {
 try {
   await signIn();
   let st = await status();
-  if (st.mode !== 'console') throw new Error(`liquid runs in ${st.mode} mode; stop the overlay first`);
   if (st.phase === 'installed' || st.phase === 'failed') {
     log('liquid is installed from an earlier run: uninstalling first');
     await api('POST', '/extensions/liquid/uninstall', { purgeData: true });

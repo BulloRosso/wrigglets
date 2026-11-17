@@ -29,6 +29,9 @@ importers:
       '@cw/extensions':
         specifier: workspace:*
         version: link:../../packages/extensions
+      '@cw/ontology-compiler':
+        specifier: workspace:*
+        version: link:../../packages/ontology-compiler
       '@cw/ontology-ir':
         specifier: workspace:*
         version: link:../../packages/ontology-ir
@@ -62,9 +65,6 @@ importers:
       jose:
         specifier: 6.2.13
         version: 6.2.13
-      pg:
-        specifier: 8.23.1
-        version: 8.23.1
       pino:
         specifier: 10.4.0
         version: 10.4.0
@@ -84,9 +84,6 @@ importers:
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
-      '@types/pg':
-        specifier: 8.23.1
-        version: 8.23.1
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -718,6 +715,19 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/ontology-compiler:
+    dependencies:
+      '@cw/ontology-ir':
+        specifier: workspace:*
+        version: link:../ontology-ir
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/ontology-ir:
     dependencies:
       zod:
@@ -733,9 +743,6 @@ importers:
       '@cw/ontology-ir':
         specifier: workspace:*
         version: link:../ontology-ir
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
     devDependencies:
       '@cw/ontology-codegen':
         specifier: workspace:*

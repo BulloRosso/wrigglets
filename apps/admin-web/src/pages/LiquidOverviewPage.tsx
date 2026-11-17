@@ -122,7 +122,6 @@ export function LiquidOverviewPage() {
                 {!ext.data.available && <Alert severity="warning" sx={{ mb: 2 }}>The extension is not fully available. Check its services on the Extensions page.</Alert>}
                 <KeyValueList
                   items={[
-                    ['Mode', ext.data.mode === 'overlay' ? 'compose overlay' : 'installed from the console'],
                     ['Version', ext.data.installedVersion ?? ext.data.version],
                     ...(ext.data.installedAt ? ([['Installed', <><RelativeTime iso={ext.data.installedAt} /> by {ext.data.installedBy}</>]] as Array<[string, React.ReactNode]>) : []),
                     ['Services', <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>{ext.data.services.map((s) => <Chip key={s.name} size="small" color={s.state === 'running' ? 'success' : 'warning'} label={s.name} />)}</Stack>],

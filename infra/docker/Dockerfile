@@ -52,6 +52,7 @@ COPY packages/lake/package.json packages/lake/
 COPY packages/sofa-domain/package.json packages/sofa-domain/
 COPY packages/ontology-ir/package.json packages/ontology-ir/
 COPY packages/ontology-codegen/package.json packages/ontology-codegen/
+COPY packages/ontology-compiler/package.json packages/ontology-compiler/
 COPY packages/ontology-sofa/package.json packages/ontology-sofa/
 COPY packages/business-workflows/package.json packages/business-workflows/
 COPY packages/playbooks/package.json packages/playbooks/
@@ -160,18 +161,21 @@ CMD ["node", "dist/main.js"]
 
 # ---------------------------------------------------------------- control-plane ("temporal" container)
 FROM ${TEMPORAL_CLI_IMAGE} AS temporal-cli
+# pinned static OPA: the control plane checks (opa check/test) and builds (opa build -t wasm) the Liquid policies (ADR-0053)
+FROM openpolicyagent/opa:1.22.0-static@sha256:906bfc9904b2693733e7959d71773dd073e6c135cf06f26d955abe94603e82b3 AS opa
 
 FROM ${NODE_IMAGE} AS control-plane
 # git: the Liquid config repository (ADR-0046) is a bare Git repository handled with git plumbing commands
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates git && rm -rf /var/lib/apt/lists/*
 # Temporal CLI (contains the dev server and the Temporal Web UI) — unmodified upstream binary.
 COPY --from=temporal-cli /usr/local/bin/temporal /usr/local/bin/temporal
+COPY --from=opa /opa /usr/local/bin/opa
 WORKDIR /app
 COPY --from=build /out/admin ./
 COPY --from=build /src/apps/admin-web/dist ./web
 # Default guiding image for agent portraits (replaceable in the admin console)
 COPY assets/agent-reference.png /app/assets/agent-reference.png
-# Liquid Enterprise policies (ADR-0044): served to OPA as a bundle by the control plane
+# Liquid Enterprise policies (ADR-0044): seed of the config repository; compiled to WASM here (ADR-0049, ADR-0053)
 COPY policies/liquid /app/policies/liquid
 # Liquid Enterprise ontology sources: seed of the config repository (ADR-0046)
 COPY ontology /app/ontology

@@ -9,10 +9,10 @@
 //   - a stack restart with gateway.json and safety-rules.json removed (fresh /data/admin) reproduces the same behaviour;
 //   - ontology editor E2/E3: a draft (new class + link) compiles, is submitted as a proposal with an ontology diff.
 // Screenshots of the Proposals page (diff graph) and the draft editor. Restores Max's allow-list afterwards.
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
+import { docker } from './lib.mjs';
 
 const args = new Set(process.argv.slice(2));
 const result = { startedAt: new Date().toISOString(), checks: [] };
@@ -23,7 +23,6 @@ const check = (name, ok, detail) => {
 };
 let s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
-const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 const AGENT = 'sofa-max';
 // the reviewer account of the local Git host (its password is an extension secret of the control plane)
 const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};

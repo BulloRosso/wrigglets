@@ -54,7 +54,8 @@ describe('event feed', () => {
     await f.load();
     fail = true;
     gateway.push({ at: new Date(Date.now() + 1000).toISOString(), agentId: 'a', tool: 't', outcome: 'ok' });
-    expect(await f.tick()).toBe(0);
+    // the failure reaches the job runner (health view); the cursor is kept
+    await expect(f.tick()).rejects.toThrow(/core down/);
     expect(f.last?.error).toMatch(/core down/);
     fail = false;
     expect(await f.tick()).toBe(1);

@@ -107,31 +107,15 @@ const schema = z.object({
   SIGNALS_HUB_TOKEN: z.string().optional(),
   MCP_SIGNALS_TOKEN: z.string().optional(),
   /*
-   * Liquid Enterprise (optional extension, ADR-0038/0039). Normally installed from the admin console (Extensions page).
-   * LIQUID_OVERLAY=true means its services were started with docker-compose.liquid.yml instead; secrets then come
-   * from the environment.
+   * Liquid Enterprise (optional extension, ADR-0038/0039), installed from the admin console (Extensions page); its
+   * secrets are generated on install (ADR-0053: the only deployment path).
    */
-  LIQUID_OVERLAY: bool('false'),
-  LIQUID_ONTOLOGY_DB_PASSWORD: z.string().optional(),
-  LIQUID_ONTOLOGY_INTERNAL_TOKEN: z.string().optional(),
-  LIQUID_ONTOLOGY_MCP_TOKEN: z.string().optional(),
-  LIQUID_POLICY_TOKEN: z.string().optional(),
-  LIQUID_CONFIG_MCP_TOKEN: z.string().optional(),
-  LIQUID_COMPILER_TOKEN: z.string().optional(),
   /** Rego policies and roles of Liquid Enterprise (copied into the control-plane image). */
   LIQUID_POLICY_DIR: z.string().default('/app/policies/liquid'),
   /** Ontology sources copied into the image; seed of the config repository (ADR-0046). */
   LIQUID_ONTOLOGY_DIR: z.string().default('/app/ontology'),
   /** Default playbooks copied into the image; seed of the config repository (ADR-0047). */
   LIQUID_PLAYBOOKS_DIR: z.string().default('/app/playbooks'),
-  LIQUID_PLAYBOOK_TOKEN: z.string().optional(),
-  LIQUID_ALERTS_TOKEN: z.string().optional(),
-  LIQUID_FORGEJO_DB_PASSWORD: z.string().optional(),
-  LIQUID_FORGEJO_SECRET_KEY: z.string().optional(),
-  LIQUID_FORGEJO_INTERNAL_TOKEN: z.string().optional(),
-  LIQUID_FORGEJO_BOT_PASSWORD: z.string().optional(),
-  LIQUID_FORGEJO_REVIEWER_PASSWORD: z.string().optional(),
-  LIQUID_FORGEJO_WEBHOOK_SECRET: z.string().optional(),
 
   /* Agent portraits (ADR-0025) */
   OPENAI_API_KEY: z.string().optional(),

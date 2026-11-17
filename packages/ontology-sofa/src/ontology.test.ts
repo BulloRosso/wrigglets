@@ -1,10 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
-import { dqChecks, generateAll, genSql, mcpTools, opaData as opaDataOf } from '@cw/ontology-codegen';
-import { loadIr, types } from './index.js';
+import { dqChecks, genSql, mcpTools, opaData as opaDataOf } from '@cw/ontology-codegen';
+import { inputValidator } from '@cw/ontology-ir';
+import { loadIr } from './index.js';
 
 // computed from the IR at runtime by the enterprise core (ADR-0049); tested here against the built-in ontology
 const MCP_TOOLS = mcpTools(loadIr());
@@ -12,23 +10,9 @@ const DQ_CHECKS = dqChecks(loadIr());
 const projectionSql = () => genSql(loadIr());
 const opaData = () => opaDataOf(loadIr()) as Record<string, unknown>;
 
-const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 type MockTool = { name: string; write?: boolean; inputSchema: { properties?: Record<string, Record<string, unknown>>; required?: string[] } };
 // @ts-expect-error plain .mjs without types; importing does not start the mock server
 const mock = (await import('../../../scripts/sofa-company/mock-mcp.mjs')) as { SERVERS: Record<string, { tools: MockTool[] }> };
-
-describe('generated files are up to date (stale check)', () => {
-  it('every file equals what the generators produce from the committed IR', () => {
-    for (const [rel, content] of Object.entries(generateAll(loadIr()))) {
-      const p = path.join(pkg, rel);
-      expect(existsSync(p), rel).toBe(true);
-      expect(readFileSync(p, 'utf8').replace(/\r\n/g, '\n'), rel).toBe(content);
-    }
-  });
-  it('every generated file starts with the GENERATED header', () => {
-    for (const rel of Object.keys(generateAll(loadIr()))) expect(readFileSync(path.join(pkg, rel), 'utf8'), rel).toMatch(/GENERATED from ontology sofa@\d+\.\d+\.\d+ \([0-9a-f]{12}\)/);
-  });
-});
 
 describe('MCP tools match the mock one to one (M2 exit criterion)', () => {
   const mockTools = Object.entries(mock.SERVERS).flatMap(([group, s]) => s.tools.map((t) => ({ ...t, group })));
@@ -81,12 +65,10 @@ describe('projection DDL and data-quality checks', () => {
   });
 });
 
-describe('generated types and OPA data', () => {
-  it('types validate real objects and action inputs of the sofa company', () => {
-    expect(types.Supplier.parse({ id: 'S-NORDHOLZ', name: 'Nordholz', skus: ['BEAM-PINE-80'], lead_workdays: 8, unit_price: 4.2, min_qty: 2000, max_qty: 20000, rating: 'A', status: 'ok' })).toBeTruthy();
-    expect(() => types.Supplier.parse({ id: 'S-1', name: 'x', skus: [], lead_workdays: 1, unit_price: 1, min_qty: 1, max_qty: 1, rating: 'Z', status: 'ok' })).toThrow();
-    expect(types.ACTION_INPUTS.create_purchase_order.parse({ supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 3000 })).toBeTruthy();
-    expect(() => types.ACTION_INPUTS.request_overtime.parse({ factory: 'F-NORTH', from: 'tomorrow', to: '2026-10-09' })).toThrow();
+describe('input validation and OPA data from the IR', () => {
+  it('action inputs of the sofa company are validated from the IR (runtime, no generated types)', () => {
+    expect(inputValidator(loadIr(), 'create_purchase_order')!.safeParse({ supplierId: 'S-BALTIC', sku: 'BEAM-PINE-80', quantity: 3000 }).success).toBe(true);
+    expect(inputValidator(loadIr(), 'request_overtime')!.safeParse({ factory: 'F-NORTH', from: 'tomorrow', to: '2026-10-09' }).success).toBe(false);
   });
   it('OPA data classifies classes and actions', () => {
     const d = opaData() as { liquid: { ontology: { classes: Record<string, { criticality: string }>; actions: Record<string, { criticality: string; destructive: boolean }> } } };

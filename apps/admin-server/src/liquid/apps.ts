@@ -84,7 +84,6 @@ export class AppRegistry {
   private readonly file: string;
   private readonly secretsFile: string;
   private chain: Promise<unknown> = Promise.resolve();
-  private timer?: NodeJS.Timeout;
 
   constructor(private readonly d: AppRegistryDeps) {
     this.dir = path.join(d.dataDir, 'liquid', 'apps');
@@ -304,19 +303,6 @@ export class AppRegistry {
       n++;
     }
     return n;
-  }
-
-  start(intervalMs = 3_600_000, enabled: () => boolean = () => true) {
-    const run = async () => {
-      if (enabled()) await this.tick().catch((err: Error) => this.d.log?.warn({ err: err.message }, 'app expiry job failed'));
-      this.timer = setTimeout(() => void run(), intervalMs);
-      this.timer.unref?.();
-    };
-    void run();
-  }
-
-  stop() {
-    if (this.timer) clearTimeout(this.timer);
   }
 
   private must(id: string): AppRecord {

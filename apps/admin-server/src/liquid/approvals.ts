@@ -40,7 +40,6 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export class ApprovalService {
   private mailed = new Set<string>();
   private readonly file: string;
-  private timer?: NodeJS.Timeout;
 
   constructor(private readonly d: ApprovalDeps) {
     this.file = path.join(d.dataDir, 'liquid', 'approvals-mailed.json');
@@ -143,17 +142,4 @@ export class ApprovalService {
     }
   }
 
-  start(enabled: () => boolean, intervalMs = 15_000) {
-    const loop = async () => {
-      try {
-        if (enabled()) await this.tick();
-      } catch (err) {
-        this.d.log?.warn({ err: String(err) }, 'approvals tick failed');
-      }
-      this.timer = setTimeout(() => void loop(), intervalMs);
-      this.timer.unref?.();
-    };
-    this.timer = setTimeout(() => void loop(), 10_000);
-    this.timer.unref?.();
-  }
 }

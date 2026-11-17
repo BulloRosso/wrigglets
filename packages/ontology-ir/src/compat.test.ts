@@ -19,6 +19,7 @@ describe('compatibility', () => {
   const cases: Array<[string, (ir: OntologyIr) => void, 'patch' | 'minor' | 'major', RegExp]> = [
     ['description', (ir) => (po(ir).description = 'changed'), 'patch', /description changed/],
     ['annotation', (ir) => (po(ir).annotations.owner = 'head-of-sales'), 'patch', /annotations.owner/],
+    ['declarative check added (ADR-0053)', (ir) => (ir.checks = [{ name: 'x_check', subject: { class: 'PurchaseOrder', input: 'poId' }, require: { path: 'note', present: true }, message: 'needs a note' }]), 'minor', /new check/],
     ['precondition added to an action (M10 D3)', (ir) => act(ir, 'release_purchase_order').preconditions.push('due_diligence_for_high_risk_material'), 'minor', /preconditions changed/],
     ['new class + optional link (D3)', (ir) => {
       ir.classes.push(carrier);

@@ -8,11 +8,10 @@ import YAML from 'yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_GATEWAY_LIMITS, DEFAULT_SAFETY_RULES } from '@cw/shared';
 import { ConfigRepoService, type ConfigTargets } from './configRepo.js';
-import { exportState, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
+import { exportState, parseState, requiredOwners, type DesiredState } from './layout.js';
 
 const PLAYBOOK = ['id: notify-on-alert', 'version: 1', 'trigger: { kind: alert, match: { source: test } }', 'steps:', '  - { id: tell, type: notify, autonomy: auto, with: { subject: hello } }', ''].join(String.fromCharCode(10));
 const SECRET = 'very-secret-internal-token-1234567890';
-const ADMIN = { email: 'ada@example.local', roles: ['Platform.Admin'] };
 
 function state(): DesiredState {
   return {
@@ -53,6 +52,14 @@ let t: FakeTargets;
 let svc: ConfigRepoService;
 const seed = { 'ontology/sofa/README.md': 'x' };
 
+/** What a merge on the Git host does (ADR-0049, ADR-0053): the proposal's files on top of main, then a reconcile. */
+async function mergeOnHost(s: ConfigRepoService, id: string) {
+  const p = await s.get(id);
+  const files = await s.git.files(p.head);
+  await s.git.commit({ ref: 'main', parent: (await s.git.rev('main'))!, changes: Object.fromEntries(p.paths.map((x) => [x, files[x] ?? null])), message: `${p.title} (proposal ${p.id})`, author: { name: 'reviewer', email: 'reviewer@example.local' } });
+  return s.reconcile('git host');
+}
+
 beforeEach(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), 'cw-config-'));
   t = new FakeTargets();
@@ -60,7 +67,6 @@ beforeEach(async () => {
   await svc.load();
 });
 afterEach(async () => {
-  svc.stop();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -98,8 +104,6 @@ describe('layout', () => {
     expect(requiredOwners(owners, ['gateway/allow-lists.yaml'])).toEqual([{ for: 'gateway/allow-lists.yaml', owners: ['ops@x'] }]);
     const sets = requiredOwners(owners, ['ontology/sofa/schema.yaml'], ['head-of-logistics', 'unknown-team']);
     expect(sets.map((s) => s.owners)).toEqual([['role:Platform.Admin'], ['bea@x']]);
-    expect(satisfies({ email: 'BEA@x', roles: [] }, ['bea@x'])).toBe(true);
-    expect(satisfies(ADMIN, ['ops@x'])).toBe(false);
   });
 });
 
@@ -203,7 +207,7 @@ describe('config repository', () => {
     expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'crm__list_customers']);
   });
 
-  it('an approved agent proposal changes the allow-list within one reconcile; rejection leaves main unchanged', async () => {
+  it('a merged agent proposal changes the allow-list within one reconcile; an unmerged one leaves main unchanged', async () => {
     await svc.init(seed, 'ada@example.local');
     const before = await svc.git.rev('main');
     const files = exportState(t.current());
@@ -213,21 +217,12 @@ describe('config repository', () => {
     expect(p.paths).toEqual(['gateway/allow-lists.yaml']);
     expect(p.owners).toEqual([{ for: 'gateway/allow-lists.yaml', owners: ['role:Platform.Admin'] }]);
     expect((await svc.get(p.id)).diff).toMatch(/\+ {4}- erp__list_suppliers/);
-    expect(await svc.git.rev('main')).toBe(before);
-
-    await expect(svc.decide(p.id, 'approve', { email: 'stefan@example.local', roles: ['Platform.Admin'] })).rejects.toThrow(/four eyes/);
-    await expect(svc.decide(p.id, 'approve', { email: 'eve@example.local', roles: [] })).rejects.toThrow(/not an owner/);
-    const done = await svc.decide(p.id, 'approve', ADMIN, 'ok');
-    expect(done.status).toBe('approved');
+    expect(await svc.git.rev('main')).toBe(before); // proposing changes nothing
+    await mergeOnHost(svc, p.id);
     expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'erp__list_suppliers']);
-    const [merge] = (await svc.status()).log;
-    expect(merge!.body).toMatch(/Approved-By: ada@example.local/);
-    expect(merge!.body).toMatch(/Agent: sofa-max/);
-    await expect(svc.decide(p.id, 'reject', ADMIN)).rejects.toThrow(/already approved/);
-
     const head = await svc.git.rev('main');
-    const q = await svc.propose({ title: 'Lara gets everything', reason: 'convenience', changes: [{ path: 'gateway/allow-lists.yaml', content: next.replace('- erp__*', '- "*"') }], author: { kind: 'agent', id: 'sofa-lara' } });
-    expect((await svc.decide(q.id, 'reject', ADMIN, 'no')).status).toBe('rejected');
+    await svc.propose({ title: 'Lara gets everything', reason: 'convenience', changes: [{ path: 'gateway/allow-lists.yaml', content: next.replace('- erp__*', '- "*"') }], author: { kind: 'agent', id: 'sofa-lara' } });
+    await svc.reconcile();
     expect(await svc.git.rev('main')).toBe(head);
   });
 
@@ -238,26 +233,12 @@ describe('config repository', () => {
     expect(JSON.stringify(bad.validation.checks)).toMatch(/must have autonomy/);
   });
 
-  it('an invalid proposal cannot be approved; secrets and paths outside the layout are refused', async () => {
+  it('an invalid proposal fails its check; secrets and paths outside the layout are refused', async () => {
     await svc.init(seed, 'ada@example.local');
     const bad = await svc.propose({ title: 'broken', reason: 'typo', changes: [{ path: 'gateway/allow-lists.yaml', content: 'allowedTools: [1, 2]\n' }], author: { kind: 'person', id: 'ben@example.local' } });
-    expect(bad.validation.ok).toBe(false);
-    await expect(svc.decide(bad.id, 'approve', ADMIN)).rejects.toThrow(/does not validate/);
+    expect(bad.validation.ok).toBe(false); // the required check fails, so the Git host cannot merge it
     await expect(svc.propose({ title: 'leak', reason: 'oops', changes: [{ path: 'playbooks/x.yaml', content: `token: ${SECRET}\n` }], author: { kind: 'agent', id: 'sofa-lara' } })).rejects.toThrow(/secret values/);
     await expect(svc.propose({ title: 'escape', reason: 'nope', changes: [{ path: 'gateway/../../etc/passwd', content: 'x' }], author: { kind: 'agent', id: 'sofa-lara' } })).rejects.toThrow(/outside/);
-  });
-
-  it('a proposal whose file changed on main meanwhile is a conflict; a non-overlapping one merges', async () => {
-    await svc.init(seed, 'ada@example.local');
-    const files = exportState(t.current());
-    const a = await svc.propose({ title: 'Option A', reason: 'reason a', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_state') }], author: { kind: 'agent', id: 'sofa-max' } });
-    const b = await svc.propose({ title: 'Option B', reason: 'reason b', changes: [{ path: 'gateway/allow-lists.yaml', content: files['gateway/allow-lists.yaml']!.replace('erp__get_kpi', 'erp__get_log') }], author: { kind: 'agent', id: 'sofa-max' } });
-    const c = await svc.propose({ title: 'Option C', reason: 'reason c', changes: [{ path: 'playbooks/x.yaml', content: PLAYBOOK }], author: { kind: 'agent', id: 'sofa-max' } });
-    await svc.decide(a.id, 'approve', ADMIN);
-    await expect(svc.decide(b.id, 'approve', ADMIN)).rejects.toThrow(/conflicts/);
-    expect((await svc.decide(c.id, 'approve', ADMIN)).status).toBe('approved');
-    expect((await allowList())['sofa-max']).toEqual(['erp__get_state']);
-    expect(Object.keys(await svc.git.files('main'))).toContain('playbooks/x.yaml');
   });
 });
 
@@ -307,7 +288,7 @@ describe('ontology changes (M8)', () => {
     expect(await s2.git.rev('refs/liquid/validate-x')).toBeNull();
   });
 
-  it('the reconciler applies a changed ontology once, after approval', async () => {
+  it('the reconciler applies a changed ontology once, after the merge', async () => {
     applied.length = 0;
     const s2 = await mk();
     await s2.reconcile();
@@ -315,7 +296,7 @@ describe('ontology changes (M8)', () => {
     await s2.reconcile();
     expect(applied).toHaveLength(1);
     const p = await s2.propose({ title: 'Carriers', reason: 'D3 carriers', changes: [{ path: 'ontology/sofa/schema.yaml', content: 'schema\n# carrier\n# v0.2.0\n' }], author: { kind: 'agent', id: 'sofa-modeller' } });
-    await s2.decide(p.id, 'approve', ADMIN);
+    await mergeOnHost(s2, p.id);
     expect(applied).toEqual(['sofa:0.1.0', 'sofa:0.2.0']);
     expect((await s2.status()).lastReconcile?.changes).toContain('ontology sofa applied');
   });

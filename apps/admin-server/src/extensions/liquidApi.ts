@@ -59,9 +59,9 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   r.post('/liquid/actions/:name/check', pass('POST', (req) => `/internal/actions/${encodeURIComponent(String(req.params.name))}/check`));
   r.get('/liquid/ontology/sdk', async (req, res, next) => {
     try {
-      // ?kind=app: the standalone SDK for registered apps (ADR-0050); default: the SDK for server-side code
-      const file = req.query.kind === 'app' ? 'app-sdk.ts' : 'sdk.ts';
-      const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/${file}`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
+      // the one SDK of the ontology in force (ADR-0053; ?kind=app still accepted)
+      void req;
+      const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/sdk.ts`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
       if (!out.ok) throw new HttpError(502, `ontology server: HTTP ${out.status}`);
       res.type('text/plain').send(await out.text());
     } catch (err) {

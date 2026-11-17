@@ -80,6 +80,11 @@ function actionChange(c: IrChange, f: CompatFinding[]) {
 export function compatibility(a: OntologyIr, b: OntologyIr): Compatibility {
   const d = diffIr(a, b);
   const f: CompatFinding[] = [];
+  // declarative preconditions (ADR-0053) change the behaviour of actions: reviewed as minor, like a precondition change
+  const checksA = new Map((a.checks ?? []).map((c) => [c.name, JSON.stringify(c)]));
+  const checksB = new Map((b.checks ?? []).map((c) => [c.name, JSON.stringify(c)]));
+  for (const [n, v] of checksB) if (checksA.get(n) !== v) f.push({ level: 'minor', path: `checks.${n}`, reason: checksA.has(n) ? 'check changed' : 'new check' });
+  for (const n of checksA.keys()) if (!checksB.has(n)) f.push({ level: 'minor', path: `checks.${n}`, reason: 'check removed' });
   const aliasesB = new Map(b.actions.flatMap((x) => (x.aliases ?? []).map((al) => [al, x.name] as const)));
   for (const c of d.changes) {
     switch (c.element) {

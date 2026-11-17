@@ -18,6 +18,23 @@ const AGENT = 'sofa-lara'; // procurement; plays the modelling agent through its
 const SKU = 'BEAM-PINE-80'; // pine beams: timber is a high-risk commodity (deforestation regulation)
 const NEW_SUPPLIER = 'S-NORDHOLZ'; // has no statement yet
 const PRE = 'due_diligence_for_high_risk_material';
+// the rule as ontology data (ADR-0053): a declarative check the release names in its preconditions — no code
+const CHECK = {
+  subject: { class: 'PurchaseOrder', input: 'poId' },
+  when: { path: 'sku.commodity_risk', equals: 'high' },
+  require: { exists: { class: 'DueDiligenceStatement', where: { supplier: { path: 'supplier' }, sanctions_checked: { equals: true } } } },
+  message: '{subject.id} needs a valid due-diligence statement of supplier {subject.supplier} before release: {subject.sku} is a high-risk commodity',
+};
+const CHECK_YAML = [
+  'checks:',
+  `  ${PRE}:`,
+  '    description: Purchase orders for high-risk commodities need a valid supplier due-diligence statement before release (D3).',
+  '    subject: { class: PurchaseOrder, input: poId }',
+  '    when: { path: sku.commodity_risk, equals: high }',
+  '    require: { exists: { class: DueDiligenceStatement, where: { supplier: { path: supplier }, sanctions_checked: { equals: true } } } }',
+  `    message: "${CHECK.message}"`,
+  '',
+].join('\n');
 const APPS = `http://${env.PUBLIC_HOST || 'localhost'}:8090`;
 const APP_ID = 'supplier-due-diligence';
 const APP = `${APPS}/apps/${APP_ID}`;
@@ -81,7 +98,10 @@ try {
   if (!/\n {2}CommodityRisk:\n/.test(schema)) schema = schema.replace(/\nenums:\n/, `${NL}enums:${NL}  CommodityRisk:${NL}    description: Risk class of a commodity for supplier due diligence (deforestation, conflict minerals, forced labour)${NL}    permissible_values:${NL}      low: {}${NL}      high: {}${NL}`);
   if (!hasDds)
     schema = schema.replace(/\nclasses:\n/, [``, `classes:`, `  DueDiligenceStatement:`, `    description: A supplier's due-diligence statement (sanctions screening, conflict minerals, labour standards), recorded by a buyer.`, `    annotations: { criticality: business_critical, data_class: confidential, owner: head-of-logistics }`, `    attributes:`, `      id: { identifier: true, description: e.g. DDS-001 }`, `      supplier: { range: Supplier, required: true, description: The supplier the statement is about }`, `      statement: { required: true, description: What the supplier declares }`, `      sanctions_checked: { range: boolean, description: The supplier was screened against the sanctions lists }`, `      signed_by: { required: true, description: Name of the person who signs the statement }`, ``, ``].join(NL));
-  let actions = actions0.replace(/(\n {2}- name: release_purchase_order\n(?:.*\n)*? {4}preconditions: \[)([^\]]*)\]/, (_m, a, list) => `${a}${list}, ${PRE}]`);
+  // the check is declared once (a re-run finds it from the first run); the release names it
+  // (before `events:` — new actions are appended at the end of the file, under `actions:`)
+  let actions = actions0.includes(`  ${PRE}:`) ? actions0 : actions0.replace(/\nevents:\n/, `\n${CHECK_YAML}\nevents:\n`);
+  actions = actions.replace(/(\n {2}- name: release_purchase_order\n(?:.*\n)*? {4}preconditions: \[)([^\]]*)\]/, (_m, a, list) => (list.includes(PRE) ? `${a}${list}]` : `${a}${list}, ${PRE}]`));
   if (!actions.includes('name: MaterialRiskClassified')) actions = actions.replace(/(\n {2}- \{ name: PurchaseOrderReleased[^\n]*\n)/, `$1  - { name: MaterialRiskClassified, object_type: Material, description: The commodity risk of a material was set }${NL}${hasDds ? '' : `  - { name: DueDiligenceStatementSubmitted, object_type: DueDiligenceStatement, description: A due-diligence statement of a supplier was recorded }${NL}`}`);
   if (!actions.includes('- name: set_commodity_risk')) actions += [
     `  - name: set_commodity_risk`,
@@ -107,7 +127,7 @@ try {
   check('validation: compiles, additive (minor), existing data fits, policy tests pass', v.valid && v.compatibility?.level === 'minor', { checks: v.checks.map((c) => `${c.name}=${c.ok}`), diff: v.diff?.summary });
 
   // 3. evidence: shadow replay of the rule over the last week, timber classified high-risk
-  const replay = await api('POST', '/liquid/shadow/precondition', { action: 'release_purchase_order', precondition: PRE, windowMs: 7 * 86_400_000, assume: { Material: { [SKU]: { commodity_risk: 'high' } } } });
+  const replay = await api('POST', '/liquid/shadow/precondition', { action: 'release_purchase_order', precondition: PRE, check: { name: PRE, ...CHECK }, windowMs: 7 * 86_400_000, assume: { Material: { [SKU]: { commodity_risk: 'high' } } } });
   check(`shadow replay: ${replay.blocked} of ${replay.total} releases of the last week (${replay.share} %) would have waited for a statement`, replay.total > 0, { examples: replay.examples.slice(0, 3).map((e) => e.poId) });
   metric('shadow_replay', { releases: replay.total, blocked: replay.blocked, sharePercent: replay.share });
   const prop = JSON.parse(agentTool(AGENT, 'config__propose_change', { title: 'Due diligence before releasing high-risk commodities (D3)', reason: 'Purchase orders for high-risk commodities need a valid supplier due-diligence statement before release.', evidence: JSON.stringify({ shadowReplay: replay, validation: v.diff?.summary }), changes }).text);

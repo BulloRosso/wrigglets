@@ -27,7 +27,7 @@ if (existsSync(path.join(root, 'policies', 'liquid'))) {
   }
   else console.log('note: Docker is not running, skipping opa test');
 }
-if (existsSync(path.join(root, 'scripts', 'liquid', 'check-generated.mjs'))) steps.push(['generated files up to date', 'node', ['scripts/liquid/check-generated.mjs']]);
+if (existsSync(path.join(root, 'scripts', 'liquid', 'check-generated.mjs'))) steps.push(['ontology IR up to date', 'node', ['scripts/liquid/check-generated.mjs']]);
 
 const results = [];
 for (const [name, cmd, cmdArgs] of steps) {

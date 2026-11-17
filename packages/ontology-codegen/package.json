@@ -6,7 +6,6 @@
   "description": "Liquid Enterprise generators (ADR-0041): ontology IR -> zod/TS types, Postgres DDL, MCP tool definitions, OPA data, data-quality checks, SDK. Each generator is a pure function IR -> files.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "ontology-codegen": "./dist/cli.js" },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

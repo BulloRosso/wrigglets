@@ -42,7 +42,6 @@ const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
 try {
   await s.signIn(ADMIN, env.BOOTSTRAP_ADMIN_EMAIL, env.BOOTSTRAP_ADMIN_PASSWORD);
   let st = await api('GET', '/extensions/liquid');
-  if (st.mode !== 'console') throw new Error(`liquid runs in ${st.mode} mode`);
   if (args.has('--reinstall') && (st.phase === 'installed' || st.phase === 'failed')) {
     log('reinstalling: uninstall with purge first');
     await api('POST', '/extensions/liquid/uninstall', { purgeData: true });

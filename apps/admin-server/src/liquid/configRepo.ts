@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { canonical, compatibility, diffIr, sourceHash, type Compatibility, type IrDiff, type OntologyIr } from '@cw/ontology-ir';
 import { GitRepo, type Author } from './git.js';
 import { codeowners, type Forge, type PullRequest } from './forge.js';
-import { DEFAULT_OWNERS, MANAGED_PREFIXES, README, ROOT_FILES, STORE_FILES, exportState, findSecrets, ownersFile, parseState, requiredOwners, satisfies, type DesiredState } from './layout.js';
+import { DEFAULT_OWNERS, MANAGED_PREFIXES, README, ROOT_FILES, STORE_FILES, exportState, findSecrets, ownersFile, parseState, requiredOwners, type DesiredState } from './layout.js';
 
 /*
  * Config repository (ADR-0046): the platform's desired state in Git (bare repo in /data/liquid/config.git, outside
@@ -112,7 +112,6 @@ export class ConfigRepoService {
   /** When the stores may be written at all (installed, no extension operation running). Checked by every reconcile,
    *  whoever triggers it (timer, webhook, deferred edit), and again right before applying (ADR-0051). */
   gate: () => boolean = () => true;
-  private timer?: NodeJS.Timeout;
   /** Called after main changed through a proposal or a reconcile applied something (e.g. to rebuild the OPA bundle). */
   onApplied?: () => void;
   /** The Git host (Forgejo, GitHub, Azure DevOps): proposals become pull requests, decisions happen there (ADR-0049). */
@@ -299,25 +298,6 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       if (changes.length) this.onReconciled?.({ head, ok: true, changes, errors: [] });
       return { ok: true, head, changes };
     });
-  }
-
-  start(intervalMs = 60_000, enabled: () => boolean = () => true) {
-    this.gate = enabled;
-    const tick = async () => {
-      try {
-        if (enabled()) await this.reconcile();
-      } catch {
-        /* recorded in lastReconcile where possible; next tick retries */
-      }
-      this.timer = setTimeout(() => void tick(), intervalMs);
-      this.timer.unref?.();
-    };
-    this.timer = setTimeout(() => void tick(), 5000);
-    this.timer.unref?.();
-  }
-
-  stop() {
-    if (this.timer) clearTimeout(this.timer);
   }
 
   /** Files of the applied revision under a prefix (e.g. the policies for the OPA bundle). */
@@ -629,68 +609,6 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       await this.persist();
       return p;
     });
-  }
-
-  /** A person decides. Approve = owners satisfied, not the requester, valid on top of the current main → merge commit. */
-  /**
-   * Local review without a Git host: owners from OWNERS.yaml, not the requester, re-validated on main. There is no
-   * console route for it any more (proposals are reviewed on the Git host, user decision 2026-11-17); the merge rules it
-   * implements are kept and unit-tested, and the Git host enforces the same rules through CODEOWNERS and protection.
-   */
-  async decide(id: string, decision: 'approve' | 'reject', person: { email: string; roles: string[] }, comment?: string): Promise<Proposal> {
-    const out = await this.serial(async () => {
-      const p = this.meta.proposals.find((x) => x.id === id);
-      if (!p) throw new ConfigError(404, `no proposal ${id}`);
-      if (p.status !== 'pending' && p.status !== 'conflict') throw new ConfigError(409, `proposal ${id} is already ${p.status}`);
-      if (this.forge && p.pr) throw new ConfigError(409, `this proposal is reviewed on the Git host: ${p.pr.url}`);
-      const email = person.email.toLowerCase();
-      if (decision === 'reject') {
-        Object.assign(p, { status: 'rejected', decidedBy: email, decidedAt: new Date().toISOString(), comment });
-        await this.persist();
-        return p;
-      }
-      if ((p.author.kind === 'person' && p.author.id.toLowerCase() === email) || p.author.user?.toLowerCase() === email) throw new ConfigError(403, 'four eyes: the requester cannot approve their own proposal');
-      const missing = p.owners.filter((s) => !satisfies({ email, roles: person.roles }, s.owners));
-      if (missing.length) throw new ConfigError(403, `not an owner of: ${missing.map((m) => `${m.for} (${m.owners.join(', ')})`).join('; ')}`);
-      const main = (await this.git.rev('main'))!;
-      let tree: string;
-      if (main === p.base) tree = await this.git.treeOf(p.head);
-      else {
-        const m = await this.git.mergeTree(main, p.head);
-        if ('conflicts' in m) {
-          p.status = 'conflict';
-          await this.persist();
-          throw new ConfigError(409, `conflicts with the current main: ${m.conflicts.join(', ') || 'see the diff'}`);
-        }
-        tree = m.tree;
-      }
-      // validate what main would become
-      const probe: Proposal = structuredClone(p);
-      const tmpRef = `refs/liquid/probe-${p.id}`;
-      const probeCommit = await this.git.commit({ ref: tmpRef, parent: main, expect: await this.git.rev(tmpRef), changes: {}, tree, message: 'probe', author: SYSTEM, extraParents: [p.head] });
-      await this.validateInto(probe, probeCommit!);
-      await this.git.deleteRef(tmpRef);
-      if (!probe.validation.ok) {
-        p.validation = probe.validation;
-        await this.persist();
-        throw new ConfigError(422, `the proposal does not validate on top of the current main: ${probe.validation.checks.filter((c) => !c.ok).map((c) => c.name).join(', ')}`);
-      }
-      const merged = await this.git.commit({
-        ref: 'main',
-        parent: main,
-        changes: {},
-        tree,
-        extraParents: [p.head],
-        message: `${p.title} (proposal ${p.id})\n\n${p.reason}\n\n${trailers({ 'Requested-By': p.author.user ?? (p.author.kind === 'person' ? p.author.id : undefined), Agent: p.author.kind === 'agent' ? p.author.id : undefined, 'Approved-By': email, 'Change-Id': p.changeId })}`,
-        author: p.author.kind === 'agent' ? { name: p.author.id, email: `${p.author.id}@agents.local` } : personAuthor(p.author.id),
-        committer: personAuthor(email),
-      });
-      Object.assign(p, { status: 'approved', decidedBy: email, decidedAt: new Date().toISOString(), comment, mergedAs: merged ?? main });
-      await this.persist();
-      return p;
-    });
-    if (out.status === 'approved') await this.reconcile(out.decidedBy ?? 'reconciler');
-    return out;
   }
 
   /** Does the core run the ontology of `rev`? (true without the in-force hook) */

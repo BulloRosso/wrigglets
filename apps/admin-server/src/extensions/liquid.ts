@@ -1,14 +1,11 @@
 import type { ExtensionManifestInput } from '@cw/extensions';
-import type { BootstrapContext, BootstrapHandler, OverlayOptions } from './service.js';
+import type { BootstrapContext, BootstrapHandler } from './service.js';
 
 /*
- * Liquid Enterprise (ADR-0038, docs/liquid-enterprise.md) as an extension manifest. It grows with each milestone of
- * docs/liquid-enterprise-extension.md: M0b the ontology database; M1 the ontology server with event log and lake
- * (DuckLake, ADR-0040); M2 the compiler service; M3 actions + upstream "onto"; M4 policy; M5 business workflows; since
- * ADR-0049 the ontology server is the enterprise core (business worker in-process, policy embedded as WASM, no OPA).
- *
- * Every service here is also declared in docker-compose.liquid.yml under the same name (checked by a test), so the
- * overlay and the console install produce the same network (service name = host name).
+ * Liquid Enterprise (ADR-0038, docs/liquid-enterprise.md) as an extension manifest, installed from the console (the only
+ * deployment path since ADR-0053). Three services: the ontology database, the enterprise core (event log, lake, actions,
+ * embedded policy, business worker; ADR-0049) and the Git host of the config repository. The ontology compiler and the
+ * policy checks run inside the control plane (ADR-0053).
  */
 
 export const LIQUID_ID = 'liquid';
@@ -27,11 +24,9 @@ export const liquidManifest: ExtensionManifestInput = {
     // the enterprise core fetches the policy package (Rego compiled to WASM) with it (ADR-0049)
     { name: 'policy_token', bytes: 32 },
     { name: 'config_mcp_token', bytes: 32 },
-    { name: 'compiler_token', bytes: 32 },
     { name: 'playbook_token', bytes: 32 },
     { name: 'alerts_token', bytes: 32 },
-    // the Git host of the config repository (ADR-0049)
-    { name: 'forgejo_db_password', bytes: 24 },
+    // the Git host of the config repository (ADR-0049); its data is SQLite in its own volume (ADR-0053)
     { name: 'forgejo_secret_key', bytes: 32 },
     { name: 'forgejo_internal_token', bytes: 48 },
     { name: 'forgejo_bot_password', bytes: 24 },
@@ -70,10 +65,7 @@ export const liquidManifest: ExtensionManifestInput = {
         POLICY_URL: 'http://temporal:8080/internal/liquid/policy',
         POLICY_TOKEN: '{{secret:policy_token}}',
         LAKE_DATA_PATH: '/lake/',
-        // the lake flush runs as the Temporal schedule `lake-flush` of the business worker (ADR-0045)
-        FLUSH_INTERVAL_SEC: '0',
-        // business worker in the same process (ADR-0049)
-        BUSINESS_WORKER: 'on',
+        // business worker in the same process (ADR-0049), incl. the lake-flush schedule (ADR-0045)
         TEMPORAL_ADDRESS: 'temporal:7233',
         CONTROL_PLANE_URL: 'http://temporal:8080',
         PLAYBOOK_TOKEN: '{{secret:playbook_token}}',
@@ -88,13 +80,9 @@ export const liquidManifest: ExtensionManifestInput = {
       image: 'codeberg.org/forgejo/forgejo:15@sha256:5d050e6d623e540923ff54b1c0c7acf41c3f9174a6c7ad515cc0c63d703fcd22',
       port: 3000,
       hostPort: 3300,
-      dependsOn: ['ontology-db'],
       env: {
-        FORGEJO__database__DB_TYPE: 'postgres',
-        FORGEJO__database__HOST: '{{svc:ontology-db.host}}:{{svc:ontology-db.port}}',
-        FORGEJO__database__NAME: 'forgejo',
-        FORGEJO__database__USER: 'forgejo',
-        FORGEJO__database__PASSWD: '{{secret:forgejo_db_password}}',
+        FORGEJO__database__DB_TYPE: 'sqlite3',
+        FORGEJO__database__PATH: '/data/gitea/forgejo.db',
         FORGEJO__server__ROOT_URL: '{{svc:forgejo.public}}/',
         FORGEJO__server__HTTP_PORT: '3000',
         FORGEJO__server__DISABLE_SSH: 'true',
@@ -114,16 +102,6 @@ export const liquidManifest: ExtensionManifestInput = {
       healthcheck: { test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/healthz'], intervalSec: 5, timeoutSec: 4, retries: 60, startPeriodSec: 10 },
       memoryMb: 512,
     },
-    {
-      name: 'ontology-compiler',
-      description: 'LinkML compiler as a service (ontology → IR) and policy checker (opa check/test) for drafts and config proposals',
-      image: 'coworking/ontology-compiler:local',
-      local: true,
-      port: 7720,
-      env: { COMPILER_TOKEN: '{{secret:compiler_token}}' },
-      healthcheck: { test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7720/health', timeout=3)"], intervalSec: 10, timeoutSec: 5, retries: 12, startPeriodSec: 5 },
-      memoryMb: 512,
-    },
   ],
   bootstrap: [
     // before the worker starts: namespace + search attributes (the handler is injected by main.ts, it needs Temporal)
@@ -131,9 +109,7 @@ export const liquidManifest: ExtensionManifestInput = {
     { id: 'seed-sofa', description: 'Seed the sofa company (T0 extract into the raw zone)', demoOnly: true },
     // the desired state in Git (ADR-0046): first commit = the running platform (handler injected by main.ts)
     { id: 'config-repo', description: 'Config repository: bootstrap from the running platform (gateway, safety, agents, policies, ontology)' },
-    // the Git host (ADR-0049): database and role in the shared Liquid Postgres before Forgejo starts; then accounts,
-    // repository, branch protection with the required check, webhook, CODEOWNERS (handlers injected by main.ts)
-    { id: 'forgejo-db', description: 'Database and role of the Git host in the shared Liquid Postgres', before: ['forgejo'] },
+    // the Git host (ADR-0049): accounts, repository, branch protection with the required check, webhook, CODEOWNERS
     { id: 'forgejo-setup', description: 'Git host: bot and reviewer accounts, repository liquid/config, branch protection, webhook, CODEOWNERS' },
   ],
   // New ontology tools for agents; the parity groups erp/crm are re-pointed by scripts/liquid/setup.mjs (not owned).
@@ -172,14 +148,3 @@ export const liquidBootstrap: Record<string, BootstrapHandler> = {
     ctx.log(r.written ? 'sofa company seeded into the raw zone' : 'sofa company extract already present', { counts: r.counts });
   },
 };
-
-/** Overlay mode (docker-compose.liquid.yml): the services run from compose, secrets come from the environment. */
-export function liquidOverlay(env: { LIQUID_OVERLAY?: boolean; LIQUID_ONTOLOGY_DB_PASSWORD?: string; LIQUID_ONTOLOGY_INTERNAL_TOKEN?: string; LIQUID_ONTOLOGY_MCP_TOKEN?: string; LIQUID_POLICY_TOKEN?: string; LIQUID_CONFIG_MCP_TOKEN?: string; LIQUID_COMPILER_TOKEN?: string; LIQUID_PLAYBOOK_TOKEN?: string; LIQUID_ALERTS_TOKEN?: string; LIQUID_FORGEJO_DB_PASSWORD?: string; LIQUID_FORGEJO_SECRET_KEY?: string; LIQUID_FORGEJO_INTERNAL_TOKEN?: string; LIQUID_FORGEJO_BOT_PASSWORD?: string; LIQUID_FORGEJO_REVIEWER_PASSWORD?: string; LIQUID_FORGEJO_WEBHOOK_SECRET?: string }): OverlayOptions {
-  return {
-    active: !!env.LIQUID_OVERLAY,
-    containerPrefix: 'cw-liquid-',
-    // the Git host is set up by the control plane in overlay mode too: one review path (user decision 2026-11-17)
-    bootstrap: ['forgejo-db', 'forgejo-setup'],
-    secrets: { ontology_db_password: env.LIQUID_ONTOLOGY_DB_PASSWORD, ontology_internal_token: env.LIQUID_ONTOLOGY_INTERNAL_TOKEN, ontology_mcp_token: env.LIQUID_ONTOLOGY_MCP_TOKEN, policy_token: env.LIQUID_POLICY_TOKEN, config_mcp_token: env.LIQUID_CONFIG_MCP_TOKEN, compiler_token: env.LIQUID_COMPILER_TOKEN, playbook_token: env.LIQUID_PLAYBOOK_TOKEN, alerts_token: env.LIQUID_ALERTS_TOKEN, forgejo_db_password: env.LIQUID_FORGEJO_DB_PASSWORD, forgejo_secret_key: env.LIQUID_FORGEJO_SECRET_KEY, forgejo_internal_token: env.LIQUID_FORGEJO_INTERNAL_TOKEN, forgejo_bot_password: env.LIQUID_FORGEJO_BOT_PASSWORD, forgejo_reviewer_password: env.LIQUID_FORGEJO_REVIEWER_PASSWORD, forgejo_webhook_secret: env.LIQUID_FORGEJO_WEBHOOK_SECRET },
-  };
-}

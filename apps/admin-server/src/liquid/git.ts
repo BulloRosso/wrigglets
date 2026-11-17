@@ -138,14 +138,6 @@ export class GitRepo {
     return commit;
   }
 
-  /** Three-way merge of two commits without a working tree: { tree } or { conflicts } (git ≥ 2.38). */
-  async mergeTree(ours: string, theirs: string): Promise<{ tree: string } | { conflicts: string[] }> {
-    const { stdout, code } = await this.run(['merge-tree', '--write-tree', '--name-only', ours, theirs], { okCodes: [1] });
-    const [tree, ...rest] = stdout.split('\n');
-    if (code === 0) return { tree: tree!.trim() };
-    return { conflicts: rest.filter((l) => l.trim() && !/^(Auto-merging|CONFLICT)/.test(l)).map((l) => l.trim()) };
-  }
-
   async diff(a: string, b: string): Promise<string> {
     return (await this.run(['diff', '--no-color', '--no-ext-diff', a, b])).stdout;
   }

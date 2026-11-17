@@ -1,7 +1,7 @@
 import { evaluateChecks, replayPrecondition } from './checks.js';
 import type pg from 'pg';
 import { EventStore } from '@cw/lake';
-import { compatibility, inputValidator, resolveAction, verifyIr, type Compatibility, type OntologyIr } from '@cw/ontology-ir';
+import { compatibility, inputValidator, resolveAction, verifyIr, type Compatibility, type OntologyIr, type IrCheck } from '@cw/ontology-ir';
 import { SCENARIO_EVENT, SCENARIO_IDS, SofaCompany, diffObjects, metaOf, objectsToWorld, worldToObjects, type Args, type Change, type CompanyMeta, type Objects, type ScenarioId, type ToolResult, type WriteRecord } from '@cw/sofa-domain';
 import { ddlFor, loadObjects, rowHash, runDq, seed, setMeta, upsert } from './projection.js';
 import { cloneExt, identifierIn, domainModel, emptyExt, extFromObjects, genericAction, migrationSql, objectsOf, type DomainModel, type Ext } from './runtime.js';
@@ -169,7 +169,7 @@ export class OntologyService {
     if (obligations.includes('require_four_eyes')) return this.requestApproval(action.name, action.target, args, caller, decision.reason);
     // core checks the ontology switches on for this action (D3): a refusal writes nothing, like a domain precondition
     if (!action.readOnly) {
-      const refusals = evaluateChecks(action.preconditions ?? [], { args, objects: this.objects() });
+      const refusals = evaluateChecks(this.ir, action.preconditions ?? [], { args, objects: this.objects() });
       if (refusals.length) return { text: refusals.join('; '), isError: true };
     }
     // actions of newer ontology versions without domain code run generically from the IR (ADR-0048)
@@ -238,19 +238,23 @@ export class OntologyService {
   checkPreconditions(name: string, args: Args): { ok: boolean; reasons: string[] } {
     const action = resolveAction(this.ir, name)?.action;
     if (!action) return { ok: false, reasons: [`unknown action ${name}`] };
-    const reasons = evaluateChecks(action.preconditions ?? [], { args, objects: this.objects() });
+    const reasons = evaluateChecks(this.ir, action.preconditions ?? [], { args, objects: this.objects() });
     return { ok: reasons.length === 0, reasons };
   }
 
-  /** Shadow replay of a precondition over the releases of a window, with assumed attribute values (D3 evidence). */
-  async shadowPrecondition(o: { action: string; precondition: string; windowMs?: number; assume?: Record<string, Record<string, Record<string, unknown>>> }) {
+  /**
+   * Shadow replay of a precondition over the releases of a window, with assumed attribute values (D3 evidence). The
+   * check comes from the ontology in force or, for a proposal not merged yet, from the request (`check`).
+   */
+  async shadowPrecondition(o: { action: string; precondition: string; check?: IrCheck; windowMs?: number; assume?: Record<string, Record<string, Record<string, unknown>>> }) {
     const windowMs = o.windowMs ?? 7 * 86_400_000;
     const rows = (await this.pool.query<{ seq: string; object_id: string; changes: Array<{ class: string; id: string; after: Record<string, unknown> | null }> | null }>(
       "SELECT seq, object_id, payload->'changes' AS changes FROM events WHERE action = $1 AND recorded_at > now() - ($2 || ' milliseconds')::interval ORDER BY seq",
       [o.action, String(windowMs)],
     )).rows;
     const events = rows.map((r) => ({ seq: Number(r.seq), objectId: r.object_id, order: (r.changes ?? []).find((c) => c.class === 'PurchaseOrder' && c.id === r.object_id)?.after ?? null }));
-    return { action: o.action, precondition: o.precondition, windowMs, ...replayPrecondition({ precondition: o.precondition, events, objects: this.objects(), assume: o.assume }) };
+    const ir = o.check ? { ...this.ir, checks: [...(this.ir.checks ?? []).filter((c) => c.name !== o.check!.name), o.check] } : this.ir;
+    return { action: o.action, precondition: o.precondition, windowMs, ...replayPrecondition({ ir, precondition: o.precondition, events, objects: this.objects(), assume: o.assume }) };
   }
 
   shadowReplay(o: { windowMs?: number; fromSeq?: number; toSeq?: number; candidate?: Candidate }) {

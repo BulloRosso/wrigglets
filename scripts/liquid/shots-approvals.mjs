@@ -2,14 +2,13 @@
 // Documentation screenshots for ADR-0049 on the running stack: the one approval inbox (a playbook's restore step and a
 // config pull request), the event log page, and the pull request on the Git host. Leaves the stack at its baseline:
 // the run is cancelled and undone by hand, the pull request is closed.
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { ADMIN, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
 import { Shots } from '../sofa-company/shots.mjs';
+import { docker } from './lib.mjs';
 
 const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
-const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 const UP = 'erp';
 const dir = path.join(root, 'docs', 'images', 'liquid');
 const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};

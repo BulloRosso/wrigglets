@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { irHash, verifyIr, type OntologyIr } from '@cw/ontology-ir';
-import { dqChecks, generateAll, genAppSdk, genSql, genTypes, mcpTools, opaData, snake } from './index.js';
+import { dqChecks, genAppSdk, genSql, mcpTools, opaData, snake } from './index.js';
 
 /* Generators on a tiny synthetic ontology: the rules, independent of the sofa company. */
 
@@ -96,15 +96,6 @@ describe('generators', () => {
     });
   });
 
-  it('types: enums, links as ids, optional vs nullish', () => {
-    const ts = genTypes(ir);
-    expect(ts).toContain('export const Color = z.enum(["red","blue"]);');
-    expect(ts).toContain('  product: z.string().min(1),');
-    expect(ts).toContain('  colors: z.array(Color).nullish(),');
-    expect(ts).toContain('  day: z.iso.date().optional(),');
-    expect(ts).toContain('add_line: AddLineInput,');
-  });
-
   it('DQ: required, enum and link checks; multi-valued links via unnest', () => {
     const ids = dqChecks(ir).map((c) => c.id);
     expect(ids).toEqual(['OrderLine.product.required', 'OrderLine.product.link', 'OrderLine.colors.enum', 'OrderLine.qty.required', 'Product.tags.link']);
@@ -117,10 +108,9 @@ describe('generators', () => {
     expect(d.actions.list_lines).toMatchObject({ target: null, criticality: 'normal' });
   });
 
-  it('is deterministic and puts the header on every file', () => {
-    const a = generateAll(ir);
-    expect(generateAll(mini())).toEqual(a);
-    for (const [p, c] of Object.entries(a)) expect(c, p).toMatch(/GENERATED from ontology mini@1\.2\.3 \(aaaaaaaaaaaa\)|GENERATED from ontology mini@1\.2\.3/);
+  it('is deterministic: the same IR gives the same bytes', () => {
+    expect(genSql(mini())).toBe(genSql(ir));
+    expect(genAppSdk(mini())).toBe(genAppSdk(ir));
   });
 
   it('app SDK (ADR-0050): standalone, typed, only relative same-origin calls, deterministic', () => {

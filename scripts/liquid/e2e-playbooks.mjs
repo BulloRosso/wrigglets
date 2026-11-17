@@ -4,10 +4,10 @@
 // for a person; after approval everything is back to baseline (gateway config, OPA overlays, held workflows diffed
 // before/after). Also: every step is an event, the reconciler keeps the tightening (it is in the config repository),
 // cancel never loosens, the alert endpoint needs its token, an auto-loosening playbook cannot be proposed.
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
+import { docker, sql } from './lib.mjs';
 
 const args = new Set(process.argv.slice(2));
 const result = { startedAt: new Date().toISOString(), checks: [] };
@@ -18,7 +18,6 @@ const check = (name, ok, detail) => {
 };
 const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
-const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 const UP = 'erp';
 const ALERT = { source: 'vuln-feed', severity: 'critical', upstream: UP, summary: 'CVE-2026-4711 in the ERP connector (e2e)' };
 
@@ -28,7 +27,6 @@ function onto(method, p, body) {
   const r = docker('exec', 'cw-ext-liquid-ontology-server', 'node', '-e', script, p, method, body ? JSON.stringify(body) : '');
   return JSON.parse(r.stdout);
 }
-const sql = (q) => docker('exec', 'cw-ext-liquid-ontology-db', 'psql', '-U', 'onto', '-d', 'onto', '-tAc', q).stdout.trim();
 const snapshot = async () => {
   const gw = await api('GET', '/gateway');
   const pol = await api('GET', '/liquid/policy');

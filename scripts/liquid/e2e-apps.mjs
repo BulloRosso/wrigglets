@@ -6,11 +6,11 @@
 // are limited to the app's registered actions and classes; caller fields from the browser are dropped; a disabled app
 // answers 410. The ontology change the app needs (class DueDiligenceStatement, two actions) goes through a reviewed
 // pull request first, like any other change (M8).
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, HUMANS, PASSWORD, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
 import { registerApp } from './app-register.mjs';
+import { docker, gitHost, sql } from './lib.mjs';
 
 const args = new Set(process.argv.slice(2));
 const result = { startedAt: new Date().toISOString(), checks: [] };
@@ -21,21 +21,13 @@ const check = (name, ok, detail) => {
 };
 const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
-const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
-const sql = (q) => docker('exec', 'cw-ext-liquid-ontology-db', 'psql', '-U', 'onto', '-d', 'onto', '-tAc', q).stdout.trim();
 const APPS = `http://${env.PUBLIC_HOST || 'localhost'}:8090`;
 const APP_ID = 'supplier-due-diligence';
 const APP = `${APPS}/apps/${APP_ID}`;
 const STEFAN = HUMANS.stefan;
 const NL = String.fromCharCode(10);
 
-const secrets = JSON.parse(docker('exec', 'cw-temporal', 'cat', '/data/admin/extensions-secrets.json').stdout || '{}').liquid ?? {};
-const forge = async (method, p, body) => {
-  const r = await fetch(`http://localhost:3300/api/v1${p}`, { method, headers: { authorization: `Basic ${Buffer.from(`reviewer:${secrets.forgejo_reviewer_password}`).toString('base64')}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-  if (r.status >= 300) throw new Error(`Forgejo ${method} ${p} → ${r.status} ${await r.text()}`);
-  const text = await r.text();
-  return text ? JSON.parse(text) : null;
-};
+const forge = (method, p, body) => gitHost().call(method, p, body);
 const file = async (p) => (await api('GET', `/liquid/config/file?path=${p}`)).content;
 const bump = (v) => {
   const [a, b] = v.split('.').map(Number);

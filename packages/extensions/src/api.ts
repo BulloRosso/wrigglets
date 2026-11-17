@@ -42,7 +42,6 @@ export interface ExtensionStatus {
   version: string;
   docs?: string;
   /** "console" = installed and managed from the admin console; "overlay" = started with a compose overlay. */
-  mode: 'console' | 'overlay';
   phase: ExtensionPhase;
   /** Installed and every service running (or overlay present): the extension's features are on. */
   available: boolean;

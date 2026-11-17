@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
+import { docker, sql } from './lib.mjs';
 
 const args = new Set(process.argv.slice(2));
 const result = { startedAt: new Date().toISOString(), checks: [] };
@@ -17,7 +18,6 @@ const check = (name, ok, detail) => {
 };
 const s = new Session();
 const api = (method, p, body) => s.json(method, `${ADMIN}/api${p}`, body);
-const docker = (...a) => spawnSync('docker', a, { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
 // ADR-0049: proposals are pull requests on the Git host; the reviewer approves and merges there (webhook → reconcile)
 const approve = async (id, comment) => {
   // the pull request may be opened by the next reconcile if the host was busy
@@ -35,7 +35,6 @@ const approve = async (id, comment) => {
   await call(`/pulls/${p.pr.number}/merge`, { Do: 'merge', merge_message_field: `${p.title} (proposal ${p.id})` });
 };
 const AGENT = 'sofa-lara'; // procurement: the role the new carrier actions are granted to
-const sql = (q) => docker('exec', 'cw-ext-liquid-ontology-db', 'psql', '-U', 'onto', '-d', 'onto', '-tAc', q).stdout.trim();
 const bump = (v, level) => {
   const [a, b] = v.split('.').map(Number);
   return level === 'major' ? `${a + 1}.0.0` : `${a}.${b + 1}.0`;

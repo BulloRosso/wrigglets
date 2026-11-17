@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The sofa company's compiled ontology (ADR-0041): IR (ir/ontology.ir.json) and every generated artefact (types, MCP tools, DQ checks, SDK, projection DDL, OPA data). Never edit generated files; run node scripts/liquid/ontology-build.mjs.",
+  "description": "The sofa company's compiled ontology (ADR-0041): the IR (ir/ontology.ir.json), compiled from ontology/sofa by node scripts/liquid/ontology-build.mjs. Everything else is computed from it at runtime.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -12,15 +12,17 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "ir", "generated"],
+  "files": [
+    "dist",
+    "ir"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@cw/ontology-ir": "workspace:*",
-    "zod": "4.6.7"
+    "@cw/ontology-ir": "workspace:*"
   },
   "devDependencies": {
     "@cw/ontology-codegen": "workspace:*",

@@ -193,10 +193,6 @@ export function requiredOwners(owners: OwnersFile, paths: string[], classOwners:
   return [...sets.values()];
 }
 
-export function satisfies(person: { email: string; roles: string[] }, set: string[]): boolean {
-  return set.some((o) => (o.startsWith('role:') ? person.roles.includes(o.slice(5)) : o.toLowerCase() === person.email.toLowerCase()));
-}
-
 export const DEFAULT_OWNERS = `# Who approves changes of the config repository (ADR-0046). Last matching rule wins (like CODEOWNERS).
 # Owners: e-mail addresses, role:<app role> or team:<name>. The ontology's class annotation \`owner\` is looked up in
 # teams; an owner without a team entry falls back to the path rules.

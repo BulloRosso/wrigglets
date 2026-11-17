@@ -49,21 +49,9 @@ export interface BootstrapContext {
 }
 export type BootstrapHandler = (ctx: BootstrapContext) => Promise<void>;
 
-export interface OverlayOptions {
-  /** The extension's services were started with a compose overlay (e.g. LIQUID_OVERLAY=true). */
-  active: boolean;
-  /** Secret values from the environment in overlay mode, by secret name. */
-  secrets: Record<string, string | undefined>;
-  /** Container names of the overlay's services: <prefix><service> (e.g. cw-liquid-). */
-  containerPrefix?: string;
-  /** Bootstrap steps the control plane runs itself in overlay mode (idempotent, retried until they succeed). */
-  bootstrap?: string[];
-}
-
 interface Registered {
   manifest: ExtensionManifest;
   handlers: Record<string, BootstrapHandler>;
-  overlay: OverlayOptions;
 }
 
 interface ExtensionRecord {
@@ -125,10 +113,10 @@ export class ExtensionService {
     this.timing = { ...DEFAULT_TIMING, ...timing };
   }
 
-  register(manifest: ExtensionManifestInput, handlers: Record<string, BootstrapHandler> = {}, overlay: OverlayOptions = { active: false, secrets: {} }) {
+  register(manifest: ExtensionManifestInput, handlers: Record<string, BootstrapHandler> = {}) {
     const m = extensionManifest.parse(manifest);
     for (const b of m.bootstrap) if (!handlers[b.id]) throw new Error(`extension ${m.id}: no handler for bootstrap step "${b.id}"`);
-    this.registered.set(m.id, { manifest: m, handlers, overlay });
+    this.registered.set(m.id, { manifest: m, handlers });
   }
 
   async load() {
@@ -175,15 +163,15 @@ export class ExtensionService {
   /* ---------------------------------------------------------------------------------------------- read side */
 
   secret(id: string, name: string): string | undefined {
-    const r = this.reg(id);
-    return r.overlay.active ? r.overlay.secrets[name] : this.secrets[id]?.[name];
+    this.reg(id);
+    return this.secrets[id]?.[name];
   }
 
   /** Every secret value of an extension (to keep them out of the config repository, ADR-0046). */
   secretValues(id: string): string[] {
     const r = this.registered.get(id);
     if (!r) return [];
-    return Object.values(r.overlay.active ? r.overlay.secrets : (this.secrets[id] ?? {})).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return Object.values(this.secrets[id] ?? {}).filter((v): v is string => typeof v === 'string' && v.length > 0);
   }
 
   url(id: string, service: string): string {
@@ -192,17 +180,15 @@ export class ExtensionService {
     return `http://${service}:${svc.port}`;
   }
 
-  /** Installed (or overlay) — without checking health; for synchronous configuration builders. */
+  /** Installed — without checking health; for synchronous configuration builders. */
   isInstalled(id: string): boolean {
-    const r = this.registered.get(id);
-    return !!r && (r.overlay.active || this.rec(id).phase === 'installed');
+    return this.registered.has(id) && this.rec(id).phase === 'installed';
   }
 
-  /** The extension's features are on: overlay present, or installed with every service running. Cached briefly. */
+  /** The extension's features are on: installed with every service running. Cached briefly. */
   async isAvailable(id: string): Promise<boolean> {
     const r = this.registered.get(id);
     if (!r) return false;
-    if (r.overlay.active) return true;
     if (this.rec(id).phase !== 'installed' || !this.runtime) return false;
     const cached = this.availability.get(id);
     if (cached && Date.now() - cached.at < this.timing.availabilityCacheMs) return cached.value;
@@ -217,10 +203,10 @@ export class ExtensionService {
   }
 
   async status(id: string): Promise<ExtensionStatus> {
-    const { manifest: m, overlay } = this.reg(id);
+    const { manifest: m } = this.reg(id);
     const rec = this.rec(id);
-    const actual = overlay.active || !this.runtime ? [] : await this.runtime.list(id).catch(() => []);
-    const presence = !this.runtime || overlay.active ? [] : await Promise.all(m.services.map(async (s) => [s.name, await this.runtime!.imagePresent(s.image).catch(() => false)] as const));
+    const actual = !this.runtime ? [] : await this.runtime.list(id).catch(() => []);
+    const presence = !this.runtime ? [] : await Promise.all(m.services.map(async (s) => [s.name, await this.runtime!.imagePresent(s.image).catch(() => false)] as const));
     const services: ExtensionServiceStatus[] = m.services.map((s) => {
       const a = actual.find((x) => x.service === s.name);
       const imagePresent = presence.find(([n]) => n === s.name)?.[1];
@@ -229,15 +215,14 @@ export class ExtensionService {
         description: s.description,
         image: s.image,
         local: s.local,
-        state: overlay.active ? 'running' : (a?.state ?? 'missing'),
-        detail: overlay.active ? 'managed by the compose overlay' : (a?.detail ?? 'not created'),
+        state: a?.state ?? 'missing',
+        detail: a?.detail ?? 'not created',
         imagePresent,
       };
     });
     const missingImages = services.filter((s) => s.local && s.imagePresent === false).map((s) => s.image);
     let blockedReason: string | undefined;
-    if (overlay.active) blockedReason = 'Started with the compose overlay; manage it with node scripts/stack.mjs liquid up|down.';
-    else if (!this.runtime) blockedReason = 'Extensions need the Docker runtime (RUNTIME=docker).';
+    if (!this.runtime) blockedReason = 'Extensions need the Docker runtime (RUNTIME=docker).';
     else if (missingImages.length) blockedReason = `Build the images first: node scripts/stack.mjs build --${id}`;
     const available = await this.isAvailable(id);
     return {
@@ -246,15 +231,14 @@ export class ExtensionService {
       description: m.description,
       version: m.version,
       docs: m.docs,
-      mode: overlay.active ? 'overlay' : 'console',
-      phase: overlay.active ? 'installed' : rec.phase,
+      phase: rec.phase,
       available,
       installedAt: rec.installedAt,
       installedBy: rec.installedBy,
       installedVersion: rec.installedVersion,
       operation: rec.operation,
       services,
-      upstreams: overlay.active ? m.upstreams.map((u) => u.name) : rec.upstreams,
+      upstreams: rec.upstreams,
       uiRoutes: available ? m.uiRoutes : [],
       missingImages,
       blockedReason,
@@ -272,7 +256,6 @@ export class ExtensionService {
 
   private guard(id: string, allowed: ExtensionPhase[]) {
     const r = this.reg(id);
-    if (r.overlay.active) throw new ExtensionError(409, `extension ${id} runs from the compose overlay; it is not managed here`);
     if (!this.runtime) throw new ExtensionError(409, 'extensions need the Docker runtime (RUNTIME=docker)');
     const phase = this.rec(id).phase;
     if (this.running.has(id)) throw new ExtensionError(409, `an operation on ${id} is already running`);
@@ -382,31 +365,6 @@ export class ExtensionService {
     return this.running.has(id);
   }
 
-  /**
-   * Overlay mode (compose): nobody presses Install, so the bootstrap steps the overlay declares run here — idempotent,
-   * retried with backoff until each succeeded (the services start in parallel with the control plane).
-   */
-  async bootstrapOverlay(id: string, opts: { attempts?: number; delayMs?: number } = {}): Promise<string[]> {
-    const { handlers, overlay } = this.reg(id);
-    if (!overlay.active) return [];
-    const done: string[] = [];
-    for (const step of overlay.bootstrap ?? []) {
-      const handler = handlers[step];
-      if (!handler) throw new ExtensionError(500, `no handler for bootstrap step ${step}`);
-      for (let attempt = 1; ; attempt++) {
-        try {
-          await handler(this.context(id));
-          done.push(step);
-          break;
-        } catch (err) {
-          if (attempt >= (opts.attempts ?? 60)) throw new ExtensionError(500, `overlay bootstrap ${step} failed: ${(err as Error).message}`);
-          await new Promise((r) => setTimeout(r, opts.delayMs ?? 5000));
-        }
-      }
-    }
-    return done;
-  }
-
   private context(id: string): BootstrapContext {
     return {
       extension: id,
@@ -418,8 +376,6 @@ export class ExtensionService {
       url: (service) => this.url(id, service),
       exec: async (service, cmd, user) => {
         if (!this.runtime) throw new Error('no container runtime');
-        const ov = this.reg(id).overlay;
-        if (ov.active && ov.containerPrefix && this.runtime.execIn) return this.runtime.execIn(`${ov.containerPrefix}${service}`, cmd, user);
         return this.runtime.exec(id, service, cmd, user);
       },
       host: (service) => service,

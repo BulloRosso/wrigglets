@@ -1,0 +1,27 @@
+{
+  "name": "@cw/ontology-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Liquid Enterprise ontology compiler (ADR-0041, TypeScript since ADR-0053): LinkML schema subset + actions.yaml + bindings.yaml → ontology IR.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cw/ontology-ir": "workspace:*",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

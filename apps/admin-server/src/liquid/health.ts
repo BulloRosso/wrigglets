@@ -32,8 +32,9 @@ export interface HealthDeps {
   policy(): Maybe<{ bundle: { revision: string } | null; compileError: string | null; consumers: Record<string, { at: string; revision: string }>; overlays: Array<{ id: string; effect: string; source?: string }> }>;
   core(): Maybe<{ events: { maxSeq: number }; dispatcher: { cursor: number; updatedAt: string; lag: number } | null; lake: { hwm: number | null; lag: number | null; lastFlush: unknown; error: string | null }; policy: { revision: string; loadedAt: string } | null; ontology: { name: string; version: string } }>;
   config(): Maybe<{ initialized: boolean; inSync: boolean; lastReconcile: { at: string; ok: boolean; errors: Array<{ path: string; message: string }> } | null; lastRunAt?: string | null; pendingProposals: number }>;
-  gitHost?(): Maybe<{ ready: boolean; setUp: boolean; overlay?: boolean; stats: { okAt?: string; errorAt?: string; error?: string; retries: number } }>;
-  eventFeed(): { at: string; forwarded: number; error?: string } | undefined;
+  gitHost(): Maybe<{ ready: boolean; setUp: boolean; stats: { okAt?: string; errorAt?: string; error?: string; retries: number } }>;
+  /** The control plane's Liquid jobs (reconcile, playbook schedules, audit forwarding, approvals, app expiry). */
+  jobs(): Array<{ id: string; label: string; everyMs: number; runs: number; lastRunAt?: string; lastOkAt?: string; lastError?: string; lastErrorAt?: string; skipped: number }>;
   inbox(): Maybe<Array<{ kind: string; createdAt: string; decideHere: boolean }>>;
   held(): Maybe<Array<{ workflowId: string; refs: string[] }>>;
   killSwitch(): { level: string; reason?: string };
@@ -111,19 +112,20 @@ export async function liquidHealth(d: HealthDeps): Promise<LiquidHealth> {
       return { status: c.inSync ? 'ok' : 'warn', detail: `${c.inSync ? 'main applied' : 'main not applied yet'}, last run ${fmt(ago(last, now))}, last change applied ${fmt(ago(r.at, now))}; ${c.pendingProposals} proposal(s) pending` };
     }),
     probe('git-host', 'Git host (Forgejo)', async () => {
-      if (!d.gitHost) return { status: 'ok', detail: 'not used (overlay mode: review in the console)' };
       const g = await d.gitHost();
-      if (!g.setUp && g.overlay) return { status: 'ok', detail: 'not used: overlay mode reviews proposals in the console' };
-      if (!g.setUp) return { status: 'warn', detail: 'not set up yet: proposals are reviewed in the console until the bootstrap ran', hint: 'Extensions → Repair runs the bootstrap', link: '/extensions' };
+      if (!g.setUp) return { status: 'warn', detail: 'not set up yet: proposals get their pull request once the bootstrap ran', hint: 'Extensions → Repair runs the bootstrap', link: '/extensions' };
       if (!g.ready) return { status: 'fail', detail: 'not reachable: no new proposals or merges; main keeps being applied', hint: 'Extensions → Repair; docker logs cw-ext-liquid-forgejo', link: '/extensions' };
       const recentError = g.stats.errorAt && (!g.stats.okAt || g.stats.errorAt > g.stats.okAt) && ago(g.stats.errorAt, now) < 10 * 60;
       return recentError ? { status: 'warn', detail: `last call failed ${fmt(ago(g.stats.errorAt, now))}: ${g.stats.error}`, link: '/liquid/proposals' } : { status: 'ok', detail: `reachable; ${g.stats.retries} retried call(s) since start` };
     }),
-    probe('event-feed', 'Audit into the event log', async () => {
-      const f = d.eventFeed();
-      if (!f) return { status: 'warn', detail: 'no forwarding run yet' };
-      if (f.error) return { status: 'fail', detail: `last run failed ${fmt(ago(f.at, now))}: ${f.error.slice(0, 200)}`, hint: 'admin, gateway and agent audit stay in their local files and are forwarded later', link: '/liquid/events' };
-      return ago(f.at, now) > 2 * 60 ? { status: 'warn', detail: `last run ${fmt(ago(f.at, now))}` } : { status: 'ok', detail: `last run ${fmt(ago(f.at, now))}, ${f.forwarded} forwarded` };
+    probe('jobs', 'Background jobs', async () => {
+      const jobs = d.jobs();
+      // failing: the last run failed after the last success; stalled: no run for three intervals (and not just started)
+      const failing = jobs.filter((j) => j.lastErrorAt && (!j.lastOkAt || j.lastErrorAt > j.lastOkAt));
+      const stalled = jobs.filter((j) => j.runs > 0 && ago(j.lastRunAt, now) * 1000 > 3 * j.everyMs);
+      if (failing.length) return { status: 'fail', detail: failing.map((j) => `${j.label}: ${j.lastError ?? 'failed'} (${fmt(ago(j.lastErrorAt, now))})`).join('; ').slice(0, 300), hint: 'each job retries on its schedule; the log has the details', link: '/liquid' };
+      if (stalled.length) return { status: 'warn', detail: stalled.map((j) => `${j.label}: last run ${fmt(ago(j.lastRunAt, now))}`).join('; '), link: '/liquid' };
+      return { status: 'ok', detail: jobs.map((j) => `${j.label} ${j.runs ? fmt(ago(j.lastRunAt, now)) : 'waiting'}`).join(' · ') };
     }),
     probe('decisions', 'Decisions waiting for a person', async () => {
       const inbox = await d.inbox();

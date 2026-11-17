@@ -2,7 +2,8 @@ import { PGlite } from '@electric-sql/pglite';
 import type pg from 'pg';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { irHash, type OntologyIr } from '@cw/ontology-ir';
-import { loadIr, types } from '@cw/ontology-sofa';
+import { inputValidator } from '@cw/ontology-ir';
+import { loadIr } from '@cw/ontology-sofa';
 import { PARITY_CALLS, SCENARIO_IDS, SofaCompany, type Args } from '@cw/sofa-domain';
 import { rpc, toolsFor } from './mcp.js';
 import { OntologyService, type PolicyHook } from './service.js';
@@ -125,7 +126,7 @@ describe.each(['baseline', ...SCENARIO_IDS])('parity through the pipeline: %s', 
     }
     const rejected: string[] = [];
     for (const [name, args] of PARITY_CALLS) {
-      const schema = (types.ACTION_INPUTS as Record<string, { safeParse(v: unknown): { success: boolean } }>)[name];
+      const schema = inputValidator(loadIr(), name);
       if (schema && !schema.safeParse(args).success) {
         rejected.push(`${name} ${JSON.stringify(args)}`);
         expect((await svc.execute(name, structuredClone(args))).isError).toBe(true);

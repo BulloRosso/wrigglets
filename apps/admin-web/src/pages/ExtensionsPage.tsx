@@ -127,7 +127,6 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
   const repair = useMutation({ mutationFn: () => api.repairExtension(ext.id), onSuccess: done });
 
   const busy = ext.phase === 'installing' || ext.phase === 'uninstalling';
-  const managed = ext.mode === 'console';
   const phase = PHASE[ext.phase];
 
   return (
@@ -137,7 +136,6 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
         subheader={`version ${ext.version}${ext.installedVersion && ext.installedVersion !== ext.version ? ` (installed: ${ext.installedVersion})` : ''}`}
         action={
           <Stack direction="row" spacing={1} sx={{ pt: 1, pr: 1 }}>
-            {ext.mode === 'overlay' && <Chip size="small" variant="outlined" label="compose overlay" />}
             <Chip size="small" color={phase.color} label={phase.label} />
             {ext.phase === 'installed' && <Chip size="small" color={ext.available ? 'success' : 'warning'} variant="outlined" label={ext.available ? 'available' : 'degraded'} />}
           </Stack>
@@ -158,7 +156,7 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
               Installed <RelativeTime iso={ext.installedAt} /> by {ext.installedBy}
             </Typography>
           )}
-          {ext.blockedReason && ext.phase !== 'installed' && <Alert severity={ext.mode === 'overlay' ? 'info' : 'warning'}>{ext.blockedReason}</Alert>}
+          {ext.blockedReason && ext.phase !== 'installed' && <Alert severity="warning">{ext.blockedReason}</Alert>}
           {ext.phase === 'installed' && !ext.available && <Alert severity="warning">Not every service is running. Its pages are hidden until it is healthy again; “Repair” re-creates missing or changed containers.</Alert>}
 
           <Table size="small">
@@ -191,7 +189,7 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
                     <Chip size="small" color={SERVICE_COLOR[s.state]} label={s.state} title={s.detail} />
                   </TableCell>
                   <TableCell align="right">
-                    {managed && s.state !== 'missing' && (
+                    {s.state !== 'missing' && (
                       <Button size="small" onClick={() => setLogsFor(s.name)}>
                         Logs
                       </Button>
@@ -209,25 +207,23 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
           <Operation ext={ext} />
         </Stack>
       </CardContent>
-      {managed && (
-        <CardActions sx={{ px: 2, pb: 2 }}>
-          {(ext.phase === 'not_installed' || ext.phase === 'failed') && (
-            <Button variant="contained" disabled={busy || ext.missingImages.length > 0} onClick={() => setDialog('install')}>
-              {ext.phase === 'failed' && ext.operation?.kind !== 'uninstall' ? 'Retry install' : 'Install'}
-            </Button>
-          )}
-          {(ext.phase === 'installed' || ext.phase === 'failed') && (
-            <Button disabled={busy} onClick={() => setDialog('repair')}>
-              Repair
-            </Button>
-          )}
-          {(ext.phase === 'installed' || ext.phase === 'failed') && (
-            <Button color="error" disabled={busy} onClick={() => setDialog('uninstall')}>
-              Uninstall
-            </Button>
-          )}
+      <CardActions sx={{ px: 2, pb: 2 }}>
+        {(ext.phase === 'not_installed' || ext.phase === 'failed') && (
+          <Button variant="contained" disabled={busy || ext.missingImages.length > 0} onClick={() => setDialog('install')}>
+            {ext.phase === 'failed' && ext.operation?.kind !== 'uninstall' ? 'Retry install' : 'Install'}
+          </Button>
+        )}
+        {(ext.phase === 'installed' || ext.phase === 'failed') && (
+          <Button disabled={busy} onClick={() => setDialog('repair')}>
+            Repair
+          </Button>
+        )}
+        {(ext.phase === 'installed' || ext.phase === 'failed') && (
+          <Button color="error" disabled={busy} onClick={() => setDialog('uninstall')}>
+            Uninstall
+          </Button>
+        )}
         </CardActions>
-      )}
 
       <ConfirmDialog
         open={dialog === 'install'}

@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { irCheck } from './checks.js';
 
 /*
- * The ontology IR (ADR-0041): a normalised JSON document produced by tools/ontology-compiler from the LinkML schema,
+ * The ontology IR (ADR-0041): a normalised JSON document produced by @cw/ontology-compiler from the LinkML schema,
  * actions.yaml and bindings.yaml. Every generator reads ONLY the IR. This schema must accept exactly what the compiler
  * writes; `verifyIr` re-computes the content hash with the same canonical form as the Python side.
  */
@@ -101,6 +102,8 @@ export const ontologyIr = z
     events: z.array(irEvent),
     actions: z.array(irAction),
     bindings: z.array(irBinding),
+    /** Declarative preconditions (ADR-0053); actions name them in `preconditions`. Absent when there are none. */
+    checks: z.array(irCheck).optional(),
     hash: z.string().regex(/^[0-9a-f]{64}$/),
   })
   .superRefine((ir, ctx) => {
@@ -123,6 +126,7 @@ export const ontologyIr = z
       }
     }
     for (const b of ir.bindings) if (!classes.has(b.class)) ctx.addIssue({ code: 'custom', message: `binding: unknown class ${b.class}` });
+    for (const c of ir.checks ?? []) if (!classes.has(c.subject.class)) ctx.addIssue({ code: 'custom', message: `check ${c.name}: unknown class ${c.subject.class}` });
   });
 
 export type OntologyIr = z.infer<typeof ontologyIr>;

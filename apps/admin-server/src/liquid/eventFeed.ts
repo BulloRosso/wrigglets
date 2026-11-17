@@ -48,7 +48,6 @@ const agentType = (s: string) => s.replace(/[^A-Za-z0-9]/g, '').replace(/^./, (c
 export class EventFeed {
   private cursor: { start: string; admin: string; gateway: string; agents: Record<string, string> } = { start: '', admin: '', gateway: '', agents: {} };
   private readonly file: string;
-  private timer?: NodeJS.Timeout;
   private running = false;
   last?: { at: string; forwarded: number; error?: string };
 
@@ -115,19 +114,11 @@ export class EventFeed {
     } catch (err) {
       await this.persist().catch(() => undefined);
       this.last = { at: new Date().toISOString(), forwarded: n, error: String(err) };
+      throw err; // the job runner records it (health view); the cursor keeps what was forwarded
     } finally {
       this.running = false;
     }
     return n;
   }
 
-  start(intervalMs = 5000) {
-    const loop = async () => {
-      await this.tick();
-      this.timer = setTimeout(() => void loop(), intervalMs);
-      this.timer.unref?.();
-    };
-    this.timer = setTimeout(() => void loop(), 3000);
-    this.timer.unref?.();
-  }
 }

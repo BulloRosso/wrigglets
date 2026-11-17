@@ -12,11 +12,13 @@ import { SignalsControlService } from './signals.js';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LIQUID_ID, liquidBootstrap, liquidManifest, liquidOverlay, ontologyCall } from './extensions/liquid.js';
+import { LIQUID_ID, liquidBootstrap, liquidManifest, ontologyCall } from './extensions/liquid.js';
 import { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import { AppRegistry } from './liquid/apps.js';
 import { createAppHost } from './liquid/appHost.js';
 import { liquidHealth } from './liquid/health.js';
+import { Jobs } from './liquid/jobs.js';
+import { buildWasm, checkRego, compileOntology } from './liquid/compiler.js';
 import { DockerExtensionRuntime } from './extensions/runtime.js';
 import { ExtensionService, vaultSecretRef } from './extensions/service.js';
 import { createAdminApp } from './api.js';
@@ -39,7 +41,6 @@ import { PlaybookService } from './liquid/playbooks.js';
 import { EventFeed } from './liquid/eventFeed.js';
 import { Forge, ForgeError } from './liquid/forge.js';
 import { ApprovalService } from './liquid/approvals.js';
-import pg from 'pg';
 
 /**
  * Control plane process of the "temporal" container:
@@ -135,19 +136,15 @@ async function main() {
     config.DATA_DIR,
     policyDir,
     () => ontologyCall(liquidCtx, 'GET', '/internal/opa/data'),
-    (files) => compilerCall('/build-wasm', { files }),
+    (files) => buildWasm(files),
     async () => ontologyCall(liquidCtx, 'GET', '/internal/policy/decisions?limit=50'),
   );
   await liquidPolicy.load();
   // Config repository (ADR-0046): desired state in Git, outside /data/admin; reconciled into the stores while installed
-  const compilerCall = async <T>(p: string, body: unknown): Promise<T> => {
-    const res = await fetch(`${extensions.url(LIQUID_ID, 'ontology-compiler')}${p}`, { method: 'POST', headers: { authorization: `Bearer ${extensions.secret(LIQUID_ID, 'compiler_token') ?? ''}`, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(90_000) });
-    if (!res.ok) throw new Error(`ontology compiler ${p}: HTTP ${res.status}`);
-    return (await res.json()) as T;
-  };
+  // compiler and policy checks run in the control plane itself (ADR-0053): TypeScript compiler, pinned OPA binary
   const validators: Validators = {
-    compileOntology: (files) => compilerCall('/compile', { files }),
-    checkRego: (files) => compilerCall('/check-rego', { files }),
+    compileOntology: async (files) => compileOntology(files),
+    checkRego: (files) => checkRego(files),
     checkOntology: (ir) => ontologyCall(liquidCtx, 'POST', '/internal/ontology/check', { ir }),
   };
   const configRepo = new ConfigRepoService(
@@ -181,7 +178,7 @@ async function main() {
   // ontology versions (ADR-0048): a changed ontology in main is compiled and applied to the running ontology server
   configRepo.ontologyInForce = async () => (await ontologyCall<{ source?: { files?: Record<string, string> } }>(liquidCtx, 'GET', '/internal/ontology')).source?.files;
   configRepo.onOntology = async (domain, files, note) => {
-    const out = await compilerCall<{ ok: boolean; ir?: unknown; errors?: Array<{ path: string; message: string }> }>('/compile', { files });
+    const out = compileOntology(files);
     if (!out.ok || !out.ir) throw new Error(`ontology ${domain} does not compile: ${(out.errors ?? []).map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     const r = await ontologyCall<{ applied: boolean; from?: string; to?: string; level?: string; migration?: string; reason?: string }>(liquidCtx, 'POST', '/internal/ontology/apply', { ir: out.ir, allowBreaking: true, note, by: 'reconciler' });
     if (!r.applied) return undefined;
@@ -205,29 +202,6 @@ async function main() {
       'config-repo': async (ctx) => {
         const r = await configRepo.init(await seedConfig(), 'install@liquid.local');
         ctx.log(r.created ? `config repository created at ${r.head.slice(0, 12)}` : `config repository exists (main ${r.head.slice(0, 12)})`);
-      },
-      // the Git host's database and role in the shared Liquid Postgres (one instance, a schema/role per consumer)
-      'forgejo-db': async (ctx) => {
-        const client = new pg.Client({ host: ctx.host('ontology-db'), port: 5432, user: 'onto', password: ctx.secret('ontology_db_password'), database: 'onto' });
-        for (let i = 0; ; i++) {
-          try {
-            await client.connect();
-            break;
-          } catch (err) {
-            if (i > 30) throw err;
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-        }
-        try {
-          const pw = ctx.secret('forgejo_db_password').replace(/'/g, "''");
-          const role = await client.query("SELECT 1 FROM pg_roles WHERE rolname = 'forgejo'");
-          await client.query(role.rows.length ? `ALTER ROLE forgejo WITH LOGIN PASSWORD '${pw}'` : `CREATE ROLE forgejo WITH LOGIN PASSWORD '${pw}'`);
-          const db = await client.query("SELECT 1 FROM pg_database WHERE datname = 'forgejo'");
-          if (!db.rows.length) await client.query('CREATE DATABASE forgejo OWNER forgejo');
-          ctx.log('database forgejo and role ready');
-        } finally {
-          await client.end();
-        }
       },
       'forgejo-setup': async (ctx) => {
         for (let i = 0; !(await forge.ready()); i++) {
@@ -263,25 +237,18 @@ async function main() {
         ctx.log(`Git host ready: ${forge.cfg.publicUrl}/${FORGE.org}/${FORGE.repo} (reviewer account "${FORGE.reviewer}")`);
       },
     },
-    liquidOverlay(config),
   );
   await extensions.load();
-  // overlay mode runs no bootstrap steps: the business namespace and the config repository are ensured here (idempotent)
-  if (config.LIQUID_OVERLAY) {
-    void temporal.ensureNamespace(BUSINESS_NAMESPACE, BUSINESS_SEARCH_ATTRIBUTES).catch((err) => logger.warn({ err: String(err) }, 'could not ensure the business namespace'));
-    void seedConfig()
-      .then((seed) => configRepo.init(seed, 'overlay@liquid.local'))
-      // the Git host is set up like on a console install (one review path): database, accounts, repository, protection
-      .then(() => extensions.bootstrapOverlay(LIQUID_ID))
-      .then((steps) => logger.info({ steps }, 'liquid overlay: bootstrap done'))
-      .catch((err) => logger.warn({ err: String(err) }, 'liquid overlay: config repository or Git host not ready'));
-  }
   // owned upstreams (onto, config) are registered by the extension, not through the console: record them after each operation
   extensions.onOperationDone = (id, kind, who) =>
     id === LIQUID_ID && kind !== 'uninstall'
       ? configRepo.capture(who, `extension ${id} ${kind}`).then(() => configRepo.reconcile('extension operation')) // a fresh core gets main's ontology at once
       : undefined;
-  configRepo.start(60_000, () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID));
+  // one gate for everything that writes or forwards (installed, no extension operation running; ADR-0051/0053)
+  const liquidGate = () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID);
+  configRepo.gate = liquidGate;
+  const jobs = new Jobs(liquidGate, logger);
+  jobs.add({ id: 'reconcile', label: 'Config reconciler', everyMs: 60_000, firstMs: 5_000, run: () => configRepo.reconcile() });
   // uninstall with delete data (user decision 2026-11-17): the control plane's Liquid data goes too, without archive
   // Playbooks (ADR-0047): one sensing path, runs in the business worker, steps executed here
   const liquidProcesses = new LiquidProcesses(() => (temporal.client ? temporal.namespaceClient(BUSINESS_NAMESPACE) : undefined));
@@ -313,7 +280,7 @@ async function main() {
     shadowReplay: (body) => ontologyCall(liquidCtx, 'POST', '/internal/shadow/replay', body),
     audit,
   });
-  playbooks.start(() => extensions.isInstalled(LIQUID_ID));
+  jobs.add({ id: 'playbook-schedules', label: 'Playbook schedules', everyMs: 60_000, firstMs: 15_000, run: () => playbooks.tickSchedules() });
   // event log as the one source of truth (ADR-0049): audit trails and reconcile runs become events
   const appendEvents = async (events: unknown[]) => void (await ontologyCall(liquidCtx, 'POST', '/internal/events', { events }));
   configRepo.onReconciled = (r) => void appendEvents([{ type: 'ConfigReconciled', objectType: 'ConfigRepository', objectId: r.head.slice(0, 12), actorUser: 'reconciler', payload: r }]).catch(() => undefined);
@@ -331,7 +298,7 @@ async function main() {
     enabled: () => extensions.isInstalled(LIQUID_ID) && !extensions.busy(LIQUID_ID),
   });
   await eventFeed.load();
-  eventFeed.start();
+  jobs.add({ id: 'event-feed', label: 'Audit into the event log', everyMs: 5_000, firstMs: 3_000, run: () => eventFeed.tick() });
   // one approval mechanism (ADR-0049): ApprovalWorkflows + pull requests + plan approvals in one inbox, mailed
   const mailService = new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined);
   const wikiAdmin = async (method: string, p: string, body?: unknown) => {
@@ -352,7 +319,7 @@ async function main() {
     log: logger,
   });
   await approvals.load();
-  approvals.start(() => extensions.isInstalled(LIQUID_ID) && !!temporal.client);
+  jobs.add({ id: 'approvals', label: 'Approvals: wiki mirror and mails', everyMs: 15_000, firstMs: 10_000, when: () => !!temporal.client, run: () => approvals.tick() });
 
   // App registry and app host (ADR-0050): registered UIs on their own origin, expiry job hourly
   const appRegistry = new AppRegistry({
@@ -361,7 +328,7 @@ async function main() {
     oauth,
     ontology: async () => {
       const ir = await ontologyCall<{ version: string; actions: Array<{ name: string }>; classes: Array<{ name: string }> }>(liquidCtx, 'GET', '/internal/ontology');
-      const r = await fetch(`${liquidCtx.url('ontology-server')}/internal/ontology/app-sdk.ts`, { headers: { authorization: `Bearer ${liquidCtx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
+      const r = await fetch(`${liquidCtx.url('ontology-server')}/internal/ontology/sdk.ts`, { headers: { authorization: `Bearer ${liquidCtx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
       if (!r.ok) throw new Error(`enterprise core: app SDK HTTP ${r.status}`);
       return { version: ir.version, actions: ir.actions.map((x) => x.name), classes: ir.classes.map((x) => x.name), sdk: await r.text() };
     },
@@ -370,7 +337,8 @@ async function main() {
     log: logger,
   });
   await appRegistry.load();
-  appRegistry.start(3_600_000, () => extensions.isInstalled(LIQUID_ID));
+  jobs.add({ id: 'app-expiry', label: 'App expiry', everyMs: 3_600_000, firstMs: 30_000, run: () => appRegistry.tick() });
+  jobs.start();
   // health of the control loop in one place (ADR-0051)
   const health = () =>
     liquidHealth({
@@ -378,8 +346,8 @@ async function main() {
       policy: () => liquidPolicy.status(),
       core: () => ontologyCall(liquidCtx, 'GET', '/internal/health/loop'),
       config: () => configRepo.status(),
-      gitHost: async () => ({ ready: await forge.ready(), setUp: configRepo.forgeReady, overlay: (await extensions.status(LIQUID_ID)).mode === 'overlay', stats: forge.stats }),
-      eventFeed: () => eventFeed.last,
+      gitHost: async () => ({ ready: await forge.ready(), setUp: configRepo.forgeReady, stats: forge.stats }),
+      jobs: () => jobs.status(),
       inbox: () => approvals.inbox(),
       held: async () => (await liquidProcesses.list()).running.filter((r) => r.hold?.held).map((r) => ({ workflowId: r.workflowId, refs: (r.hold?.holds ?? []).map((h: { ref: string }) => h.ref) })),
       killSwitch: () => killSwitch.get().global,
@@ -425,7 +393,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, liquidApps: appRegistry, liquidHealth: health, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, liquidApps: appRegistry, liquidHealth: health, mail: mailService } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

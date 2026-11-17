@@ -67,7 +67,6 @@ const RANK: Record<KillLevel, number> = { normal: 0, paused: 1, tools_off: 2, st
 
 export class PlaybookService {
   private lastTick = new Map<string, number>();
-  private timer?: NodeJS.Timeout;
 
   constructor(private readonly d: PlaybookDeps) {}
 
@@ -118,29 +117,18 @@ export class PlaybookService {
   }
 
   /** Schedule triggers: a tick per playbook when its interval has passed (checked every minute). */
-  start(enabled: () => boolean) {
-    const tick = async () => {
-      try {
-        if (enabled()) {
-          const { playbooks } = await this.load();
-          for (const p of playbooks) {
-            if (p.trigger.kind !== 'schedule') continue;
-            const last = this.lastTick.get(p.id) ?? Date.now();
-            if (!this.lastTick.has(p.id)) this.lastTick.set(p.id, last);
-            else if (Date.now() - last >= durationMs(p.trigger.every)) {
-              this.lastTick.set(p.id, Date.now());
-              await this.sense({ kind: 'schedule', playbook: p.id, data: { playbook: p.id, every: p.trigger.every } }, 'schedule');
-            }
-          }
-        }
-      } catch {
-        /* next tick */
+  /** Schedule triggers (`trigger: { kind: schedule, every }`): run by the job runner every minute (ADR-0053). */
+  async tickSchedules(): Promise<void> {
+    const { playbooks } = await this.load();
+    for (const p of playbooks) {
+      if (p.trigger.kind !== 'schedule') continue;
+      const last = this.lastTick.get(p.id) ?? Date.now();
+      if (!this.lastTick.has(p.id)) this.lastTick.set(p.id, last);
+      else if (Date.now() - last >= durationMs(p.trigger.every)) {
+        this.lastTick.set(p.id, Date.now());
+        await this.sense({ kind: 'schedule', playbook: p.id, data: { playbook: p.id, every: p.trigger.every } }, 'schedule');
       }
-      this.timer = setTimeout(() => void tick(), 60_000);
-      this.timer.unref?.();
-    };
-    this.timer = setTimeout(() => void tick(), 15_000);
-    this.timer.unref?.();
+    }
   }
 
   async assess(trigger: Record<string, unknown>): Promise<BlastRadius | null> {

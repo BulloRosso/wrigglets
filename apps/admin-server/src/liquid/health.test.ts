@@ -11,7 +11,7 @@ const healthy = (): HealthDeps => ({
   core: async () => ({ events: { maxSeq: 500 }, dispatcher: { cursor: 500, updatedAt: at(10), lag: 0 }, lake: { hwm: 480, lag: 20, lastFlush: null, error: null }, policy: { revision: 'rev-1234abcd', loadedAt: at(30) }, ontology: { name: 'sofa', version: '5.1.0' } }),
   config: async () => ({ initialized: true, inSync: true, lastReconcile: { at: at(20), ok: true, errors: [] }, pendingProposals: 0 }),
   gitHost: async () => ({ ready: true, setUp: true, stats: { okAt: at(5), retries: 0 } }),
-  eventFeed: () => ({ at: at(4), forwarded: 3 }),
+  jobs: () => [{ id: 'reconcile', label: 'Config reconciler', everyMs: 60_000, runs: 3, lastRunAt: at(20), lastOkAt: at(20), skipped: 0 }, { id: 'event-feed', label: 'Audit into the event log', everyMs: 5_000, runs: 40, lastRunAt: at(3), lastOkAt: at(3), skipped: 0 }],
   inbox: async () => [],
   held: async () => [],
   killSwitch: () => ({ level: 'normal' }),
@@ -23,7 +23,7 @@ describe('control loop health (ADR-0051)', () => {
   it('everything running: ok, one item per part', async () => {
     const h = await liquidHealth(healthy());
     expect(h.status).toBe('ok');
-    expect(h.items.map((i) => i.id)).toEqual(['services', 'policy', 'core', 'reconcile', 'git-host', 'event-feed', 'decisions', 'tightening', 'apps']);
+    expect(h.items.map((i) => i.id)).toEqual(['services', 'policy', 'core', 'reconcile', 'git-host', 'jobs', 'decisions', 'tightening', 'apps']);
     expect(h.items.every((i) => i.status === 'ok')).toBe(true);
   });
 
@@ -58,5 +58,15 @@ describe('control loop health (ADR-0051)', () => {
     expect(h.items.find((i) => i.id === 'tightening')!.detail).toMatch(/kill switch tools_off.*1 business workflow\(s\) held \(console-abc\)/);
     expect(h.items.find((i) => i.id === 'decisions')).toMatchObject({ status: 'warn' });
     expect(h.status).toBe('warn');
+  });
+
+  it('a failing job fails the jobs item; a job without a run for three intervals is a warning', async () => {
+    const d = healthy();
+    d.jobs = () => [
+      { id: 'event-feed', label: 'Audit into the event log', everyMs: 5_000, runs: 9, lastRunAt: at(2), lastOkAt: at(60), lastError: 'event log unreachable', lastErrorAt: at(2), skipped: 0 },
+    ];
+    expect((await liquidHealth(d)).items.find((i) => i.id === 'jobs')).toMatchObject({ status: 'fail', detail: expect.stringContaining('event log unreachable') });
+    d.jobs = () => [{ id: 'reconcile', label: 'Config reconciler', everyMs: 60_000, runs: 2, lastRunAt: at(400), lastOkAt: at(400), skipped: 0 }];
+    expect((await liquidHealth(d)).items.find((i) => i.id === 'jobs')).toMatchObject({ status: 'warn' });
   });
 });

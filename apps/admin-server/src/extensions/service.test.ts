@@ -1,10 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
 import type { UpstreamServer } from '@cw/shared';
 import { extensionManifest, type ExtensionManifestInput, type ServiceSpec } from '@cw/extensions';
 import { liquidManifest } from './liquid.js';
@@ -27,10 +24,7 @@ class FakeRuntime implements ExtensionRuntime {
   }
   execs: string[] = [];
   async exec(ext: string, service: string, cmd: string[]) {
-    return this.execIn(`cw-ext-${ext}-${service}`, cmd);
-  }
-  async execIn(container: string, cmd: string[]) {
-    this.execs.push(`${container}: ${cmd.join(' ')}`);
+    this.execs.push(`cw-ext-${ext}-${service}: ${cmd.join(' ')}`);
     return { code: 0, output: 'ok' };
   }
   imageIds = new Map<string, string>();
@@ -105,7 +99,7 @@ let audit: Array<{ action: string; target: string }>;
 let secretStore: Map<string, string>;
 let boot: string[];
 
-const make = (opts: { secretStore?: boolean; overlay?: boolean } = {}) => {
+const make = (opts: { secretStore?: boolean } = {}) => {
   const svc = new ExtensionService(
     dir,
     rt,
@@ -128,7 +122,6 @@ const make = (opts: { secretStore?: boolean; overlay?: boolean } = {}) => {
       migrate: async (ctx) => void boot.push(`migrate ${ctx.url('db')} ${ctx.secret('db_password').length > 10}`),
       seed: async () => void boot.push('seed'),
     },
-    { active: !!opts.overlay, secrets: { db_password: 'from-env' } },
   );
   return svc;
 };
@@ -366,49 +359,6 @@ describe('uninstall', () => {
   });
 });
 
-describe('overlay mode', () => {
-  it('is available without install, uses environment secrets and refuses console operations', async () => {
-    const svc = make({ overlay: true });
-    await svc.load();
-    expect(await svc.isAvailable('demo')).toBe(true);
-    expect(svc.secret('demo', 'db_password')).toBe('from-env');
-    const s = await svc.status('demo');
-    expect(s.mode).toBe('overlay');
-    expect(s.blockedReason).toContain('overlay');
-    await expect(svc.install('demo', { seedDemo: false }, 'a')).rejects.toThrow(/overlay/);
-  });
-});
-
-describe('overlay bootstrap', () => {
-  it('runs the declared steps itself (no install), retries until they succeed, execs in the overlay containers', async () => {
-    const svc = make({ overlay: true });
-    let tries = 0;
-    svc.register(
-      manifest,
-      {
-        migrate: async () => {
-          if (++tries < 3) throw new Error('database not up yet');
-          boot.push('migrate');
-        },
-        seed: async (ctx) => void boot.push(`seed ${(await ctx.exec('db', ['psql', '-c', 'select 1'])).output}`),
-      },
-      { active: true, secrets: { db_password: 'from-env' }, containerPrefix: 'cw-demo-', bootstrap: ['migrate', 'seed'] },
-    );
-    await svc.load();
-    expect(await svc.bootstrapOverlay('demo', { delayMs: 1 })).toEqual(['migrate', 'seed']);
-    expect(tries).toBe(3);
-    expect(boot).toEqual(['migrate', 'seed ok']);
-    expect(rt.execs).toEqual(['cw-demo-db: psql -c select 1']);
-  });
-
-  it('gives up after the attempts with the step named; outside overlay mode it does nothing', async () => {
-    const svc = make({ overlay: true });
-    svc.register(manifest, { migrate: async () => Promise.reject(new Error('no database')), seed: async () => undefined }, { active: true, secrets: {}, bootstrap: ['migrate'] });
-    await expect(svc.bootstrapOverlay('demo', { attempts: 2, delayMs: 1 })).rejects.toThrow(/overlay bootstrap migrate failed: no database/);
-    expect(await make().bootstrapOverlay('demo')).toEqual([]);
-  });
-});
-
 describe('runtime helpers', () => {
   it.each([
     ['Up 3 minutes (healthy)', true, 'running'],
@@ -424,12 +374,10 @@ describe('liquid manifest', () => {
     expect(() => extensionManifest.parse(liquidManifest)).not.toThrow();
   });
 
-  it('declares the same services as docker-compose.liquid.yml', () => {
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
-    const compose = parse(readFileSync(path.join(root, 'docker-compose.liquid.yml'), 'utf8')) as { services: Record<string, { image?: string }> };
-    const overlay = Object.keys(compose.services).filter((s) => s !== 'temporal');
+  it('three services and twelve secrets since ADR-0053 (compiler in the control plane, Forgejo on SQLite)', () => {
     const m = extensionManifest.parse(liquidManifest);
-    expect(overlay.sort()).toEqual(m.services.map((s) => s.name).sort());
-    for (const s of m.services) expect(compose.services[s.name]!.image).toBe(s.image);
+    expect(m.services.map((s) => s.name)).toEqual(['ontology-db', 'ontology-server', 'forgejo']);
+    expect(m.secrets).toHaveLength(12);
+    expect(m.bootstrap.map((b) => b.id)).not.toContain('forgejo-db');
   });
 });

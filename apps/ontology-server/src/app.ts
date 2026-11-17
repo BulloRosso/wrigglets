@@ -1,8 +1,9 @@
+import { irCheck } from '@cw/ontology-ir';
 import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import { z, ZodError } from 'zod';
 import type { EventStore, Lake } from '@cw/lake';
-import { opaData, genAppSdk, genSdk } from '@cw/ontology-codegen';
+import { opaData, genAppSdk } from '@cw/ontology-codegen';
 import { freshWorld, sofaExtract } from '@cw/sofa-domain';
 import { identifierIn } from './runtime.js';
 import { GROUPS, rpc, type Group } from './mcp.js';
@@ -213,12 +214,12 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/policy/engine', (_req, res) => res.json(d.engine ?? { loaded: false }));
-  // core checks of an action without running it, and the shadow replay of a precondition (D3, M10)
+  // the checks of an action without running it, and the shadow replay of a precondition (D3; declarative since ADR-0053)
   internal.post('/actions/:name/check', (req, res) => res.json(d.svc.checkPreconditions(String(req.params.name), (req.body ?? {}) as Record<string, unknown>)));
   internal.post(
     '/shadow/precondition',
     wrap(async (req, res) => {
-      const b = z.object({ action: z.string().min(1), precondition: z.string().min(1), windowMs: z.number().int().min(60_000).max(90 * 86_400_000).optional(), assume: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.unknown()))).optional() }).parse(req.body ?? {});
+      const b = z.object({ action: z.string().min(1), precondition: z.string().min(1), check: irCheck.optional(), windowMs: z.number().int().min(60_000).max(90 * 86_400_000).optional(), assume: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.unknown()))).optional() }).parse(req.body ?? {});
       res.json(await d.svc.shadowPrecondition(b));
     }),
   );
@@ -249,9 +250,8 @@ export function createApp(d: AppDeps) {
       res.json(await d.svc.apply(b.ir, { allowBreaking: b.allowBreaking, note: b.note, by: b.by }));
     }),
   );
-  internal.get('/ontology/sdk.ts', (_req, res) => res.type('text/plain').send(genSdk(d.svc.ir)));
-  // the standalone SDK registered apps must use, byte for byte (ADR-0050)
-  internal.get('/ontology/app-sdk.ts', (_req, res) => res.type('text/plain').send(genAppSdk(d.svc.ir)));
+  // the one SDK (ADR-0053): standalone, typed, the one registered apps must use byte for byte (ADR-0050)
+  internal.get('/ontology/sdk.ts', (_req, res) => res.type('text/plain').send(genAppSdk(d.svc.ir)));
 
   // parity runner (the mock's control surface)
   internal.get('/sim/kpi', (_req, res) => res.json(d.svc.company.kpi()));

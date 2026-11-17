@@ -4,3 +4,4 @@ export * from './graph.js';
 export * from './diff.js';
 export * from './compat.js';
 export * from './runtime.js';
+export * from './checks.js';

@@ -54,7 +54,7 @@
   <rect x="475" y="200" width="125" height="22" rx="5" class="chk"/><text x="483" y="215" class="lbl">opa check + test</text>
   <circle cx="350" cy="248" r="10" class="bd"/><text x="350" y="252" class="num">2</text>
   <text x="368" y="252" class="d">console: text diff + ontology diff graph</text>
-  <text x="340" y="276" class="lbl">validators run in the ontology-compiler service</text>
+  <text x="340" y="276" class="lbl">validators run in the control plane (TS compiler, opa binary)</text>
 
   <!-- review -->
   <rect x="320" y="320" width="300" height="120" rx="12" class="usr"/>

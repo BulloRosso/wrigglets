@@ -1,6 +1,6 @@
 # ADR-0041: Ontology in LinkML, compiled to an IR, every layer generated from the IR
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0053](0053-liquid-simplification-ii.md) (compiler in TypeScript, no generated code in git)
 - **Date:** 2026-11-16
 - **Extends:** [ADR-0038](0038-liquid-enterprise-extension.md), [ADR-0040](0040-lake-ducklake-event-log.md)
 - **Explainer:** [docs/link-ml.md](../link-ml.md)

@@ -1,6 +1,6 @@
 # ADR-0039: Extension manager: optional modules installed from the admin console
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0053](0053-liquid-simplification-ii.md) (overlay mode removed)
 - **Date:** 2026-11-16
 - **Extends:** [ADR-0003](0003-agent-runtime-abstraction.md), [ADR-0037](0037-optional-signals.md), [ADR-0038](0038-liquid-enterprise-extension.md)
 

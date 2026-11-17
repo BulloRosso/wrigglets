@@ -73,8 +73,8 @@
 
   <!-- compiler -->
   <rect x="640" y="440" width="240" height="160" rx="12" class="opa"/>
-  <text x="660" y="468" class="h">ontology-compiler</text>
-  <text x="660" y="490" class="mono">POST /build-wasm</text>
+  <text x="660" y="468" class="h">control plane (opa binary)</text>
+  <text x="660" y="490" class="mono">opa build -t wasm</text>
   <text x="660" y="510" class="d">Rego of the applied revision</text>
   <text x="660" y="526" class="d">→ one WASM module</text>
   <text x="660" y="550" class="d">opa check + opa test</text>

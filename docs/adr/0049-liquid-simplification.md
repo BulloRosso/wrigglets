@@ -1,6 +1,6 @@
 # ADR-0049: Simplification — event log as truth, embedded policy, enterprise core, Git host, one approval mechanism
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0053](0053-liquid-simplification-ii.md) (compiler in the control plane, Forgejo on SQLite)
 - **Date:** 2026-11-17
 - **Supersedes in part:** [ADR-0044](0044-policy-as-code-opa.md) (OPA service), [ADR-0045](0045-business-workflows-temporal.md) (business-worker service), [ADR-0046](0046-config-repository-proposals.md) (console review of proposals)
 - **Extends:** [ADR-0040](0040-lake-ducklake-event-log.md), [ADR-0047](0047-playbooks-tighten-only.md), [ADR-0048](0048-ontology-evolution-runtime.md)

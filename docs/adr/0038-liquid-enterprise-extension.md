@@ -1,6 +1,6 @@
 # ADR-0038: Liquid Enterprise as an optional, installable extension
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0053](0053-liquid-simplification-ii.md) (compose overlay removed)
 - **Date:** 2026-11-16
 - **Extends:** [ADR-0021](0021-mcp-gateway.md), [ADR-0022](0022-kill-switch.md), [ADR-0037](0037-optional-signals.md)
 - **Plan:** [liquid-enterprise-extension.md](../liquid-enterprise-extension.md) · **Docs:** [liquid-enterprise.md](../liquid-enterprise.md)

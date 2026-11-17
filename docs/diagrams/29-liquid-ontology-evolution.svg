@@ -46,7 +46,7 @@
   <text x="608" y="126" class="h">Reconciler (control plane)</text>
   <circle cx="620" cy="150" r="10" class="bd"/><text x="620" y="154" class="num">4</text>
   <text x="638" y="154" class="d">ontology files changed?</text>
-  <text x="638" y="172" class="lbl">compile (compiler service)</text>
+  <text x="638" y="172" class="lbl">compile (in the control plane)</text>
   <text x="638" y="190" class="mono">POST /internal/ontology/apply</text>
   <text x="638" y="214" class="lbl">then: gateway drops its tool cache</text>
 

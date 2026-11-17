@@ -1,6 +1,6 @@
 # ADR-0052: Acceptance D2/D3 — core checks switched on by the ontology, workflow v2 by ontology version
 
-- **Status:** Accepted
+- **Status:** Accepted; superseded in part by [ADR-0053](0053-liquid-simplification-ii.md) (overlay removed, D3 rule declarative)
 - **Date:** 2026-11-17
 - **Extends:** [ADR-0045](0045-business-workflows-temporal.md), [ADR-0047](0047-playbooks-tighten-only.md), [ADR-0048](0048-ontology-evolution-runtime.md), [ADR-0051](0051-control-loop-health-robustness.md)
 

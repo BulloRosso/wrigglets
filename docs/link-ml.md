@@ -215,8 +215,8 @@ everything else regenerated.
 | Piece | Status |
 |---|---|
 | LinkML schema, actions and bindings of the sofa company (`ontology/sofa/`) | done (M2) |
-| Compiler (Python, LinkML 1.12.1, pinned image, CLI and HTTP) → IR | done (M2) |
-| Generators: types, SQL, MCP tools, OPA data, DQ checks, SDK; stale check | done (M2) |
+| Compiler → IR (Python in M2; TypeScript since ADR-0053, same IR byte for byte) | done |
+| Generators: SQL, MCP tools, OPA data, DQ checks, SDK, computed from the IR at runtime (ADR-0048, ADR-0053) | done |
 | Ontology editor: viewer (E1) | done (M2) |
 | Ontology editor: drafts and validation (E2) | M6 |
 | Ontology server using the generated artefacts as the only write path | done (M3) |

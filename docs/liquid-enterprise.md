@@ -94,32 +94,32 @@ What gets created:
 | secrets | `DATA_DIR/admin/extensions-secrets.json` (0600) | upstream credentials also in Key Vault as `ext-liquid-<secret>` |
 | state | `DATA_DIR/admin/extensions.json` | phase, steps of the last operation, owned upstreams |
 
-Services (after the simplification, [ADR-0049](adr/0049-liquid-simplification.md)):
+Services (after the simplifications, [ADR-0049](adr/0049-liquid-simplification.md) and
+[ADR-0053](adr/0053-liquid-simplification-ii.md)):
 
 | Service | Role |
 |---|---|
-| `ontology-db` | Postgres 17.6, the one database of the extension: event log, projection, lake catalog, dispatch cursor, Forgejo's database |
+| `ontology-db` | Postgres 17.6, the one database of the extension: event log, projection, lake catalog, dispatch cursor |
 | `ontology-server` | the **enterprise core**: only write path, event log owner, lake writer, embedded policy engine, and the business worker (Temporal worker + event dispatcher) |
-| `ontology-compiler` | LinkML → IR compiler and Rego → WASM builder, as an HTTP service |
-| `forgejo` | the Git host of the config repository (pull requests, review, branch protection); web UI on `127.0.0.1:3300` only |
+| `forgejo` | the Git host of the config repository (pull requests, review, branch protection), on SQLite in its own volume; web UI on `127.0.0.1:3300` only |
+
+Inside the control plane, without a container of their own: the ontology compiler (TypeScript,
+`@cw/ontology-compiler`), the OPA binary for `opa check`, `opa test` and the WASM build, and the job runner of the
+background loops. The extension has 12 secrets.
 
 An install of a newer manifest removes the containers of services that were retired (OPA and business-worker before
-ADR-0049), so an upgrade needs no manual cleanup.
+ADR-0049, the compiler service before ADR-0053), so an upgrade needs no manual cleanup. Moving from Forgejo on Postgres
+to SQLite (ADR-0053) needs *Uninstall* with *delete data* and a fresh install.
 
-**Compose overlay** (development and CI): the same services under the same names, secrets from `.env`.
-
-```bash
-node scripts/stack.mjs liquid up      # = docker compose -f docker-compose.yml -f docker-compose.liquid.yml up -d
-node scripts/stack.mjs liquid down    # removes the liquid services, restarts the control plane without the overlay
-node scripts/stack.mjs liquid reset   # also deletes the overlay's volumes
-```
+The console install is the only way to deploy the extension, also for development and CI. The compose overlay was
+removed in ADR-0053. After rebuilding the extension's image (`node scripts/stack.mjs build --liquid`), use **Repair**
+to re-create its containers.
 
 The **Overview** page (Liquid enterprise → Overview) shows the installation and which layers are live:
 
 ![Liquid enterprise overview](images/liquid/liquid-overview.png)
 
-In overlay mode the Extensions page shows Liquid read-only. Use one mode at a time: `liquid up` refuses to start while a
-console install exists. `node scripts/stack.mjs reset` removes both.
+`node scripts/stack.mjs reset` also removes the extension's containers and volumes.
 
 ## Architecture
 
@@ -244,32 +244,44 @@ Annotations the compiler requires on every class:
 | `owner` | a role, e.g. `head-of-logistics` | approves structural changes of the class (proposals, M6) |
 | `mcp_group` | `erp`, `crm` | tool groups of the parity phase (M3) |
 
-**Compiler** — `tools/ontology-compiler` (Python, LinkML 1.12.1, pinned image `coworking/ontology-compiler:local`;
-its tests run in the image build). It validates all references and rules and reports every error with its path, for
-example `actions.yaml#create_purchase_order.emits: unknown event 'PurchaseOrderMade'`.
+**Compiler** — `packages/ontology-compiler` (TypeScript, ADR-0053; it replaced the Python compiler and produces the same
+IR byte for byte). It compiles the LinkML subset the ontology uses and refuses other LinkML features with *LinkML feature
+'x' is not supported*. It validates all references and rules and reports every error with its path, for example
+`actions.yaml#create_purchase_order.emits: unknown event 'PurchaseOrderMade'`. The control plane runs it in-process
+(validation, drafts, reconciler).
 
 **IR (the contract)** — `packages/ontology-sofa/ir/ontology.ir.json`, schema in `packages/ontology-ir`: name, semver,
 enums, classes (attributes with range kind, required, multivalued, identifier), links, events, actions, bindings,
 SHA-256 of each source file and a content hash over canonical JSON. Generators read only the IR. The TypeScript side
 recomputes the hash and rejects an edited IR.
 
-**Generated** (pure functions IR → files, `packages/ontology-codegen`; every file starts with `GENERATED from ontology
-sofa@0.1.0 (<hash>) — do not edit`):
+**Nothing generated is checked in** (ADR-0053). Everything is computed from the IR in force at runtime by pure functions
+(`packages/ontology-codegen`, `packages/ontology-ir`; ADR-0048, ADR-0049):
 
-| Artefact | File | Used by |
-|---|---|---|
-| zod schemas + TS types per enum, class, action input | `packages/ontology-sofa/src/generated/types.ts` | domain code, SDK |
-| SDK client | `…/src/generated/sdk.ts` | UIs (M9) |
+- MCP tool definitions and input validation;
+- data-quality checks and the projection DDL;
+- the policy data document and the OPA test fixtures (`scripts/liquid/opa-fixtures.mjs`, used by `check.mjs`);
+- the app SDK, served at `GET /api/liquid/ontology/sdk` (UIs, M9).
 
-Everything else is computed from the IR in force at runtime by the same pure generator functions (ADR-0048, ADR-0049):
-MCP tool definitions, input validation, data-quality checks, projection DDL, the policy data document, and the OPA
-test fixtures (`scripts/liquid/opa-fixtures.mjs`, used by `check.mjs`).
+**Declarative checks** (ADR-0053): simple business rules are ontology data in `actions.yaml`. A check has a subject
+(the object an action input names), an optional `when`, a `require` and a message. Conditions are path comparisons
+(`equals`, `in`, `present`), `exists … where`, and `all`, `any`, `not`; paths follow links. An action lists the check in
+its `preconditions`:
+
+```yaml
+checks:
+  due_diligence_for_high_risk_material:
+    subject: { class: PurchaseOrder, input: poId }
+    when: { path: sku.commodity_risk, equals: high }
+    require: { exists: { class: DueDiligenceStatement, where: { supplier: { path: supplier }, sanctions_checked: { equals: true } } } }
+    message: "{subject.id} needs a valid due-diligence statement of supplier {subject.supplier} before release"
+```
 
 **Changing the ontology** (until proposals exist, M6): edit the YAML, then
 
 ```bash
-node scripts/liquid/ontology-build.mjs --verify   # compile (twice, must be identical) and regenerate
-node scripts/liquid/check.mjs                     # includes the stale check: sources ↔ IR ↔ generated files
+node scripts/liquid/ontology-build.mjs --verify   # compile (twice, must be identical) into the IR
+node scripts/liquid/check.mjs                     # includes "ontology IR up to date": sources ↔ IR
 ```
 
 and commit sources, IR and generated files together. Versioning: patch for descriptions/annotations, minor for
@@ -335,7 +347,7 @@ Admin console → Liquid enterprise → **Ontology** shows the ontology the onto
 **Editing (E2) and proposals (E3).** *Edit as draft* forks the three ontology files from the config repository
 (branch `main`). Changes are typed operations: add class, add or change attribute, add link (drag from the blue dot of
 one class to another), add enum value, change an annotation. They are applied to the YAML with comments and order
-preserved. Every change is compiled by the compiler service; the panel shows errors and the changes against the base,
+preserved. Every change is compiled by the control plane; the panel shows errors and the changes against the base,
 the canvas colours them (green added, amber changed, red removed) and zooms to them. *Submit* turns the draft into a
 proposal (see [Config repository and proposals](#config-repository-and-proposals)); the owners of the touched classes
 approve it.
@@ -354,7 +366,8 @@ Decision records: [ADR-0044](adr/0044-policy-as-code-opa.md), embedded engine [A
 <img src="diagrams/25-liquid-policy.svg" alt="Policy as code: two enforcement points, one bundle" width="100%">
 
 Authorization rules are code in `policies/liquid/` (Rego, tested with `opa test` in `scripts/liquid/check.mjs`). The
-compiler service builds the applied revision into a **WASM module**; the control plane serves module and data
+control plane builds the applied revision into a **WASM module** (`opa build -t wasm` with the OPA binary in its
+image); the control plane serves module and data
 (ontology, roles, overlays) at `/internal/liquid/policy` with an ETag, and both enforcement points embed it
 (`@cw/policy-wasm`, polled every 5 s). There is no OPA container:
 
@@ -378,7 +391,7 @@ automatically.
 `policy: opa`; the extension's own upstream `onto` always has it. Any upstream can be switched in Safety & tools → upstream →
 *Policy*.
 
-![Policies page: bundle, overlays, recent decisions](images/liquid/liquid-policies.png)
+![Policies page: tabs Overlays, Recent decisions and Bundle](images/liquid/liquid-policies.png)
 
 ## Business workflows
 
@@ -432,7 +445,7 @@ histories.
 **Demo timing** (env of ontology-server): `SIM_TODAY` (2026-10-05), `MS_PER_SIM_DAY` (20 s per simulated day),
 `RELEASE_AFTER_MS` (30 s), `APPROVAL_REMINDER_MS` (4 h), `APPROVAL_EXPIRE_MS` (7 d), `LAKE_FLUSH_EVERY` (1m).
 
-![Business processes page: a hold on Supplier:S-NORDHOLZ, a pending approval, running processes](images/liquid/liquid-processes.png)
+![Business processes page: an active hold, then tabs Approvals, Running and Recently closed](images/liquid/liquid-processes.png)
 
 ## Config repository and proposals
 
@@ -480,8 +493,7 @@ structural diff and compatibility class, `opa check` + `opa test` for policies. 
 Liquid enterprise → **Proposals** still shows reason, evidence, checks, owners, the text diff and, for ontology changes,
 the diff graph, with the link to the pull request. The Git host's web UI is only bound to `127.0.0.1:3300`; the
 `reviewer` account's password is the extension secret `forgejo_reviewer_password` (`DATA_DIR/admin/extensions-secrets.json`).
-There is no console decision any more: compose overlay mode runs Forgejo too, and the control plane sets it up at start
-(the same idempotent bootstrap as a console install). A proposal made while the Git host is not reachable gets its pull
+There is no console decision: proposals are decided on the Git host only. A proposal made while the Git host is not reachable gets its pull
 request as soon as it is.
 
 **Giving an agent the config tools:** add `config__*` (or only `config__read` and `config__get_proposal`) to its
@@ -561,7 +573,7 @@ react to; signals observations become `SignalObserved` events the same way.
 **Edits and the reconciler.** A playbook step or console edit changes a store first and commits it right after; while
 that is in flight the reconciler defers instead of taking the change for drift.
 
-![Playbooks page: a run waiting for restore, the example playbook](images/liquid/liquid-playbooks.png)
+![Playbooks page: an active run waiting for its restore step](images/liquid/liquid-playbooks.png)
 
 ## Identity and apps
 
@@ -672,6 +684,11 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
 - **Apps:** the app host listens on `127.0.0.1:8090` (`APPS_PORT`, `APPS_PUBLIC_URL` for another host name). Registry
   data is in `DATA_DIR/liquid/apps*` (secrets of the OIDC clients in `apps-secrets.json`, 0600). After an ontology
   change, *Check again* shows which apps need a new SDK; their owners re-register. The expiry job runs hourly.
+- **Background jobs:** the control plane's loops (config reconciler, playbook schedules, audit forwarding, approvals,
+  app expiry) run in one job runner. They pause while an extension operation runs. *Control loop health → Background
+  jobs* shows the last run and the last error of each.
+- **Rebuild after a code change:** `node scripts/stack.mjs build --liquid` (the `ontology-server` image), then *Repair*
+  on the Extensions page. The compiler and OPA come with the control-plane image.
 - **Complete runtime test:** `node scripts/liquid/e2e-all.mjs` runs every milestone's end-to-end check in order
   (`--from <suite>` to continue, `--shots` to refresh the screenshots); results in `scripts/liquid/results/`.
 - *(planned)* Replaying a window, restoring after a playbook run, rotating the ontology DB credentials.
@@ -742,7 +759,8 @@ due-diligence statement before release."*
 1. **Proposal by the modelling agent:**
    - `Material.commodity_risk` (enum `CommodityRisk`) and the action `set_commodity_risk`;
    - the due-diligence statement, already added by M9 through a reviewed change;
-   - the rule `due_diligence_for_high_risk_material` on `release_purchase_order`;
+   - the rule `due_diligence_for_high_risk_material` on `release_purchase_order`, as a declarative check
+     (ADR-0053);
    - the role to write the new action.
 
    Validation: compiles, **minor** (additive), existing data fits, policy tests pass.
@@ -784,15 +802,14 @@ The runtime tests found these problems. Each is fixed and covered by a unit test
 
 ### Limits
 
-- Business rules beyond create, read, update and delete still need code: the due-diligence check and the v2 wait step
-  ship with the core, and the ontology decides where and when they apply. A rule switched on applies to direct calls
-  at once; workflows in flight are protected by the version split only if they are past the step it guards.
+- Simple rules are ontology data (declarative checks, ADR-0053). Workflow steps are still code: the v2 wait step ships
+  with the core, and the ontology decides where it applies. A rule switched on applies to direct calls at once;
+  workflows in flight are protected by the version split only if they are past the step it guards.
 - The agent and the people are scripted. Whether a model makes the same proposals unaided is not shown here (see D1).
 - The mock ERP connector has no versions; the D2 fix pins a build only in the upstream's description.
 - The incident is recorded in the event log (`IncidentRecorded`, the run's events), not as an object of a new
   ontology class.
 - Entra ID sign-in is implemented but not tested against a tenant (postponed). Apps sign in at the local OAuth server.
-- The compose-overlay path (Forgejo bootstrap by the control plane) is covered by unit tests, not by an end-to-end run.
 - One machine, demo pace, one simulated company.
 
 ### Next steps
@@ -801,7 +818,7 @@ The runtime tests found these problems. Each is fixed and covered by a unit test
 2. The Entra check with a tenant: admin console and one agent with mapped app roles.
 3. Red-team cases for the new tools: a prompt-injected config proposal, loosening through a playbook proposal, a
    destructive action in a plan step.
-4. A rule language for simple preconditions in the ontology, so that rules like D3's need no code.
+4. ~~A rule language for simple preconditions in the ontology~~ — done: declarative checks (ADR-0053).
 5. Per-app Entra registrations when the console runs on Entra.
 
 ## Appendix: implementation log
@@ -1341,6 +1358,48 @@ Deviations
 - The incident is recorded as events, not as an object of a new class.
 - The "fresh stack" is a fresh *extension* install (uninstall with *delete data*, install), not `stack reset`, which
   would remove the host's other services.
+
+### Simplification II — compiler in TypeScript, one deployment path, one SDK, job runner, declarative checks (2026-11-17)
+
+[ADR-0053](adr/0053-liquid-simplification-ii.md). The review asked how to cut the number of technical components.
+Decisions with the user: remove the compose overlay, port the compiler to TypeScript, keep Rego with the OPA binary in
+the control-plane image.
+
+| | Before | After |
+|---|---|---|
+| Containers of the extension | 4 | 3 |
+| Images built locally | 3 | 2 |
+| Languages | TypeScript, Python, Rego | TypeScript, Rego |
+| Deployment modes | console install, compose overlay | console install |
+| Databases | onto, forgejo (Postgres) | onto (Forgejo on SQLite) |
+| Secrets | 14 | 12 |
+| Generated code in git | 3,144 lines | 0 |
+| Control-plane loops | 5 timers | one job runner |
+| D3 rule | TypeScript in the core | ontology data |
+
+- `packages/ontology-compiler` (TS): golden test byte-identical to the committed sofa IR; unsupported LinkML features
+  refused. `tools/ontology-compiler` and its image are deleted.
+- `opa` 1.22 static binary in the control-plane image; `checkRego` and `buildWasm` spawn it after path validation.
+- Overlay removed: `docker-compose.liquid.yml`, `LIQUID_*`, `stack.mjs liquid`, overlay mode in the extension manager.
+- Forgejo on SQLite; `forgejo-db` step, `pg` client and two secrets (`compiler_token`, `forgejo_db_password`) removed.
+- Generated `types.ts`/`sdk.ts` and the generator CLI removed; the SDK is served from the IR in force.
+- `jobs.ts`: reconcile, playbook schedules, event feed, approvals, app expiry; one gate; health probe *Background jobs*.
+- IR `checks` with `evaluateCheck` (`@cw/ontology-ir`) and `evaluateChecks` in the core; shadow replay uses them;
+  compatibility rates check changes as minor. D3 now proposes its rule as a check.
+- Dead code: console decision of proposals, the core's own flush timer, a second `MailService`, local helper copies in
+  the e2e scripts.
+- Fixes found by the runtime test: hold and release skip workflows that completed meanwhile (after a reset withdrew
+  them); `e2e-apps` waits for policy convergence.
+- Deviation: overlays keep their own store (one GitOps pattern for reviewed files).
+- Verified: `check.mjs` green; the complete runtime test after a fresh install, all 12 suites, **193/193** checks
+  (M2 has 7 checks now), about 9 minutes. The screenshots of this document were refreshed in the same run.
+
+### UI review (2026-11-17)
+
+[docs/review/user-interface.md](review/user-interface.md): every screen with an ID and before/after screenshots. Role
+view (IT Engineer / Business Engineer / All), navigation grouped by task, tabs with links, folded sections, steppers for
+the proposal and task lifecycles, app registration and extension operations, paging of long lists. The screenshots in
+this document were retaken after the review.
 
 ### Later
 

@@ -42,10 +42,10 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0035](0035-company-wiki.md) | A central company wiki that people govern | Accepted |
 | [0036](0036-ordered-delegation.md) | Ordered delegation: the platform keeps the order of dependent work | Accepted |
 | [0037](0037-optional-signals.md) | Optional Signals: proactive follow-up on observations and deadlines | Accepted |
-| [0038](0038-liquid-enterprise-extension.md) | Liquid Enterprise as an optional, installable extension | Accepted |
-| [0039](0039-extension-manager.md) | Extension manager: optional modules installed from the admin console | Accepted |
+| [0038](0038-liquid-enterprise-extension.md) | Liquid Enterprise as an optional, installable extension | Accepted (compose overlay removed: 0053) |
+| [0039](0039-extension-manager.md) | Extension manager: optional modules installed from the admin console | Accepted (overlay mode removed: 0053) |
 | [0040](0040-lake-ducklake-event-log.md) | Lake on DuckLake, event log in Postgres, DuckDB 2 embedded in the ontology server | Accepted |
-| [0041](0041-ontology-linkml-ir-generators.md) | Ontology in LinkML, compiled to an IR, every layer generated from the IR | Accepted |
+| [0041](0041-ontology-linkml-ir-generators.md) | Ontology in LinkML, compiled to an IR, every layer generated from the IR | Accepted (compiler in TypeScript, no generated code in git: 0053) |
 | [0042](0042-ontology-editor-react-flow.md) | Ontology editor in the admin console with React Flow | Accepted |
 | [0043](0043-ontology-server-action-pipeline.md) | Ontology server, action pipeline, event-sourced projection | Accepted |
 | [0044](0044-policy-as-code-opa.md) | Policy as code with OPA at two enforcement points | Accepted (engine embedded: 0049) |
@@ -53,7 +53,8 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0046](0046-config-repository-proposals.md) | Desired state in a config repository; proposals and reconciler | Accepted (review on the Git host: 0049) |
 | [0047](0047-playbooks-tighten-only.md) | Playbooks, autonomy tiers and the tighten-only rule | Accepted |
 | [0048](0048-ontology-evolution-runtime.md) | Ontology evolution: runtime interpretation, compatibility, live migration | Accepted |
-| [0049](0049-liquid-simplification.md) | Simplification: event log as truth, embedded policy, enterprise core, Git host, one approval mechanism | Accepted |
+| [0049](0049-liquid-simplification.md) | Simplification: event log as truth, embedded policy, enterprise core, Git host, one approval mechanism | Accepted (compiler in the control plane, Forgejo on SQLite: 0053) |
 | [0050](0050-entra-option-app-registry.md) | Entra ID as identity provider option; app registry and app host for generated UIs | Accepted |
 | [0051](0051-control-loop-health-robustness.md) | Control loop health and robustness rules | Accepted |
-| [0052](0052-acceptance-core-checks-workflow-v2.md) | Acceptance D2/D3: core checks switched on by the ontology, workflow v2 by ontology version | Accepted |
+| [0052](0052-acceptance-core-checks-workflow-v2.md) | Acceptance D2/D3: core checks switched on by the ontology, workflow v2 by ontology version | Accepted (overlay removed, D3 rule declarative: 0053) |
+| [0053](0053-liquid-simplification-ii.md) | Simplification II: compiler in TypeScript, one deployment path, Forgejo on SQLite, one SDK, job runner, declarative checks | Accepted |

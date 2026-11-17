@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Core containers and their responsibilities: agent platform and Liquid Enterprise extension</title>
+  <desc>Left: the six core containers of the agent platform (control plane, agents, tool gateway, AI gateway, identity, secret store). Right: the Liquid Enterprise extension (Git host, compiler, enterprise core, database, open lake). Agents reach business data only through the tool gateway and the enterprise core.</desc>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .ph { font-size: 16px; font-weight: 600; fill: #1d2733; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .c { font-size: 11px; fill: #5b6777; font-family: 'Roboto Mono', Consolas, monospace; text-anchor: end; }
+    .tag { font-size: 11px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .lbl { font-size: 11px; fill: #37414f; text-anchor: middle; }
+    .lbl-l { font-size: 11px; fill: #37414f; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.5; }
+    .pan-ag { fill: #f3faf9; stroke: #00796b; stroke-width: 1.5; }
+    .pan-da { fill: #f3f7fd; stroke: #1f5fad; stroke-width: 1.5; }
+    .card { fill: #ffffff; stroke: #c9d1dc; stroke-width: 1.5; }
+    .card-v { fill: #ffffff; stroke: #1f5fad; stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .ib-ag { fill: #e0f2f1; }
+    .ib-da { fill: #e8f0fb; }
+    .ic-ag { fill: none; stroke: #00796b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .ic-da { fill: none; stroke: #1f5fad; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .dot-ag { fill: #00796b; }
+    .dot-da { fill: #1f5fad; }
+    .ag-b { fill: #00796b; }
+    .da-b { fill: #1f5fad; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+  </defs>
+  <rect width="1200" height="780" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Core containers and what each one is responsible for</text>
+  <text x="40" y="68" class="st">Left: the agent platform, which runs on its own. Right: the Liquid Enterprise extension, which adds data, meaning and rules.</text>
+
+  <!-- panels -->
+  <rect x="40" y="96" width="500" height="648" rx="12" class="pan-ag"/>
+  <rect x="56" y="108" width="120" height="24" rx="12" class="ag-b"/>
+  <text x="116" y="125" class="tag">AGENT PLATFORM</text>
+  <text x="188" y="126" class="ph">Agents that work under control</text>
+
+  <rect x="700" y="96" width="460" height="648" rx="12" class="pan-da"/>
+  <rect x="716" y="108" width="120" height="24" rx="12" class="da-b"/>
+  <text x="776" y="125" class="tag">DATA EXTENSION</text>
+  <text x="848" y="126" class="ph">Data, meaning and rules you own</text>
+
+  <!-- connectors between the two parts (drawn in the gutter) -->
+  <path d="M524,176 L716,176" class="ln" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="620" y="168" class="lbl">config repository, reviews</text>
+  <path d="M524,204 L600,204 L600,372 L716,372" class="ln" marker-end="url(#a)"/>
+  <text x="608" y="282" class="lbl-l">applies config,</text>
+  <text x="608" y="297" class="lbl-l">serves policy</text>
+  <path d="M524,396 L716,396" class="ln" marker-end="url(#a)"/>
+  <text x="620" y="414" class="lbl">typed actions (MCP)</text>
+
+  <!-- ===== left: agent platform ===== -->
+  <!-- control plane -->
+  <rect x="56" y="140" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="160" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,166) scale(1.5)" class="ic-ag"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 13h4M7 16.5h9"/></g>
+  <text x="136" y="170" class="h">Control plane</text>
+  <text x="508" y="170" class="c">temporal</text>
+  <text x="136" y="192" class="d">Creates and watches agents, serves the admin console,</text>
+  <text x="136" y="210" class="d">and runs all work as durable Temporal workflows.</text>
+
+  <!-- agents -->
+  <rect x="56" y="240" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="260" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,266) scale(1.5)" class="ic-ag"><rect x="5" y="9" width="14" height="10" rx="2"/><path d="M12 9V6M3 13v3M21 13v3M9.5 16.5h5"/><circle cx="12" cy="4.6" r="1.2"/><circle cx="9.5" cy="13" r="0.9" class="dot-ag"/><circle cx="14.5" cy="13" r="0.9" class="dot-ag"/></g>
+  <text x="136" y="270" class="h">Agents</text>
+  <text x="508" y="270" class="c">one container per agent</text>
+  <text x="136" y="292" class="d">API, worker and a model-neutral agent harness,</text>
+  <text x="136" y="310" class="d">each with its own Git-versioned workspace.</text>
+
+  <!-- tool gateway -->
+  <rect x="56" y="340" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="360" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,366) scale(1.5)" class="ic-ag"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2.2 2.2L15 10.4"/></g>
+  <text x="136" y="370" class="h">Tool gateway</text>
+  <text x="508" y="370" class="c">mcp-gateway</text>
+  <text x="136" y="392" class="d">The only path from agents to tools and data: allow-lists,</text>
+  <text x="136" y="410" class="d">kill switch, embedded policy, agent-to-agent tasks.</text>
+
+  <!-- AI gateway -->
+  <rect x="56" y="440" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="460" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,466) scale(1.5)" class="ic-ag"><path d="M11 4l1.8 5.2L18 11l-5.2 1.8L11 18l-1.8-5.2L4 11l5.2-1.8z"/><path d="M18.5 3.5v3M17 5h3M18.5 16.5v3M17 18h3"/></g>
+  <text x="136" y="470" class="h">AI gateway</text>
+  <text x="508" y="470" class="c">litellm</text>
+  <text x="136" y="492" class="d">The only path to AI models: one key and one spend</text>
+  <text x="136" y="510" class="d">limit in USD per agent. The provider can be swapped.</text>
+
+  <!-- identity -->
+  <rect x="56" y="540" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="560" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,566) scale(1.5)" class="ic-ag"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M17.5 12v3M21 12v2.5"/></g>
+  <text x="136" y="570" class="h">Identity</text>
+  <text x="508" y="570" class="c">oauth</text>
+  <text x="136" y="592" class="d">Sign-in for people and agents (OpenID Connect),</text>
+  <text x="136" y="610" class="d">with roles per agent. Entra ID is an option.</text>
+
+  <!-- secret store -->
+  <rect x="56" y="640" width="468" height="88" rx="10" class="card"/>
+  <rect x="72" y="660" width="48" height="48" rx="10" class="ib-ag"/>
+  <g transform="translate(78,666) scale(1.5)" class="ic-ag"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1" class="dot-ag"/></g>
+  <text x="136" y="670" class="h">Secret store</text>
+  <text x="508" y="670" class="c">keyvault</text>
+  <text x="136" y="692" class="d">Keeps passwords and keys out of code, images</text>
+  <text x="136" y="710" class="d">and agents; rotated and audited in one place.</text>
+
+  <!-- ===== right: data extension ===== -->
+  <!-- git host -->
+  <rect x="716" y="140" width="428" height="88" rx="10" class="card"/>
+  <rect x="732" y="160" width="48" height="48" rx="10" class="ib-da"/>
+  <g transform="translate(738,166) scale(1.5)" class="ic-da"><circle cx="7" cy="5.5" r="2"/><circle cx="7" cy="18.5" r="2"/><circle cx="17" cy="8.5" r="2"/><path d="M7 7.5v9M17 10.5c0 4-10 2-10 6"/></g>
+  <text x="796" y="170" class="h">Git host</text>
+  <text x="1128" y="170" class="c">forgejo</text>
+  <text x="796" y="192" class="d">Holds the company's desired state: every change</text>
+  <text x="796" y="210" class="d">is a pull request with checks and an owner's review.</text>
+
+  <!-- compiler -->
+  <rect x="716" y="240" width="428" height="88" rx="10" class="card"/>
+  <rect x="732" y="260" width="48" height="48" rx="10" class="ib-da"/>
+  <g transform="translate(738,266) scale(1.5)" class="ic-da"><path d="M9 4c-2 0-3 1-3 3v2c0 1.5-1 2.5-2 3 1 .5 2 1.5 2 3v2c0 2 1 3 3 3"/><path d="M15 4c2 0 3 1 3 3v2c0 1.5 1 2.5 2 3-1 .5-2 1.5-2 3v2c0 2-1 3-3 3"/></g>
+  <text x="796" y="270" class="h">Compiler</text>
+  <text x="1128" y="270" class="c">ontology-compiler</text>
+  <text x="796" y="292" class="d">Checks and compiles the business description and</text>
+  <text x="796" y="310" class="d">the policies for every draft and proposal.</text>
+
+  <!-- enterprise core -->
+  <rect x="716" y="340" width="428" height="88" rx="10" class="card" style="stroke:#1f5fad;stroke-width:2"/>
+  <rect x="732" y="360" width="48" height="48" rx="10" class="ib-da"/>
+  <g transform="translate(738,366) scale(1.5)" class="ic-da"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><circle cx="12" cy="12" r="2.6"/><path d="M12 3v6.4M4 16.5l5.7-3.2M20 16.5l-5.7-3.2"/></g>
+  <text x="796" y="370" class="h">Enterprise core</text>
+  <text x="1128" y="370" class="c">ontology-server</text>
+  <text x="796" y="392" class="d">The only write path to business data: typed actions,</text>
+  <text x="796" y="410" class="d">policy check, event log, business workflows.</text>
+
+  <!-- database -->
+  <rect x="716" y="440" width="428" height="88" rx="10" class="card"/>
+  <rect x="732" y="460" width="48" height="48" rx="10" class="ib-da"/>
+  <g transform="translate(738,466) scale(1.5)" class="ic-da"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></g>
+  <text x="796" y="470" class="h">Database</text>
+  <text x="1128" y="470" class="c">ontology-db</text>
+  <text x="796" y="492" class="d">Postgres: the append-only event log, the current</text>
+  <text x="796" y="510" class="d">state of the business, and the lake's catalog.</text>
+
+  <!-- open lake (volume) -->
+  <rect x="716" y="540" width="428" height="88" rx="10" class="card-v"/>
+  <rect x="732" y="560" width="48" height="48" rx="10" class="ib-da"/>
+  <g transform="translate(738,566) scale(1.5)" class="ic-da"><path d="M12 4l9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 16l9 4 9-4"/></g>
+  <text x="796" y="570" class="h">Open lake</text>
+  <text x="1128" y="570" class="c">volume lake-data</text>
+  <text x="796" y="592" class="d">Parquet files any engine can read: raw data and</text>
+  <text x="796" y="610" class="d">the full history. Storage, not a container.</text>
+
+  <!-- note -->
+  <text x="716" y="668" class="d">The extension is installed from the admin console.</text>
+  <text x="716" y="686" class="d">Agents reach business data only through the tool gateway</text>
+  <text x="716" y="704" class="d">and the enterprise core; there is no other way in.</text>
+</svg>

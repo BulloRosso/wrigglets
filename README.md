@@ -8,7 +8,7 @@ You give an agent a task through a web page, for example "write the monthly sale
 The agent works in its own workspace, drafts the document, comes back to refine it, and asks you for a decision by
 e-mail when one is due. You can see what it did, ask it questions, approve or reject its work, and stop it at any time.
 
-<img src="docs/article/img/06-core-containers.svg" alt="Core containers and their responsibilities: the agent platform on the left, the optional Liquid Enterprise extension on the right" width="100%">
+<img src="docs/diagrams/00c-core-containers.svg" alt="Core containers and their responsibilities: the agent platform on the left, the optional Liquid Enterprise extension on the right" width="100%">
 
 *The core containers at a glance. The agent platform (left) runs on its own; the optional
 [Liquid Enterprise](docs/liquid-enterprise.md) extension (right) adds data, meaning and rules.*

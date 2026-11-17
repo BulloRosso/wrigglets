@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T09:31:44.405Z",
+  "startedAt": "2026-11-17T10:35:49.846Z",
   "checks": [
     {
       "name": "all services running, no OPA container (policy embedded)",
@@ -30,7 +30,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "10:31:52 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 10:31:52 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+      "detail": "11:35:57 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 11:35:57 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
     },
     {
       "name": "a read through gateway + embedded policy works",
@@ -82,5 +82,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T09:32:25.172Z"
+  "finishedAt": "2026-11-17T10:36:30.712Z"
 }

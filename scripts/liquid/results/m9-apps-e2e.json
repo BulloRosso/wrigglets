@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T09:39:31.544Z",
+  "startedAt": "2026-11-17T10:40:29.834Z",
   "checks": [
     {
       "name": "the app host listens on its own origin (port 8090)",
@@ -11,7 +11,8 @@
       "ok": true,
       "detail": {
         "version": "1.1.0",
-        "proposed": false
+        "proposed": true,
+        "compat": "minor"
       }
     },
     {
@@ -43,7 +44,7 @@
       "ok": true,
       "detail": {
         "owner": "stefan.lang@sofaworks.example",
-        "expiresAt": "2027-05-16T09:39:32.804Z"
+        "expiresAt": "2027-05-16T10:40:44.367Z"
       }
     },
     {
@@ -103,7 +104,7 @@
       "detail": {
         "ok": true,
         "result": "{\n  \"id\": \"DDS-001\",\n  \"supplier\": \"S-BALTIC\",\n  \"statement\": \"No conflict minerals; ILO core labour standards met; audit 2026 on file. (e2e)\",\n  \"sanctions_checked\": true,\n  \"signed_by\": \"Stefan Lang\"\n}",
-        "seq": 1203
+        "seq": 1166
       }
     },
     {
@@ -133,5 +134,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T09:39:41.678Z"
+  "finishedAt": "2026-11-17T10:40:52.980Z"
 }

@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T09:32:25.220Z",
+  "startedAt": "2026-11-17T10:36:30.758Z",
   "checks": [
     {
       "name": "repair: all services running (business worker inside the enterprise core)",
@@ -23,9 +23,9 @@
       "name": "create_purchase_order starts one PurchaseOrderRelease per order",
       "ok": true,
       "detail": [
-        "PurchaseOrderRelease-ee3f4e4c-f1eb-452b-a426-884c34e3621c",
-        "PurchaseOrderRelease-1e79d446-2097-482e-a138-f05339915fb9",
-        "PurchaseOrderRelease-6421d40c-3600-45dc-a172-017258f4fe85"
+        "PurchaseOrderRelease-a4bdfb83-a50b-4f1b-b7f4-18caf00b3684",
+        "PurchaseOrderRelease-a0394b4d-d5b5-4037-b4db-4924f1e51f76",
+        "PurchaseOrderRelease-ed84de18-8244-4468-a929-17d592b1d1cc"
       ]
     },
     {
@@ -56,7 +56,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "10:33:09 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
+      "detail": "11:37:16 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
     },
     {
       "name": "payment-critical write outside an approved task waits for four eyes",
@@ -67,7 +67,7 @@
       "name": "the request became an ApprovalWorkflow",
       "ok": true,
       "detail": {
-        "workflowId": "ApprovalWorkflow-3206ddbb-c29c-4a46-aa7c-1487ada9e699",
+        "workflowId": "ApprovalWorkflow-fabde450-6c57-49d7-bb6a-224d07491b57",
         "objects": [
           "Supplier:S-BALTIC",
           "Material:BEAM-PINE-80"
@@ -85,7 +85,7 @@
     {
       "name": "events after the restart are dispatched",
       "ok": true,
-      "detail": "PurchaseOrderRelease-a9dbf912-dcc8-44df-be55-aca14b7f0b5e"
+      "detail": "PurchaseOrderRelease-06a61f41-3803-4b2f-8b0f-8bce150fe71e"
     },
     {
       "name": "approval accepted (decided by the signed-in person)",
@@ -130,15 +130,15 @@
       "name": "lake-flush schedule flushes the event log into the lake",
       "ok": true,
       "detail": {
-        "at": "2026-11-17T09:34:00.245Z",
+        "at": "2026-11-17T10:38:00.216Z",
         "result": {
-          "flushed": 13,
-          "hwm": 1074,
+          "flushed": 11,
+          "hwm": 1072,
           "waiting": 0
         }
       }
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T09:34:07.574Z"
+  "finishedAt": "2026-11-17T10:38:09.576Z"
 }

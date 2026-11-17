@@ -193,7 +193,7 @@ try {
   opened.push(op.id);
   check('submitted as a proposal: compiled, with ontology diff and owners', op.validation.ok && op.irDiff?.classes?.Carrier === 'added' && op.owners.length >= 1, { checks: op.validation.checks.map((c) => `${c.name}=${c.ok}`), owners: op.owners });
   check('the ontology proposal is a pull request too', !!op.pr?.number, op.pr?.url);
-  if (!args.has('--no-shots')) await shot(`/liquid/proposals/${op.id}`, 'liquid-proposal-ontology', 1700);
+  if (!args.has('--no-shots')) await shot(`/liquid/proposals/${op.id}?view=ontology`, 'liquid-proposal-ontology', 1700);
   await forge('PATCH', `/repos/liquid/config/pulls/${op.pr.number}`, { state: 'closed' });
 
   // 7. exit criterion: fresh gateway/safety stores + restart → same behaviour from the repository

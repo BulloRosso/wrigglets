@@ -1,11 +1,11 @@
 {
-  "startedAt": "2026-11-17T09:34:07.618Z",
+  "startedAt": "2026-11-17T10:38:09.644Z",
   "checks": [
     {
       "name": "config repository initialised from the running platform; main applied, no drift",
       "ok": true,
       "detail": {
-        "head": "1e50533ace4a",
+        "head": "0fb04c629f1b",
         "files": 30
       }
     },
@@ -18,7 +18,7 @@
       "ok": true,
       "detail": {
         "secrets": 37,
-        "revisions": 16,
+        "revisions": 15,
         "hits": 0
       }
     },
@@ -49,7 +49,7 @@
       "name": "agent proposal is validated immediately",
       "ok": true,
       "detail": {
-        "id": "cp-mwkhwvhb-f0fb",
+        "id": "cp-mwkk77vr-4cde",
         "approvers": [
           {
             "for": "gateway/allow-lists.yaml",
@@ -74,7 +74,7 @@
     {
       "name": "the console has no decision route: review and merge happen on the Git host only",
       "ok": true,
-      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/proposals/cp-mwkhwvhb-f0fb/decide → 404 {\"error\":\"not f"
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/proposals/cp-mwkk77vr-4cde/decide → 404 {\"error\":\"not f"
     },
     {
       "name": "an invalid proposal cannot be merged: required check failed (branch protection)",
@@ -102,14 +102,14 @@
       "detail": "reviewer"
     },
     {
-      "name": "after approval the gateway offers erp__file_incident_report to the agent (9 s)",
+      "name": "after approval the gateway offers erp__file_incident_report to the agent (7 s)",
       "ok": true
     },
     {
       "name": "the agent sees the decision",
       "ok": true,
       "detail": {
-        "id": "cp-mwkhwvhb-f0fb",
+        "id": "cp-mwkk77vr-4cde",
         "title": "sofa-max may call erp__file_incident_report",
         "status": "approved",
         "valid": true,
@@ -124,8 +124,8 @@
           }
         ],
         "decidedBy": "reviewer",
-        "decidedAt": "2026-11-17T09:34:24.822Z",
-        "mergedAs": "c1b6c6946dd75f5f10514ea1e110dd253e28b40c"
+        "decidedAt": "2026-11-17T10:38:27.932Z",
+        "mergedAs": "fc6e877f8901874fb3fdf4b71257c1fa5fc14693"
       }
     },
     {
@@ -144,7 +144,7 @@
     {
       "name": "an invalid draft operation is rejected",
       "ok": true,
-      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/ontology/drafts/dr-mwkhxayg-1a91/op"
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/ontology/drafts/dr-mwkk7mb2-b647/op"
     },
     {
       "name": "E4: compatibility minor, the suggested version is set",
@@ -201,5 +201,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T09:34:57.673Z"
+  "finishedAt": "2026-11-17T10:38:58.193Z"
 }

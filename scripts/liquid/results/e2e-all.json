@@ -1,11 +1,101 @@
 {
-  "startedAt": "2026-11-17T09:39:31.509Z",
+  "startedAt": "2026-11-17T10:34:28.227Z",
   "suites": [
+    {
+      "name": "M0b extension (fresh install, resume after restart)",
+      "script": "e2e-extension.mjs",
+      "ok": true,
+      "seconds": 38,
+      "checks": {
+        "ok": 12,
+        "total": 12
+      }
+    },
+    {
+      "name": "M1 event log and lake",
+      "script": "e2e-lake.mjs",
+      "ok": true,
+      "seconds": 12,
+      "checks": {
+        "ok": 10,
+        "total": 10
+      }
+    },
+    {
+      "name": "M2 ontology and editor",
+      "script": "e2e-ontology.mjs",
+      "ok": true,
+      "seconds": 9,
+      "checks": {
+        "ok": 7,
+        "total": 7
+      }
+    },
+    {
+      "name": "M3 backend swap",
+      "script": "e2e-backend.mjs",
+      "ok": true,
+      "seconds": 23,
+      "checks": {
+        "ok": 13,
+        "total": 13
+      }
+    },
+    {
+      "name": "M4 policy (embedded)",
+      "script": "e2e-policy.mjs",
+      "ok": true,
+      "seconds": 41,
+      "checks": {
+        "ok": 14,
+        "total": 14
+      }
+    },
+    {
+      "name": "M5 business workflows",
+      "script": "e2e-processes.mjs",
+      "ok": true,
+      "seconds": 99,
+      "checks": {
+        "ok": 19,
+        "total": 19
+      }
+    },
+    {
+      "name": "M6 config repository (Git host)",
+      "script": "e2e-config.mjs",
+      "ok": true,
+      "seconds": 49,
+      "checks": {
+        "ok": 25,
+        "total": 25
+      }
+    },
+    {
+      "name": "M7 playbooks",
+      "script": "e2e-playbooks.mjs",
+      "ok": true,
+      "seconds": 51,
+      "checks": {
+        "ok": 18,
+        "total": 18
+      }
+    },
+    {
+      "name": "M8 ontology evolution",
+      "script": "e2e-ontology-evolution.mjs",
+      "ok": true,
+      "seconds": 41,
+      "checks": {
+        "ok": 19,
+        "total": 19
+      }
+    },
     {
       "name": "M9 apps (registry, app host, sample app)",
       "script": "e2e-apps.mjs",
       "ok": true,
-      "seconds": 10,
+      "seconds": 23,
       "checks": {
         "ok": 20,
         "total": 20
@@ -15,7 +105,7 @@
       "name": "D2 new security risk",
       "script": "scenario-security.mjs",
       "ok": true,
-      "seconds": 36,
+      "seconds": 37,
       "checks": {
         "ok": 18,
         "total": 18
@@ -25,13 +115,13 @@
       "name": "D3 new business requirement",
       "script": "scenario-business.mjs",
       "ok": true,
-      "seconds": 107,
+      "seconds": 108,
       "checks": {
         "ok": 18,
         "total": 18
       }
     }
   ],
-  "finishedAt": "2026-11-17T09:42:05.349Z",
+  "finishedAt": "2026-11-17T10:43:18.372Z",
   "ok": true
 }

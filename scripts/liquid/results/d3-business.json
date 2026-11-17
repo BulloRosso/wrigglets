@@ -1,17 +1,17 @@
 {
-  "startedAt": "2026-11-17T09:40:18.010Z",
+  "startedAt": "2026-11-17T10:41:30.022Z",
   "checks": [
     {
       "name": "the running ontology does not know the rule yet",
       "ok": true,
       "detail": "sofa@1.1.0",
-      "atMs": 5619
+      "atMs": 5655
     },
     {
       "name": "an order in flight before the change (PO-4430, v1) is released as before",
       "ok": true,
       "detail": "2026-10-05",
-      "atMs": 37238
+      "atMs": 39278
     },
     {
       "name": "validation: compiles, additive (minor), existing data fits, policy tests pass",
@@ -32,10 +32,10 @@
           "changed": 3
         }
       },
-      "atMs": 42391
+      "atMs": 44493
     },
     {
-      "name": "shadow replay: 4 of 10 releases of the last week (40 %) would have waited for a statement",
+      "name": "shadow replay: 4 of 9 releases of the last week (44.4 %) would have waited for a statement",
       "ok": true,
       "detail": {
         "examples": [
@@ -44,109 +44,109 @@
           "PO-4431"
         ]
       },
-      "atMs": 42418
+      "atMs": 44524
     },
     {
       "name": "the agent proposes it; the proposal is a pull request with the replay as evidence",
       "ok": true,
       "detail": {
-        "id": "cp-mwki5jy1-fa03"
+        "id": "cp-mwkkcaxb-c377"
       },
-      "atMs": 43420
+      "atMs": 45537
     },
     {
       "name": "live: the rule is on the release action; Material.commodity_risk and the statement exist",
       "ok": true,
       "detail": "1.2.0",
-      "atMs": 48257
+      "atMs": 49349
     },
     {
       "name": "the app SDK is regenerated from the new ontology (setCommodityRisk, new version)",
       "ok": true,
       "detail": "// GENERATED SDK for apps — ontology sofa@1.2.0 (95f0d13d780a); do not edit (download it from the app registry)",
-      "atMs": 48369
+      "atMs": 49463
     },
     {
       "name": "the registered app fails its re-check after the SDK changed (it loses sign-in until re-registered)",
       "ok": true,
       "detail": "rejected",
-      "atMs": 48414
+      "atMs": 49507
     },
     {
       "name": "re-registered with the new SDK: checks pass, active",
       "ok": true,
-      "detail": "version 3",
-      "atMs": 49000
+      "detail": "version 2",
+      "atMs": 50095
     },
     {
       "name": "BEAM-PINE-80 classified high-risk through the new action (generic, from the IR)",
       "ok": true,
       "detail": "{\n  \"sku\": \"BEAM-PINE-80\",\n  \"name\": \"Pine beam 80 mm (frame)\",\n  \"unit\": \"pcs\",",
-      "atMs": 49199
+      "atMs": 50290
     },
     {
       "name": "S-NORDHOLZ has no valid statement yet",
       "ok": true,
       "detail": 1,
-      "atMs": 49368
+      "atMs": 50464
     },
     {
       "name": "the new order PO-4431 runs PurchaseOrderRelease v2 and waits (awaiting_due_diligence) after its release window",
       "ok": true,
-      "detail": "PurchaseOrderRelease-7737107e-189d-437d-b64b-8702429ddb0b",
-      "atMs": 82506
+      "detail": "PurchaseOrderRelease-024a1739-46f6-431f-99e7-ea5596807592",
+      "atMs": 83556
     },
     {
       "name": "a direct release is refused by the rule (the ontology put it on the action)",
       "ok": true,
       "detail": "PO-4431 needs a valid due-diligence statement of supplier S-NORDHOLZ before release: BEAM-PINE-80 is a high-risk commodity",
-      "atMs": 82679
+      "atMs": 83749
     },
     {
       "name": "a reminder goes out while it waits",
       "ok": true,
       "detail": "PO-4431 waits for a due-diligence statement",
-      "atMs": 102101
+      "atMs": 103204
     },
     {
       "name": "the buyer submits the statement in the sample app",
       "ok": true,
       "detail": "{\n  \"id\": \"DDS-002\",\n  \"supplier\": \"S-NORDHOLZ\",\n  \"statement\": \"FSC-certified p",
-      "atMs": 102228
+      "atMs": 103336
     },
     {
       "name": "PO-4431 is released after the statement arrived",
       "ok": true,
       "detail": "2026-10-05",
-      "atMs": 106782
+      "atMs": 107873
     },
     {
       "name": "the statement is an event of the buyer through the app",
       "ok": true,
       "detail": "stefan.lang@sofaworks.example|supplier-due-diligence",
-      "atMs": 106937
+      "atMs": 108020
     },
     {
       "name": "PO-4430 (started before the change) continues on v1: released before, never waited for a statement",
       "ok": true,
       "detail": {
         "state": "awaiting_delivery",
-        "workflow": "PurchaseOrderRelease-0e680106-048b-49cb-9cde-bdeeca6c0e8f"
+        "workflow": "PurchaseOrderRelease-5d570d06-2ef4-4c0b-87af-3d8d61ddd1a8"
       },
-      "atMs": 107323
+      "atMs": 108335
     }
   ],
   "metrics": {
     "shadow_replay": {
-      "releases": 10,
+      "releases": 9,
       "blocked": 4,
-      "sharePercent": 40
+      "sharePercent": 44.4
     },
     "live_seconds_after_merge": 3,
-    "policy_seconds_after_merge": 5,
+    "policy_seconds_after_merge": 4,
     "waited_seconds_for_statement": 57,
     "evidence": {
-      "proposal": "cp-mwki5jy1-fa03",
+      "proposal": "cp-mwkkcaxb-c377",
       "ontology": "1.2.0",
       "v1Order": "PO-4430",
       "v2Order": "PO-4431",
@@ -154,6 +154,6 @@
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-17T09:42:05.334Z",
-  "durationMs": 107324
+  "finishedAt": "2026-11-17T10:43:18.357Z",
+  "durationMs": 108335
 }

@@ -101,7 +101,7 @@ try {
   check('the agent proposes the extension; validated, compatibility minor', prop.valid && prop.compatibility?.level === 'minor', { id: prop.id, version: v1 });
   const p1 = await api('GET', `/liquid/proposals/${prop.id}`);
   check('the review shows the ontology diff (Carrier added, PurchaseOrder changed)', p1.irDiff?.classes?.Carrier === 'added' && p1.irDiff?.classes?.PurchaseOrder === 'changed');
-  if (!args.has('--no-shots')) await shot(`/liquid/proposals/${prop.id}`, 'liquid-proposal-d3', 1900);
+  if (!args.has('--no-shots')) await shot(`/liquid/proposals/${prop.id}?view=ontology`, 'liquid-proposal-d3', 1900);
 
   // approve → live in one reconcile
   const t0 = Date.now();

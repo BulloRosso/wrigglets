@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T09:38:27.102Z",
+  "startedAt": "2026-11-17T10:39:48.760Z",
   "checks": [
     {
       "name": "the running ontology",
@@ -30,7 +30,7 @@
       "name": "the agent proposes the extension; validated, compatibility minor",
       "ok": true,
       "detail": {
-        "id": "cp-mwki2d7x-111c",
+        "id": "cp-mwkk99yz-fd66",
         "version": "0.2.0"
       }
     },
@@ -39,7 +39,7 @@
       "ok": true
     },
     {
-      "name": "live in 4 s: ontology 0.2.0, class Carrier, actions present",
+      "name": "live in 5 s: ontology 0.2.0, class Carrier, actions present",
       "ok": true
     },
     {
@@ -90,7 +90,7 @@
       "name": "the projection is still exactly the event log replayed",
       "ok": true,
       "detail": {
-        "events": 24
+        "events": 21
       }
     },
     {
@@ -123,5 +123,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T09:39:07.359Z"
+  "finishedAt": "2026-11-17T10:40:29.784Z"
 }

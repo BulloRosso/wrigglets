@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T09:39:41.724Z",
+  "startedAt": "2026-11-17T10:40:53.024Z",
   "checks": [
     {
       "name": "baseline: erp enabled, no overlay, no hold; two purchase orders in their release window",
@@ -10,30 +10,30 @@
           "PO-4431"
         ]
       },
-      "atMs": 7143
+      "atMs": 7180
     },
     {
       "name": "an agent reads supplier data through the ERP connector",
       "ok": true,
       "detail": "[\n {\n  \"id\": \"S-NORDHOLZ\",\n  \"name\": \"Nordholz Sägewerk GmbH",
-      "atMs": 7345
+      "atMs": 7368
     },
     {
       "name": "the alert starts the playbook \"Vulnerable third-party upstream\"",
       "ok": true,
       "detail": [
         {
-          "runId": "pr-mwki40vs-964a",
+          "runId": "pr-mwkkappb-5097",
           "playbook": "third-party-upstream-vulnerability",
-          "workflowId": "PlaybookRun-pr-mwki40vs-964a"
+          "workflowId": "PlaybookRun-pr-mwkkappb-5097"
         }
       ],
-      "atMs": 7545
+      "atMs": 7575
     },
     {
       "name": "upstream erp disabled automatically",
       "ok": true,
-      "atMs": 15766
+      "atMs": 16223
     },
     {
       "name": "policy overlay: four eyes on every write action the upstream reaches (blast radius from the ontology)",
@@ -42,7 +42,7 @@
         "writeActions": 10,
         "classes": 14
       },
-      "atMs": 15766
+      "atMs": 16223
     },
     {
       "name": "the release workflows of the affected purchase orders are held",
@@ -54,96 +54,96 @@
         ],
         "heldWorkflows": 2
       },
-      "atMs": 15766
+      "atMs": 16223
     },
     {
       "name": "agents can no longer reach the ERP connector",
       "ok": true,
       "detail": "Tool call failed: Error: Unknown tool erp__list_suppliers",
-      "atMs": 15921
+      "atMs": 16409
     },
     {
       "name": "the security owner is notified (mail outbox)",
       "ok": true,
       "detail": "Upstream erp contained",
-      "atMs": 16018
+      "atMs": 16525
     },
     {
       "name": "shadow replay of the last 7 days with the candidate policy is part of the run",
       "ok": true,
-      "detail": "replayed 1224 events: 11 action(s) would need approval or be blocked, 7 diverged",
-      "atMs": 16018
+      "detail": "replayed 1188 events: 10 action(s) would need approval or be blocked, 6 diverged",
+      "atMs": 16525
     },
     {
       "name": "restore (loosening) waits for a person in the approvals inbox",
       "ok": true,
-      "atMs": 16044
+      "atMs": 16543
     },
     {
       "name": "the fix keeps erp disabled (the agent may not loosen; restore is the person’s decision)",
       "ok": true,
-      "atMs": 20337
+      "atMs": 20831
     },
     {
       "name": "the agent’s fix is a validated proposal with shadow-replay evidence",
       "ok": true,
       "detail": {
-        "id": "cp-mwki4b28-9ccb",
+        "id": "cp-mwkkb08w-53cc",
         "replay": {
-          "events": 1235,
+          "events": 1200,
           "diverged": 0
         }
       },
-      "atMs": 21444
+      "atMs": 21951
     },
     {
       "name": "the fix is merged on the Git host (pull request, required check, reviewer)",
       "ok": true,
       "detail": "http://127.0.0.1:3300/liquid/config/pulls/10",
-      "atMs": 24183
+      "atMs": 24715
     },
     {
       "name": "after the approval everything is back to baseline: erp enabled, overlay gone, workflows released",
       "ok": true,
       "detail": "2 workflow(s) released; overlay ov-1 removed; upstream erp enabled",
-      "atMs": 34780
+      "atMs": 35483
     },
     {
       "name": "the fix stays: the upstream carries the patched build",
       "ok": true,
       "detail": "ERP connector of the sofa company, pinned to the patched build 2.4.1 (CVE-2026-4711)",
-      "atMs": 34780
+      "atMs": 35484
     },
     {
       "name": "agents reach the ERP connector again",
       "ok": true,
-      "atMs": 34958
+      "atMs": 35664
     },
     {
       "name": "the incident and every step are in the event log (one source of truth)",
       "ok": true,
       "detail": "20 events",
-      "atMs": 35080
+      "atMs": 35783
     },
     {
       "name": "a playbook that would loosen automatically (even after a clean replay) is invalid: tighten-only stays",
       "ok": true,
       "detail": "{\"check\":\"layout and schemas\",\"errors\":[{\"path\":\"playbooks/auto-remediation.yaml\",\"message\":\"steps.1.autonomy: restore loosens and must have autonomy \\\"human\\\" (tighten automatically, loosen only with",
-      "atMs": 35975
+      "atMs": 36678
     }
   ],
   "metrics": {
-    "containment_seconds": 4,
+    "containment_seconds": 5,
     "restore_seconds_after_approval": 5,
     "events_written": 33,
     "evidence": {
-      "run": "pr-mwki40vs-964a",
+      "run": "pr-mwkkappb-5097",
       "fixPullRequest": "http://127.0.0.1:3300/liquid/config/pulls/10",
-      "temporal": "namespace business, workflow PlaybookRun-pr-mwki40vs-964a",
+      "temporal": "namespace business, workflow PlaybookRun-pr-mwkkappb-5097",
       "adminUrl": "http://127.0.0.1:8080/liquid/playbooks"
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-17T09:40:17.960Z",
-  "durationMs": 36236
+  "finishedAt": "2026-11-17T10:41:29.965Z",
+  "durationMs": 36940
 }

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>The Liquid Enterprise tutorial: seven chapters, the value each one shows, the layers it touches</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 14px; font-weight: 600; fill: #1d2733; }
+    .col { font-size: 12px; font-weight: 600; fill: #5b6777; letter-spacing: 0.04em; }
+    .d { font-size: 12.5px; fill: #37414f; }
+    .lbl { font-size: 11px; fill: #1d2733; }
+    .num { font-size: 15px; font-weight: 700; fill: #ffffff; }
+    .row { fill: #ffffff; stroke: #d5dbe3; stroke-width: 1; }
+    .row7 { fill: #ffffff; stroke: #d5dbe3; stroke-width: 1; stroke-dasharray: 5 3; }
+    .dot { fill: #1f5fad; }
+    .dot7 { fill: #6a3fb4; }
+    .data { fill: #e0f2f1; stroke: #00796b; stroke-width: 1; }
+    .onto { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1; }
+    .pol { fill: #fdecea; stroke: #c62828; stroke-width: 1; }
+    .wf { fill: #fff3e0; stroke: #e65100; stroke-width: 1; }
+    .git { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1; }
+    .loop { fill: #fce4ec; stroke: #ad1457; stroke-width: 1; }
+    .app { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1; }
+    .ppl { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1; }
+  </style>
+  <rect width="1200" height="700" fill="#ffffff"/>
+  <text x="40" y="44" class="t">The tutorial: one chapter per core value, on the live platform</text>
+  <text x="40" y="68" class="st">Liquid enterprise → Tutorial in the admin console. Each step ticks itself once the platform shows it happened. About 45 minutes, no model needed.</text>
+
+  <text x="40" y="104" class="col">CHAPTER</text>
+  <text x="410" y="104" class="col">WHAT IT SHOWS</text>
+  <text x="850" y="104" class="col">LAYERS IT TOUCHES</text>
+
+  <!-- 1 -->
+  <rect x="30" y="116" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="147" r="15" class="dot"/><text x="53" y="152" class="num">1</text>
+  <text x="84" y="143" class="h">Your data, one source of truth</text>
+  <text x="84" y="162" class="d">Overview, Event log</text>
+  <text x="410" y="143" class="d">Business data in open formats you own (Parquet);</text>
+  <text x="410" y="162" class="d">every change is an event in an append-only log.</text>
+  <rect x="850" y="134" width="84" height="26" rx="13" class="data"/><text x="866" y="151" class="lbl">Event log</text>
+  <rect x="942" y="134" width="56" height="26" rx="13" class="data"/><text x="958" y="151" class="lbl">Lake</text>
+
+  <!-- 2 -->
+  <rect x="30" y="186" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="217" r="15" class="dot"/><text x="53" y="222" class="num">2</text>
+  <text x="84" y="213" class="h">Meaning in one place</text>
+  <text x="84" y="232" class="d">Ontology</text>
+  <text x="410" y="213" class="d">One versioned ontology says what the data means;</text>
+  <text x="410" y="232" class="d">tools, checks, policy data and SDKs are computed from it.</text>
+  <rect x="850" y="204" width="80" height="26" rx="13" class="onto"/><text x="866" y="221" class="lbl">Ontology</text>
+
+  <!-- 3 -->
+  <rect x="30" y="256" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="287" r="15" class="dot"/><text x="53" y="292" class="num">3</text>
+  <text x="84" y="283" class="h">Rules as code, tightened without a deploy</text>
+  <text x="84" y="302" class="d">Approvals, Policies</text>
+  <text x="410" y="283" class="d">Four eyes for an agent on a payment-critical order;</text>
+  <text x="410" y="302" class="d">an overlay freezes purchasing in seconds, lifting it is audited.</text>
+  <rect x="850" y="274" width="64" height="26" rx="13" class="pol"/><text x="866" y="291" class="lbl">Policy</text>
+  <rect x="922" y="274" width="84" height="26" rx="13" class="onto"/><text x="938" y="291" class="lbl">Core (write)</text>
+  <rect x="1014" y="274" width="68" height="26" rx="13" class="ppl"/><text x="1030" y="291" class="lbl">Person</text>
+
+  <!-- 4 -->
+  <rect x="30" y="326" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="357" r="15" class="dot"/><text x="53" y="362" class="num">4</text>
+  <text x="84" y="353" class="h">Processes you can hold</text>
+  <text x="84" y="372" class="d">Business processes</text>
+  <text x="410" y="353" class="d">Workflows start from events; a hold by business object</text>
+  <text x="410" y="372" class="d">pauses every process that touches a supplier.</text>
+  <rect x="850" y="344" width="90" height="26" rx="13" class="wf"/><text x="866" y="361" class="lbl">Workflows</text>
+
+  <!-- 5 -->
+  <rect x="30" y="396" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="427" r="15" class="dot"/><text x="53" y="432" class="num">5</text>
+  <text x="84" y="423" class="h">Change through review, live without a deploy</text>
+  <text x="84" y="442" class="d">Ontology editor, Proposals, Forgejo</text>
+  <text x="410" y="423" class="d">A draft becomes a validated pull request; after the merge</text>
+  <text x="410" y="442" class="d">the new ontology is live in seconds, no build, no restart.</text>
+  <rect x="850" y="414" width="80" height="26" rx="13" class="onto"/><text x="866" y="431" class="lbl">Ontology</text>
+  <rect x="938" y="414" width="86" height="26" rx="13" class="git"/><text x="954" y="431" class="lbl">Git review</text>
+  <rect x="1032" y="414" width="84" height="26" rx="13" class="git"/><text x="1048" y="431" class="lbl">Reconciler</text>
+
+  <!-- 6 -->
+  <rect x="30" y="466" width="1140" height="62" rx="8" class="row"/>
+  <circle cx="58" cy="497" r="15" class="dot"/><text x="53" y="502" class="num">6</text>
+  <text x="84" y="493" class="h">Contain automatically, recover with a person</text>
+  <text x="84" y="512" class="d">Playbooks, Approvals</text>
+  <text x="410" y="493" class="d">One alert: upstream off, four eyes, workflows held, owner mailed;</text>
+  <text x="410" y="512" class="d">restore waits for a person's approval.</text>
+  <rect x="850" y="484" width="84" height="26" rx="13" class="loop"/><text x="866" y="501" class="lbl">Playbooks</text>
+  <rect x="942" y="484" width="64" height="26" rx="13" class="pol"/><text x="958" y="501" class="lbl">Policy</text>
+  <rect x="1014" y="484" width="90" height="26" rx="13" class="wf"/><text x="1030" y="501" class="lbl">Workflows</text>
+
+  <!-- 7 -->
+  <rect x="30" y="536" width="1140" height="62" rx="8" class="row7"/>
+  <circle cx="58" cy="567" r="15" class="dot7"/><text x="53" y="572" class="num">7</text>
+  <text x="84" y="563" class="h">A new business requirement, end to end</text>
+  <text x="84" y="582" class="d">advanced · optional: the modelling agent proposes it</text>
+  <text x="410" y="563" class="d">Due diligence for high-risk timber: ontology, rule, workflow</text>
+  <text x="410" y="582" class="d">and app change together, from one reviewed pull request.</text>
+  <rect x="850" y="554" width="80" height="26" rx="13" class="onto"/><text x="866" y="571" class="lbl">Ontology</text>
+  <rect x="938" y="554" width="90" height="26" rx="13" class="wf"/><text x="954" y="571" class="lbl">Workflows</text>
+  <rect x="1036" y="554" width="48" height="26" rx="13" class="app"/><text x="1050" y="571" class="lbl">App</text>
+  <rect x="1092" y="554" width="68" height="26" rx="13" class="ppl"/><text x="1108" y="571" class="lbl">Person</text>
+
+  <!-- footer -->
+  <rect x="30" y="616" width="1140" height="56" rx="8" fill="#f4f6fa" stroke="#d5dbe3"/>
+  <text x="50" y="641" class="h">What you did</text>
+  <text x="50" y="660" class="d">The event log since the start of the tutorial holds every step: your console actions, the agent's request, policy decisions, playbook steps, ontology versions, business events.</text>
+</svg>

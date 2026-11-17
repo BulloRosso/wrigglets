@@ -41,6 +41,7 @@ import { appsRouter } from './liquid/appsApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { LiquidProcesses } from './extensions/liquidProcesses.js';
 import { playbooksInternalRouter, playbooksRouter } from './liquid/playbooksApi.js';
+import { tutorialRouter } from './liquid/tutorialApi.js';
 import type { PlaybookService } from './liquid/playbooks.js';
 import type { ApprovalService } from './liquid/approvals.js';
 import { captureEdits, liquidConfigInternalRouter, liquidConfigRouter, liquidForgeRouter, type LiquidConfigDeps } from './liquid/configApi.js';
@@ -383,6 +384,8 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   if (d.liquidConfig) r.use(liquidConfigRouter(d.extensions, d.liquidConfig, by));
   if (d.liquidPlaybooks) r.use(playbooksRouter(d.extensions, d.liquidPlaybooks, by, d.audit, d.liquidApprovals));
   if (d.liquidApps) r.use(appsRouter(d.extensions, d.liquidApps, by, d.oauth, d.audit));
+  // the guided tutorial (ADR-0054): demo world, whitelisted actions, the prepared D3 proposal, local Git host login
+  r.use(tutorialRouter({ ext: d.extensions, policy: d.liquidPolicy, processes: d.liquidProcesses, playbooks: d.liquidPlaybooks, gateway: d.gateway, killSwitch: d.killSwitch, repo: d.liquidConfig?.repo, audit: d.audit }, by));
   if (d.liquidHealth) {
     const health = d.liquidHealth;
     r.get('/liquid/health', requireExtension(d.extensions, LIQUID_ID), async (_req, res, next) => health().then((h) => res.json(h), next));

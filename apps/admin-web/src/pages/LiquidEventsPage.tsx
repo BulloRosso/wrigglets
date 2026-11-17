@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -51,11 +52,14 @@ function summary(e: LiquidEvent): string {
 }
 
 export function LiquidEventsPage() {
-  const [type, setType] = useState('');
-  const [actor, setActor] = useState('');
-  const [text, setText] = useState('');
+  // filters can come from a link (?types=&actor=&q=&since=, e.g. from the tutorial); typing does not rewrite the URL
+  const [params] = useSearchParams();
+  const [type, setType] = useState(params.get('types') ?? '');
+  const [actor, setActor] = useState(params.get('actor') ?? '');
+  const [text, setText] = useState(params.get('q') ?? '');
+  const [since, setSince] = useState(params.get('since') ?? '');
   const [open, setOpen] = useState<number | undefined>();
-  const q = useQuery({ queryKey: ['liquid-events', type, actor, text], queryFn: () => api.liquidEvents({ types: type, actor, q: text, limit: '200' }), refetchInterval: 5000 });
+  const q = useQuery({ queryKey: ['liquid-events', type, actor, text, since], queryFn: () => api.liquidEvents({ types: type, actor, q: text, since, limit: since ? '500' : '200' }), refetchInterval: 5000 });
   const paged = usePaged(q.data?.events ?? [], 25);
   return (
     <>
@@ -73,6 +77,7 @@ export function LiquidEventsPage() {
           </TextField>
           <TextField size="small" label="Actor (agent or person)" value={actor} onChange={(e) => setActor(e.target.value)} />
           <TextField size="small" label="Search in the payload" value={text} onChange={(e) => setText(e.target.value)} sx={{ flex: 1 }} />
+          {since && <Chip label={`since ${new Date(since).toLocaleString()}`} onDelete={() => setSince('')} sx={{ alignSelf: 'center' }} />}
         </Stack>
         {q.isLoading && <Loading />}
         {q.data && q.data.events.length === 0 && <EmptyState title="No events" text="Nothing matches the filter." />}

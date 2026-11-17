@@ -463,6 +463,12 @@ export const api = {
   releaseLiquidHold: (ref: string) => apiFetch<{ ref: string; workflows: string[] }>('/api/liquid/processes/release', { method: 'POST', json: { ref } }),
   decideLiquidApproval: (workflowId: string, decision: 'approve' | 'reject', comment?: string) => apiFetch<LiquidApprovalState>(`/api/liquid/approvals/${id(workflowId)}/decide`, { method: 'POST', json: { decision, comment } }),
   removeLiquidOverlay: (overlayId: string) => apiFetch<void>(`/api/liquid/policy/overlays/${id(overlayId)}`, { method: 'DELETE' }),
+  /* The guided tutorial (ADR-0054) */
+  tutorialPrepare: () => apiFetch<{ startedAt: string; startSeq: number; purchaseOrders: string[]; cleaned: string[]; converged: boolean }>('/api/liquid/tutorial/prepare', { method: 'POST', json: {} }),
+  tutorialAction: (action: string, args: Record<string, unknown>) => apiFetch<{ status: number; ok: boolean; result?: string; seq?: number; as: string }>('/api/liquid/tutorial/action', { method: 'POST', json: { action, args } }),
+  tutorialProposeDueDiligence: () => apiFetch<ConfigProposal & { shadowReplay?: { total: number; blocked: number; share: number } | null }>('/api/liquid/tutorial/propose/due-diligence', { method: 'POST', json: {} }),
+  tutorialDueDiligence: () => apiFetch<{ candidate: { sku: string; supplier: string; quantity: number } | null; covered: string[] }>('/api/liquid/tutorial/due-diligence'),
+  tutorialGitHost: () => apiFetch<{ url: string; user: string | null; password: string | null; reason?: string }>('/api/liquid/tutorial/git-host'),
   extensionLogs: (extId: string, service: string) =>
     fetch(`/api/extensions/${id(extId)}/services/${id(service)}/logs?tail=300`, { credentials: 'same-origin' }).then(async (r) => {
       if (!r.ok) throw new Error(`logs: HTTP ${r.status}`);

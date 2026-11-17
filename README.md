@@ -305,7 +305,8 @@ An installable extension adds the data half to the agent half:
 - small apps on a generated SDK.
 
 Install it from the admin console: **Extensions → Liquid Enterprise → Install**. Then check it with
-`node scripts/liquid/doctor.mjs`. Read [docs/liquid-enterprise.md](docs/liquid-enterprise.md) for the guide, the results
+`node scripts/liquid/doctor.mjs`, and take the [tutorial](docs/liquid-tutorial.md) (*Liquid enterprise → Tutorial*):
+seven chapters on the live platform, one per core value. Read [docs/liquid-enterprise.md](docs/liquid-enterprise.md) for the guide, the results
 of the demonstrations D1–D3, and the operations runbook.
 
 ## Documentation
@@ -314,6 +315,7 @@ of the demonstrations D1–D3, and the operations runbook.
 - [Technical documentation](docs/architecture.md) (architecture, diagrams, APIs, configuration, verification)
 - [Exfiltration guard](docs/exfiltration-guard.md): protection against multi-turn prompt injection
 - [Signals](docs/signals.md): optional module, agents notice open loops in incoming mails and messages
+- [Liquid enterprise tutorial](docs/liquid-tutorial.md): the core values hands-on, in seven chapters (also in the console)
 - [Liquid enterprise](docs/liquid-enterprise.md): optional extension — event log, ontology, policy as code, business workflows, config repository, playbooks, apps
 - [Azure target and resource types](docs/azure.md)
 - [Runbook](docs/runbook.md)

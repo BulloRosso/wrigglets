@@ -58,3 +58,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0051](0051-control-loop-health-robustness.md) | Control loop health and robustness rules | Accepted |
 | [0052](0052-acceptance-core-checks-workflow-v2.md) | Acceptance D2/D3: core checks switched on by the ontology, workflow v2 by ontology version | Accepted (overlay removed, D3 rule declarative: 0053) |
 | [0053](0053-liquid-simplification-ii.md) | Simplification II: compiler in TypeScript, one deployment path, Forgejo on SQLite, one SDK, job runner, declarative checks | Accepted |
+| [0054](0054-liquid-tutorial.md) | A guided tutorial in the console, with a small tutorial API | Accepted |

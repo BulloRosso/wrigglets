@@ -17,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import { ErrorAlert, KeyValueList, Loading, PageHeader, RelativeTime } from '@cw/ui';
 import { api } from '../api';
 import { Section, forView, useRoleView } from '../components/Sections';
+import { tutorialStarted } from './LiquidTutorialPage';
 
 /*
  * Liquid Enterprise (ADR-0038) overview: what is installed, the health of the control loop (ADR-0051), the lake.
@@ -274,6 +275,11 @@ export function LiquidOverviewPage() {
           {!ext.data.available && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               The extension is not fully available. Check its services on the Extensions page.
+            </Alert>
+          )}
+          {ext.data.available && !tutorialStarted() && (
+            <Alert severity="info" sx={{ mb: 2 }} action={<Button onClick={() => navigate('/liquid/tutorial')}>Start the tutorial</Button>}>
+              New here? The tutorial walks you through the core values of Liquid Enterprise in seven short chapters, on the live platform.
             </Alert>
           )}
           {ext.data.available && forView(view, ['business']) && <AttentionRow />}

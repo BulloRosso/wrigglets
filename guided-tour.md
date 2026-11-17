@@ -296,6 +296,8 @@ When an agent is paused, its users see a banner: who paused it, why, and what th
 
 ## Where to go next
 
+- [docs/liquid-tutorial.md](docs/liquid-tutorial.md): with the optional Liquid Enterprise extension installed, the
+  tutorial shows its core values hands-on (also in the console: *Liquid enterprise → Tutorial*).
 - [docs/architecture.md](docs/architecture.md): how it works.
 - [docs/adr/](docs/adr/README.md): why it is built this way, for example:
   - [ADR-0026](docs/adr/0026-human-in-the-loop-email.md) human in the loop by e-mail;

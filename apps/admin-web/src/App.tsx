@@ -35,6 +35,8 @@ import { LiquidPlaybooksPage } from './pages/LiquidPlaybooksPage';
 import { LiquidEventsPage } from './pages/LiquidEventsPage';
 import { LiquidApprovalsPage } from './pages/LiquidApprovalsPage';
 import { LiquidAppsPage } from './pages/LiquidAppsPage';
+import { LiquidTutorialPage } from './pages/LiquidTutorialPage';
+import SchoolOutlined from '@mui/icons-material/SchoolOutlined';
 import AppsOutlined from '@mui/icons-material/AppsOutlined';
 import InboxOutlined from '@mui/icons-material/InboxOutlined';
 import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
@@ -54,6 +56,7 @@ export function App() {
   const liquid = extensions.data?.find((e) => e.id === 'liquid');
   const LIQUID_ICONS: Record<string, React.ReactNode> = {
     '/liquid': <WaterDropOutlined />,
+    '/liquid/tutorial': <SchoolOutlined />,
     '/liquid/ontology': <HubOutlined />,
     '/liquid/policies': <GavelOutlined />,
     '/liquid/processes': <AccountTreeOutlined />,
@@ -116,6 +119,7 @@ export function App() {
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/extensions" element={<ExtensionsPage />} />
           <Route path="/liquid" element={<LiquidOverviewPage />} />
+          <Route path="/liquid/tutorial" element={<LiquidTutorialPage />} />
           <Route path="/liquid/ontology" element={<LiquidOntologyPage />} />
           <Route path="/liquid/policies" element={<LiquidPoliciesPage />} />
           <Route path="/liquid/processes" element={<LiquidProcessesPage />} />

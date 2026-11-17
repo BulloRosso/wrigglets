@@ -25,6 +25,7 @@ const suites = [
   ['M9 apps (registry, app host, sample app)', 'e2e-apps.mjs', shots.length ? [] : ['--shots'], 'm9-apps-e2e.json'],
   ['D2 new security risk', 'scenario-security.mjs', [], 'd2-security.json'],
   ['D3 new business requirement', 'scenario-business.mjs', [], 'd3-business.json'],
+  ['Tutorial (every chapter, ticks on the page)', 'e2e-tutorial.mjs', shots.length ? [] : ['--shots'], 'tutorial.json'],
 ];
 const start = from ? Math.max(0, suites.findIndex((s) => s[1].includes(from))) : 0;
 const out = { startedAt: new Date().toISOString(), suites: [] };

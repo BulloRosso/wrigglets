@@ -12,11 +12,15 @@ tighten automatically and loosen only with a human decision.
 - Implementation plan: [liquid-enterprise-extension.md](liquid-enterprise-extension.md).
 - Why LinkML, and how a requirement travels from data to ontology to logic and UI: [link-ml.md](link-ml.md).
 
+> **New here?** Take the [tutorial](liquid-tutorial.md) first (*Liquid enterprise → Tutorial* in the console): seven
+> chapters on the live platform, one per core value, about 45 minutes, no model needed.
+
 > **Status:** implemented (M0–M10). The [results](#results-d1d3) say what was shown and what was not (real-model
 > runs, Entra tenant); the [implementation log](#appendix-implementation-log) records each milestone.
 
 ## Contents
 
+0. [Tutorial](liquid-tutorial.md) (separate document)
 1. [Overview](#overview)
 2. [Activation](#activation)
 3. [Architecture](#architecture)
@@ -1400,6 +1404,21 @@ the control-plane image.
 view (IT Engineer / Business Engineer / All), navigation grouped by task, tabs with links, folded sections, steppers for
 the proposal and task lifecycles, app registration and extension operations, paging of long lists. The screenshots in
 this document were retaken after the review.
+
+### Tutorial (2026-11-17)
+
+[ADR-0054](adr/0054-liquid-tutorial.md), [liquid-tutorial.md](liquid-tutorial.md).
+
+- Done: *Liquid enterprise → Tutorial*, seven chapters (one per core value) and a preparation step. Steps link to the
+  page where they are done and tick themselves from the live platform. A small tutorial API provides the demo world,
+  three whitelisted actions, the prepared D3 proposal, a supplier for chapter 7, and the reviewer login on a local Git
+  host. The Event log takes its filters from the URL. The Overview suggests the tutorial until it is started.
+- Found while testing it: the simulation reset leaves due-diligence statements alone (they are history), so a second
+  run of D3 finds the supplier covered. Chapter 7 therefore picks the next material and supplier without a statement
+  (six pairs, timber from Nordholz first).
+- Verified: `e2e-tutorial.mjs` **21/21** checks, every chapter at *n/n* on the page (24 of 24 steps), about 4 minutes;
+  the screenshots in `docs/images/liquid/tutorial/` come from that run. Admin-server unit tests for the change builder
+  and the action whitelist.
 
 ### Later
 

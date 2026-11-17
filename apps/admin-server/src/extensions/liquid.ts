@@ -118,6 +118,7 @@ export const liquidManifest: ExtensionManifestInput = {
   ],
   uiRoutes: [
     { label: 'Overview', path: '/liquid' },
+    { label: 'Tutorial', path: '/liquid/tutorial' },
     { label: 'Approvals', path: '/liquid/approvals' },
     { label: 'Ontology', path: '/liquid/ontology' },
     { label: 'Policies', path: '/liquid/policies' },

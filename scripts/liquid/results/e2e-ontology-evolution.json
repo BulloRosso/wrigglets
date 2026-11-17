@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:25:20.895Z",
+  "startedAt": "2026-11-17T09:38:27.102Z",
   "checks": [
     {
       "name": "the running ontology",
@@ -30,7 +30,7 @@
       "name": "the agent proposes the extension; validated, compatibility minor",
       "ok": true,
       "detail": {
-        "id": "cp-mwkfgcre-f3ed",
+        "id": "cp-mwki2d7x-111c",
         "version": "0.2.0"
       }
     },
@@ -39,7 +39,7 @@
       "ok": true
     },
     {
-      "name": "live in 2 s: ontology 0.2.0, class Carrier, actions present",
+      "name": "live in 4 s: ontology 0.2.0, class Carrier, actions present",
       "ok": true
     },
     {
@@ -66,7 +66,7 @@
     {
       "name": "the SDK is regenerated from the new version",
       "ok": true,
-      "detail": "12049 chars"
+      "detail": "22055 chars"
     },
     {
       "name": "the agent creates a carrier through the new tool",
@@ -90,7 +90,7 @@
       "name": "the projection is still exactly the event log replayed",
       "ok": true,
       "detail": {
-        "events": 21
+        "events": 24
       }
     },
     {
@@ -123,5 +123,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T08:25:49.253Z"
+  "finishedAt": "2026-11-17T09:39:07.359Z"
 }

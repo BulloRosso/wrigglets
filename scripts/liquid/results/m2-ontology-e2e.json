@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:21:31.866Z",
+  "startedAt": "2026-11-17T09:31:11.675Z",
   "checks": [
     {
       "name": "repair picked up the new images and is available",
@@ -10,9 +10,7 @@
         "volumes=done",
         "service:ontology-db=done",
         "service:ontology-server=done",
-        "bootstrap:forgejo-db=done",
         "service:forgejo=done",
-        "service:ontology-compiler=done",
         "retired=done",
         "bootstrap:business-namespace=done",
         "bootstrap:seed-sofa=done",
@@ -78,8 +76,22 @@
         "builtIn": "0.1.0",
         "added": []
       }
+    },
+    {
+      "name": "React Flow renders one node per class",
+      "ok": true,
+      "detail": "19 nodes"
+    },
+    {
+      "name": "React Flow renders one edge per link",
+      "ok": true,
+      "detail": "21 edges"
+    },
+    {
+      "name": "selecting a class shows its details and source table",
+      "ok": true
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T08:21:35.416Z"
+  "finishedAt": "2026-11-17T09:31:20.410Z"
 }

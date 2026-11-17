@@ -68,8 +68,13 @@ export class LiquidProcesses {
     const held = new Set<string>();
     for (const o of objects) {
       for (const r of await this.rows(`${BSA.OntologyObjects.name} = ${q(o)} AND ExecutionStatus = 'Running' AND WorkflowType != 'lakeFlush'`, 500)) {
-        await this.c().workflow.getHandle(r.workflowId).signal(holdSignal, { reason, ref });
-        held.add(r.workflowId);
+        // the visibility list can lag: a workflow that completed meanwhile needs no hold (it runs nothing any more)
+        try {
+          await this.c().workflow.getHandle(r.workflowId).signal(holdSignal, { reason, ref });
+          held.add(r.workflowId);
+        } catch (err) {
+          if (!/already completed|not found/i.test(String((err as Error)?.message ?? err))) throw err;
+        }
       }
     }
     return { ref, workflows: [...held].sort() };
@@ -82,8 +87,12 @@ export class LiquidProcesses {
       const h = this.c().workflow.getHandle(r.workflowId);
       const state = await h.query(holdStateQuery).catch(() => undefined);
       if (!state?.holds.some((x) => x.ref === ref)) continue;
-      await h.signal(releaseSignal, { ref });
-      released.push(r.workflowId);
+      try {
+        await h.signal(releaseSignal, { ref });
+        released.push(r.workflowId);
+      } catch (err) {
+        if (!/already completed|not found/i.test(String((err as Error)?.message ?? err))) throw err;
+      }
     }
     return { ref, workflows: released.sort() };
   }

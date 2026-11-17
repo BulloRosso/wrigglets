@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:21:25.312Z",
+  "startedAt": "2026-11-17T09:30:59.344Z",
   "checks": [
     {
       "name": "installed and available",
@@ -10,9 +10,7 @@
         "volumes=done",
         "service:ontology-db=done",
         "service:ontology-server=done",
-        "bootstrap:forgejo-db=done",
         "service:forgejo=done",
-        "service:ontology-compiler=done",
         "retired=done",
         "bootstrap:business-namespace=done",
         "bootstrap:seed-sofa=done",
@@ -27,8 +25,7 @@
       "detail": [
         "ontology-db=running",
         "ontology-server=running",
-        "forgejo=running",
-        "ontology-compiler=running"
+        "forgejo=running"
       ]
     },
     {
@@ -70,7 +67,7 @@
       "ok": true,
       "detail": {
         "first": {
-          "flushed": 1005,
+          "flushed": 1002,
           "hwm": 1005,
           "waiting": 0
         },
@@ -110,13 +107,13 @@
         "erp_purchase_orders": 1,
         "erp_suppliers": 1,
         "erp_workers": 1,
-        "events": 2
+        "events": 3
       }
     },
     {
       "name": "lake data files are Parquet on the volume",
       "ok": true,
-      "detail": "16 parquet files under /lake"
+      "detail": "17 parquet files under /lake"
     },
     {
       "name": "DuckLake catalog lives in Postgres schema lake_catalog",
@@ -126,13 +123,13 @@
   ],
   "lake": {
     "hwm": 1005,
-    "snapshots": 7,
-    "lastSnapshotAt": "2026-11-17 08:21:30.605997+00",
+    "snapshots": 8,
+    "lastSnapshotAt": "2026-11-17 09:31:04.868002+00",
     "extracts": [
       {
         "id": "sofa-T0",
         "source": "sofa-company mock (scripts/sofa-company/mock-mcp.mjs), initial state",
-        "at": "2026-11-17 08:21:17.991+00",
+        "at": "2026-11-17 09:30:48.736+00",
         "tables": {
           "erp_factories": 2,
           "erp_machines": 6,
@@ -153,7 +150,7 @@
       }
     ],
     "lastFlush": {
-      "at": "2026-11-17T08:21:30.790Z",
+      "at": "2026-11-17T09:31:05.077Z",
       "result": {
         "flushed": 0,
         "hwm": 1005,
@@ -177,7 +174,7 @@
       "erp_purchase_orders": 1,
       "erp_suppliers": 1,
       "erp_workers": 1,
-      "events": 2
+      "events": 3
     },
     "eventLog": {
       "count": 1005,
@@ -203,5 +200,5 @@
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-17T08:21:31.824Z"
+  "finishedAt": "2026-11-17T09:31:11.630Z"
 }

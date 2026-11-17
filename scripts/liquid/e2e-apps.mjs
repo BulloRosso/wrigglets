@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { ADMIN, HUMANS, PASSWORD, Session, env, log, root, sleep, until } from '../sofa-company/lib.mjs';
 import { registerApp } from './app-register.mjs';
-import { docker, gitHost, sql } from './lib.mjs';
+import { docker, gitHost, policyConverged, sql } from './lib.mjs';
 
 const args = new Set(process.argv.slice(2));
 const result = { startedAt: new Date().toISOString(), checks: [] };
@@ -85,6 +85,7 @@ async function ensureDueDiligenceOntology() {
     );
   const roles = JSON.parse(await file('policies/liquid/roles/data.json'));
   roles.roles.procurement.writes = [...new Set([...roles.roles.procurement.writes, 'submit_due_diligence_statement'])];
+  const rev0 = (await api('GET', '/liquid/policy')).bundle?.revision;
   const p = await api('POST', '/liquid/proposals', {
     title: 'Due-diligence statements of suppliers (M9 sample app)',
     reason: 'Buyers record suppliers’ due-diligence statements in a small app; the statement must be an ontology object written by an action.',
@@ -98,6 +99,8 @@ async function ensureDueDiligenceOntology() {
   await forge('POST', `/repos/liquid/config/pulls/${p.pr.number}/reviews`, { event: 'APPROVED', body: 'ok (e2e apps)' });
   await forge('POST', `/repos/liquid/config/pulls/${p.pr.number}/merge`, { Do: 'merge', merge_message_field: `${p.title} (proposal ${p.id})` });
   await until('due-diligence ontology live', async () => ((await api('GET', '/liquid/ontology')).version === v1 ? true : undefined), 120_000, 2000);
+  // the policy engines learn the new actions with the next package; until then unknown actions are denied (fail closed)
+  await policyConverged(api, rev0);
   return { version: v1, proposed: true, compat: p.compat?.level };
 }
 

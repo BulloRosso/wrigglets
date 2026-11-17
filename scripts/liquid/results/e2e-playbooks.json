@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:24:37.332Z",
+  "startedAt": "2026-11-17T09:37:31.522Z",
   "checks": [
     {
       "name": "the example playbook is in the config repository and valid",
@@ -25,9 +25,9 @@
       "ok": true,
       "detail": [
         {
-          "runId": "pr-mwkffg03-8651",
+          "runId": "pr-mwki1c5v-64e2",
           "playbook": "third-party-upstream-vulnerability",
-          "workflowId": "PlaybookRun-pr-mwkffg03-8651"
+          "workflowId": "PlaybookRun-pr-mwki1c5v-64e2"
         }
       ]
     },
@@ -50,7 +50,7 @@
       "detail": {
         "tools": 23,
         "writeActions": 10,
-        "workflows": 5
+        "workflows": 1
       }
     },
     {
@@ -58,13 +58,13 @@
       "ok": true,
       "detail": {
         "overlays": "[\"ov-1\"]",
-        "held": "PurchaseOrderRelease-81e41158-632d-4183-92c5-e121f88c2aff"
+        "held": "PurchaseOrderRelease-2f6aa8bf-4b25-47bf-bb47-43bdf8d8952a"
       }
     },
     {
       "name": "shadow replay reported on the last 7 days",
       "ok": true,
-      "detail": "replayed 1102 events: 8 action(s) would need approval or be blocked, 5 diverged"
+      "detail": "replayed 1130 events: 9 action(s) would need approval or be blocked, 6 diverged"
     },
     {
       "name": "the reconciler keeps the tightening (it was committed to the config repository)",
@@ -116,5 +116,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T08:25:20.851Z"
+  "finishedAt": "2026-11-17T09:38:27.057Z"
 }

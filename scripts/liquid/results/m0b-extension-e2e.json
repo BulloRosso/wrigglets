@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:20:28.144Z",
+  "startedAt": "2026-11-17T09:30:00.662Z",
   "checks": [
     {
       "name": "delete data removed the control-plane data (config repository, proposals, apps)",
@@ -31,9 +31,7 @@
         "volumes",
         "service:ontology-db",
         "service:ontology-server",
-        "bootstrap:forgejo-db",
         "service:forgejo",
-        "service:ontology-compiler",
         "retired",
         "bootstrap:business-namespace",
         "bootstrap:seed-sofa",
@@ -50,10 +48,9 @@
       "name": "ontology-db container is labelled and healthy",
       "ok": true,
       "detail": [
-        "cw-ext-liquid-ontology-compiler Up 10 seconds (healthy)",
-        "cw-ext-liquid-forgejo Up 17 seconds (healthy)",
-        "cw-ext-liquid-ontology-server Up 23 seconds (healthy)",
-        "cw-ext-liquid-ontology-db Up 30 seconds (healthy)"
+        "cw-ext-liquid-forgejo Up 10 seconds (healthy)",
+        "cw-ext-liquid-ontology-server Up 17 seconds (healthy)",
+        "cw-ext-liquid-ontology-db Up 23 seconds (healthy)"
       ]
     },
     {
@@ -123,5 +120,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T08:21:25.238Z"
+  "finishedAt": "2026-11-17T09:30:59.279Z"
 }

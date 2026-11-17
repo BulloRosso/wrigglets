@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T08:21:58.930Z",
+  "startedAt": "2026-11-17T09:31:44.405Z",
   "checks": [
     {
       "name": "all services running, no OPA container (policy embedded)",
@@ -7,8 +7,7 @@
       "detail": [
         "ontology-db=running",
         "ontology-server=running",
-        "forgejo=running",
-        "ontology-compiler=running"
+        "forgejo=running"
       ]
     },
     {
@@ -31,7 +30,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "09:22:06 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 09:22:06 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+      "detail": "10:31:52 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 10:31:52 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
     },
     {
       "name": "a read through gateway + embedded policy works",
@@ -79,9 +78,9 @@
     {
       "name": "policy decisions are in the event log (gateway and core)",
       "ok": true,
-      "detail": "11 decisions, e.g. policy: cancel_purchase_order is destructive: it needs an approved plan"
+      "detail": "10 decisions, e.g. policy: cancel_purchase_order is destructive: it needs an approved plan"
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T08:22:38.081Z"
+  "finishedAt": "2026-11-17T09:32:25.172Z"
 }

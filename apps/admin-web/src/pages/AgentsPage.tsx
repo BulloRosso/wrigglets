@@ -28,6 +28,7 @@ import { AgentPortrait, EmptyState, ErrorAlert, KeyValueList, KillSwitchChip, Lo
 import { api, avatarSrc } from '../api';
 import { AiNotConfiguredAlert, ModelSelect, useAi } from '../components/Ai';
 import { formatUsd } from '@cw/shared';
+import { forView, useRoleView } from '../components/Sections';
 
 export function CreateAgentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -125,6 +126,7 @@ function AgentCard({ a }: { a: AgentSummary }) {
   const running = a.runtime.state === 'running' || a.runtime.state === 'starting';
   const ai = useAi();
   const sp = ai.data?.agents.find((x) => x.agentId === a.spec.agentId);
+  const { view } = useRoleView();
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
@@ -141,18 +143,26 @@ function AgentCard({ a }: { a: AgentSummary }) {
             {a.spec.description}
           </Typography>
         )}
+        {/* state as chips; three facts for everyone, the technical ones in the IT view (UI review ADM-02) */}
+        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', mb: 1.5 }}>
+          {a.health && <StatusChip status={a.health.status} />}
+          {a.killSwitch && <KillSwitchChip level={a.killSwitch.level} reason={a.killSwitch.entry?.reason} source={a.killSwitch.source === 'global' ? 'global' : 'agent'} />}
+          {a.lock?.holder ? <Chip size="small" color="info" label={`busy · ${a.lock.waiting.length} waiting`} /> : a.lock ? <Chip size="small" variant="outlined" label="idle" /> : null}
+          {sp?.exceeded && <Chip size="small" color="error" label="spend limit reached" />}
+        </Stack>
         <KeyValueList
           dense
           items={[
-            ['Health', a.health ? <StatusChip status={a.health.status} /> : '–'],
-            ['Kill switch', a.killSwitch ? <KillSwitchChip level={a.killSwitch.level} reason={a.killSwitch.entry?.reason} source={a.killSwitch.source === 'global' ? 'global' : 'agent'} showNormal /> : '–'],
             ['Collaborates with', a.spec.peers?.length ? a.spec.peers.join(', ') : 'isolated'],
-            ['Harness', a.health ? `${a.health.harness.state}${a.health.harness.version ? ` · v${a.health.harness.version}` : ''}` : '–'],
-            ['Workspace', a.lock?.holder ? `busy (${a.lock.waiting.length} waiting)` : a.lock ? 'idle' : '–'],
             ['Open tasks', a.openTasks ?? '–'],
-            ['Model', a.spec.model],
-            ['Spend (30 days)', sp ? `${formatUsd(sp.spentUsd)} of ${formatUsd(sp.limitUsd)}${sp.exceeded ? ' — limit reached' : ''}` : '–'],
-            ['Image', <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{a.spec.image}</Typography>],
+            ['Spend (30 days)', sp ? `${formatUsd(sp.spentUsd)} of ${formatUsd(sp.limitUsd)}` : '–'],
+            ...(forView(view, ['it'])
+              ? ([
+                  ['Model', a.spec.model],
+                  ['Harness', a.health ? `${a.health.harness.state}${a.health.harness.version ? ` · v${a.health.harness.version}` : ''}` : '–'],
+                  ['Image', <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>{a.spec.image}</Typography>],
+                ] as Array<[string, React.ReactNode]>)
+              : []),
           ]}
         />
         <ErrorAlert error={action.error} />
@@ -173,7 +183,7 @@ function AgentCard({ a }: { a: AgentSummary }) {
         <Button size="small" onClick={() => navigate(`/agents/${a.spec.agentId}`)}>
           Manage
         </Button>
-        <Chip size="small" variant="outlined" label={`:${a.spec.hostPort}`} sx={{ ml: 'auto' }} />
+        {forView(view, ['it']) && <Chip size="small" variant="outlined" label={`:${a.spec.hostPort}`} sx={{ ml: 'auto' }} />}
       </CardActions>
     </Card>
   );
@@ -186,7 +196,7 @@ export function AgentsPage() {
     <>
       <PageHeader
         title="Agents"
-        subtitle="Each agent is one container (API, Temporal worker, Agent Harness) with its own persistent workspace."
+        subtitle="Your AI colleagues: what they do, how busy they are, what they cost"
         actions={
           <Button variant="contained" startIcon={<AddOutlined />} onClick={() => setCreating(true)}>
             New agent

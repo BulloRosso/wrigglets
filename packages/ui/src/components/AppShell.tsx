@@ -106,7 +106,8 @@ export function AppShell({ product, context, nav, navTitle, user, actions, child
               item.onClick();
               setOpen(false);
             }}
-            sx={{ borderRadius: 2, mb: 0.5 }}
+            dense
+            sx={{ borderRadius: 2, mb: 0.25 }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.label} />

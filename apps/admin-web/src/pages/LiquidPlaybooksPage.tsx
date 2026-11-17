@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { ConfirmDialog, EmptyState, ErrorAlert, Loading, PageHeader, RelativeTime } from '@cw/ui';
 import { directionOf, type Playbook } from '@cw/playbooks';
+import { SectionTabs } from '../components/Sections';
 import { api, type PlaybookRunView, type PlaybookStepResult } from '../api';
 
 /*
@@ -21,14 +22,40 @@ import { api, type PlaybookRunView, type PlaybookStepResult } from '../api';
  * and the decisions waiting for a person. Tightening steps run automatically; loosening steps (restore) wait here.
  */
 
-const DIR_COLOR = { tighten: 'warning', neutral: 'default', loosen: 'success' } as const;
-const STATE_COLOR: Record<PlaybookStepResult['state'], 'default' | 'success' | 'warning' | 'error' | 'info'> = { pending: 'default', awaiting_approval: 'warning', running: 'info', done: 'success', failed: 'error', skipped: 'default', proposed: 'info', cancelled: 'default' };
-const RUN_COLOR = { running: 'info', awaiting_approval: 'warning', completed: 'success', cancelled: 'default', failed: 'error' } as const;
+const DIR_COLOR = {
+  tighten: 'warning',
+  neutral: 'default',
+  loosen: 'success',
+} as const;
+const STATE_COLOR: Record<PlaybookStepResult['state'], 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+  pending: 'default',
+  awaiting_approval: 'warning',
+  running: 'info',
+  done: 'success',
+  failed: 'error',
+  skipped: 'default',
+  proposed: 'info',
+  cancelled: 'default',
+};
+const RUN_COLOR = {
+  running: 'info',
+  awaiting_approval: 'warning',
+  completed: 'success',
+  cancelled: 'default',
+  failed: 'error',
+} as const;
 
 function PlaybookCard({ p, source }: { p: Playbook; source?: string }) {
   return (
     <Card variant="outlined">
-      <CardHeader title={p.title ?? p.id} subheader={<><code>{p.id}</code> v{p.version} · {source}</>} />
+      <CardHeader
+        title={p.title ?? p.id}
+        subheader={
+          <>
+            <code>{p.id}</code> v{p.version} · {source}
+          </>
+        }
+      />
       <CardContent>
         <Stack spacing={1}>
           {p.description && <Typography variant="body2">{p.description}</Typography>}
@@ -60,15 +87,37 @@ function RunCard({ r }: { r: PlaybookRunView }) {
   const qc = useQueryClient();
   const [comment, setComment] = useState('');
   const refresh = () => void qc.invalidateQueries({ queryKey: ['liquid-playbook-runs'] });
-  const decide = useMutation({ mutationFn: (v: { step: string; decision: 'approve' | 'reject' }) => api.decidePlaybookStep(r.runId, v.step, v.decision, comment || undefined), onSuccess: refresh });
-  const cancel = useMutation({ mutationFn: () => api.cancelPlaybookRun(r.runId), onSuccess: refresh });
+  const decide = useMutation({
+    mutationFn: (v: { step: string; decision: 'approve' | 'reject' }) => api.decidePlaybookStep(r.runId, v.step, v.decision, comment || undefined),
+    onSuccess: refresh,
+  });
+  const cancel = useMutation({
+    mutationFn: () => api.cancelPlaybookRun(r.runId),
+    onSuccess: refresh,
+  });
   const waiting = r.steps.find((s) => s.state === 'awaiting_approval');
   const open = r.state === 'running' || r.state === 'awaiting_approval';
   return (
     <Card variant="outlined">
       <CardHeader
-        title={<>{r.playbook} <Typography component="span" variant="caption" color="text.secondary">{r.runId}</Typography></>}
-        subheader={<>trigger {r.trigger.kind}: {Object.entries(r.trigger.data).filter(([k]) => ['source', 'severity', 'upstream', 'summary', 'rule', 'agent'].includes(k)).map(([k, v]) => `${k}=${String(v)}`).join(' · ')} · <RelativeTime iso={r.startTime} /></>}
+        title={
+          <>
+            {r.playbook}{' '}
+            <Typography component="span" variant="caption" color="text.secondary">
+              {r.runId}
+            </Typography>
+          </>
+        }
+        subheader={
+          <>
+            trigger {r.trigger.kind}:{' '}
+            {Object.entries(r.trigger.data)
+              .filter(([k]) => ['source', 'severity', 'upstream', 'summary', 'rule', 'agent'].includes(k))
+              .map(([k, v]) => `${k}=${String(v)}`)
+              .join(' · ')}{' '}
+            · <RelativeTime iso={r.startTime} />
+          </>
+        }
         action={<Chip color={RUN_COLOR[r.state]} label={r.state.replace('_', ' ')} />}
       />
       <CardContent>
@@ -133,7 +182,12 @@ function RunCard({ r }: { r: PlaybookRunView }) {
 
 function AlertDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
-  const [a, setA] = useState({ source: 'vuln-feed', severity: 'critical', upstream: 'erp', summary: 'CVE-2026-0001 in the ERP connector' });
+  const [a, setA] = useState({
+    source: 'vuln-feed',
+    severity: 'critical',
+    upstream: 'erp',
+    summary: 'CVE-2026-0001 in the ERP connector',
+  });
   const send = useMutation({
     mutationFn: () => api.sendPlaybookAlert(a),
     onSuccess: () => {
@@ -142,7 +196,16 @@ function AlertDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
     },
   });
   return (
-    <ConfirmDialog open={open} title="Send a test alert" text="The alert goes the same way as an external one (POST /internal/alerts): it is recorded as an event and starts every matching playbook. Tightening steps take effect immediately." confirmLabel="Send alert" busy={send.isPending} error={send.error} onConfirm={() => send.mutate()} onClose={onClose}>
+    <ConfirmDialog
+      open={open}
+      title="Send a test alert"
+      text="The alert goes the same way as an external one (POST /internal/alerts): it is recorded as an event and starts every matching playbook. Tightening steps take effect immediately."
+      confirmLabel="Send alert"
+      busy={send.isPending}
+      error={send.error}
+      onConfirm={() => send.mutate()}
+      onClose={onClose}
+    >
       <Stack spacing={2} sx={{ mt: 1 }}>
         <TextField label="Source" value={a.source} onChange={(e) => setA({ ...a, source: e.target.value })} />
         <TextField select label="Severity" value={a.severity} onChange={(e) => setA({ ...a, severity: e.target.value })}>
@@ -160,37 +223,74 @@ function AlertDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
 }
 
 export function LiquidPlaybooksPage() {
-  const pbs = useQuery({ queryKey: ['liquid-playbooks'], queryFn: api.liquidPlaybooks, refetchInterval: 30_000 });
-  const runs = useQuery({ queryKey: ['liquid-playbook-runs'], queryFn: api.liquidPlaybookRuns, refetchInterval: 3000 });
+  const pbs = useQuery({
+    queryKey: ['liquid-playbooks'],
+    queryFn: api.liquidPlaybooks,
+    refetchInterval: 30_000,
+  });
+  const runs = useQuery({
+    queryKey: ['liquid-playbook-runs'],
+    queryFn: api.liquidPlaybookRuns,
+    refetchInterval: 3000,
+  });
   const [alerting, setAlerting] = useState(false);
   const active = (runs.data ?? []).filter((r) => r.state === 'running' || r.state === 'awaiting_approval');
   const done = (runs.data ?? []).filter((r) => !active.includes(r)).slice(0, 10);
   return (
     <>
-      <PageHeader overline="Liquid enterprise" title="Playbooks" subtitle="Sense → decide → act. Tighten automatically, loosen only with a person. Playbooks live in the config repository (playbooks/*.yaml)." actions={<Button variant="contained" onClick={() => setAlerting(true)}>Send test alert</Button>} />
+      <PageHeader
+        overline="Liquid enterprise"
+        title="Playbooks"
+        subtitle="Sense → decide → act: tighten automatically, loosen only with a person"
+        actions={
+          <Button variant="contained" onClick={() => setAlerting(true)}>
+            Send test alert
+          </Button>
+        }
+      />
       <ErrorAlert error={pbs.error ?? runs.error} title="Could not load the playbooks" />
       {(pbs.isLoading || runs.isLoading) && <Loading />}
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 7 }}>
-          <Stack spacing={2}>
-            <Typography variant="h6">Active runs ({active.length})</Typography>
-            {active.length === 0 ? <EmptyState title="No active runs" text="An alert, a tripped safety rule or a schedule starts the matching playbooks." /> : active.map((r) => <RunCard key={r.runId} r={r} />)}
-            <Typography variant="h6">Recent runs</Typography>
-            {done.length === 0 ? <EmptyState title="No finished runs" text="Finished, cancelled and failed runs show up here." /> : done.map((r) => <RunCard key={r.runId} r={r} />)}
-          </Stack>
-        </Grid>
-        <Grid size={{ xs: 12, md: 5 }}>
-          <Stack spacing={2}>
-            <Typography variant="h6">Playbooks ({pbs.data?.playbooks.length ?? 0})</Typography>
-            {pbs.data?.invalid.map((i) => (
-              <Alert key={i.path} severity="error">
-                {i.path}: {i.issues.map((x) => `${x.path}: ${x.message}`).join('; ')}
-              </Alert>
-            ))}
-            {pbs.data?.playbooks.map((p) => <PlaybookCard key={p.id} p={p} source={pbs.data?.sources[p.id]} />)}
-          </Stack>
-        </Grid>
-      </Grid>
+      {/* runs and definitions were two columns of cards; now tabs, active runs first (UI review LIQ-08) */}
+      <SectionTabs
+        tabs={[
+          {
+            id: 'active',
+            label: 'Active runs',
+            badge: active.length,
+            badgeColor: 'warning',
+            render: () => (
+              <Stack spacing={2}>{active.length === 0 ? <EmptyState title="No active runs" text="An alert, a tripped safety rule or a schedule starts the matching playbooks." /> : active.map((r) => <RunCard key={r.runId} r={r} />)}</Stack>
+            ),
+          },
+          {
+            id: 'recent',
+            label: 'Recent runs',
+            render: () => <Stack spacing={2}>{done.length === 0 ? <EmptyState title="No finished runs" text="Finished, cancelled and failed runs show up here." /> : done.map((r) => <RunCard key={r.runId} r={r} />)}</Stack>,
+          },
+          {
+            id: 'definitions',
+            label: 'Playbooks',
+            badge: pbs.data?.invalid.length ? `${pbs.data.invalid.length} invalid` : undefined,
+            badgeColor: 'error',
+            render: () => (
+              <Stack spacing={2}>
+                {pbs.data?.invalid.map((i) => (
+                  <Alert key={i.path} severity="error">
+                    {i.path}: {i.issues.map((x) => `${x.path}: ${x.message}`).join('; ')}
+                  </Alert>
+                ))}
+                <Grid container spacing={2}>
+                  {pbs.data?.playbooks.map((p) => (
+                    <Grid key={p.id} size={{ xs: 12, lg: 6 }}>
+                      <PlaybookCard p={p} source={pbs.data?.sources[p.id]} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Stack>
+            ),
+          },
+        ]}
+      />
       <AlertDialog open={alerting} onClose={() => setAlerting(false)} />
     </>
   );

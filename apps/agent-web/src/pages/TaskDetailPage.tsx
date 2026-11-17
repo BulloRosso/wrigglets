@@ -19,6 +19,11 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import Stepper from '@mui/material/Stepper';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ExpandMoreOutlined from '@mui/icons-material/ExpandMoreOutlined';
@@ -51,6 +56,7 @@ export function TaskDetailPage() {
   const [previewPath, setPreviewPath] = useState<string>();
   const [params, setParams] = useSearchParams();
   const deepLinkHandled = useRef(false);
+  const [tab, setTab] = useState<'conversation' | 'activity' | 'commits'>('conversation');
 
   const detail = useQuery({
     queryKey: ['task', id],
@@ -74,8 +80,7 @@ export function TaskDetailPage() {
     void qc.invalidateQueries({ queryKey: ['tasks'] });
   };
   const act = useMutation({
-    mutationFn: async ({ kind, text }: { kind: NonNullable<Pending>['kind']; text: string }) =>
-      kind === 'cancel' ? api.cancel(id, text) : api.decide(id, kind, text),
+    mutationFn: async ({ kind, text }: { kind: NonNullable<Pending>['kind']; text: string }) => (kind === 'cancel' ? api.cancel(id, text) : api.decide(id, kind, text)),
     onSuccess: (s) => {
       setPending(undefined);
       refresh(s);
@@ -89,7 +94,10 @@ export function TaskDetailPage() {
   const decideProposal = useMutation({
     mutationFn: ({ messageId, decision }: { messageId: string; decision: 'approve' | 'reject' }) => api.decideScheduleProposal(id, messageId, decision),
     onSuccess: (m) => {
-      qc.setQueryData(['chat', id], (chat.data ?? []).map((x) => (x.id === m.id ? m : x)));
+      qc.setQueryData(
+        ['chat', id],
+        (chat.data ?? []).map((x) => (x.id === m.id ? m : x)),
+      );
       void qc.invalidateQueries({ queryKey: ['schedules'] });
     },
   });
@@ -128,7 +136,11 @@ export function TaskDetailPage() {
   return (
     <>
       <PageHeader
-        overline={<Link component={RouterLink} to="/tasks">Tasks</Link>}
+        overline={
+          <Link component={RouterLink} to="/tasks">
+            Tasks
+          </Link>
+        }
         title={state.title}
         subtitle={
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1, mt: 1 }}>
@@ -152,12 +164,13 @@ export function TaskDetailPage() {
           ) : undefined
         }
       />
+      <TaskStepper state={state} />
 
       {state.suspended && state.status === 'suspended' && (
         <Alert severity="warning" sx={{ mb: 3 }}>
           <AlertTitle>Suspended by the kill switch</AlertTitle>
-          The running step was aborted {formatDateTime(state.suspended.at)}{state.suspended.reason ? ` (${state.suspended.reason})` : ''}. It resumes automatically when an
-          administrator lifts the pause.
+          The running step was aborted {formatDateTime(state.suspended.at)}
+          {state.suspended.reason ? ` (${state.suspended.reason})` : ''}. It resumes automatically when an administrator lifts the pause.
         </Alert>
       )}
 
@@ -223,83 +236,91 @@ export function TaskDetailPage() {
         <Grid size={{ xs: 12, lg: 8 }}>
           <Stack spacing={3}>
             {active && <LivePanel taskId={id} />}
-            <TaskConversation
-              state={state}
-              agentName={me.data?.agent.displayName ?? 'Agent'}
-              chat={chat.data ?? []}
-              pendingQuestion={ask.isPending ? ask.variables : undefined}
-              onSend={(text) => ask.mutateAsync(text)}
-              sending={ask.isPending}
-              error={ask.error}
-              canDecideProposal={(p) => !!user && (user.upn === p.requestedBy.upn || hasRole(me.data, 'admin'))}
-              onDecideProposal={(messageId, decision) => decideProposal.mutateAsync({ messageId, decision })}
-              decidingProposal={decideProposal.isPending ? decideProposal.variables?.messageId : undefined}
-              proposalError={decideProposal.error}
-              onOpenFile={setPreviewPath}
-            />
-            <Card>
-              <CardHeader title="Activity timeline" subheader="From the Temporal event history" />
-              <CardContent>{timeline.data ? <TimelineChart timeline={timeline.data} showLegend /> : timeline.isLoading ? <Loading /> : <ErrorAlert error={timeline.error} />}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader title="Steps" subheader={`${state.steps.length} step(s)`} />
-              <CardContent sx={{ pt: 0 }}>
-                {state.steps.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    No steps yet.
-                  </Typography>
-                )}
-                {state.steps.map((s) => (
-                  <Accordion key={s.stepId} disableGutters variant="outlined" sx={{ mb: 1, '&:before': { display: 'none' } }}>
-                    <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ '& .MuiAccordionSummary-content': { minWidth: 0, overflow: 'hidden' } }}>
-                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0, width: '100%' }}>
-                        <Chip size="small" label={s.kind} color={s.kind === 'plan' ? 'secondary' : s.kind === 'fix' ? 'warning' : 'primary'} />
-                        <Typography variant="body2" noWrap sx={{ minWidth: 0, flex: 1 }}>
-                          {s.summary}
+            {/* conversation, activity and commits were stacked; one at a time now (UI review AGT-03) */}
+            <Box>
+              <Tabs value={tab} onChange={(_, v: typeof tab) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Tab value="conversation" label="Conversation" />
+                <Tab value="activity" label={`Activity · ${state.steps.length} step(s)`} />
+                <Tab value="commits" label={`Commits${commits.data ? ` · ${commits.data.length}` : ''}`} />
+              </Tabs>
+              {tab === 'conversation' && (
+                <TaskConversation
+                  state={state}
+                  agentName={me.data?.agent.displayName ?? 'Agent'}
+                  chat={chat.data ?? []}
+                  pendingQuestion={ask.isPending ? ask.variables : undefined}
+                  onSend={(text) => ask.mutateAsync(text)}
+                  sending={ask.isPending}
+                  error={ask.error}
+                  canDecideProposal={(p) => !!user && (user.upn === p.requestedBy.upn || hasRole(me.data, 'admin'))}
+                  onDecideProposal={(messageId, decision) => decideProposal.mutateAsync({ messageId, decision })}
+                  decidingProposal={decideProposal.isPending ? decideProposal.variables?.messageId : undefined}
+                  proposalError={decideProposal.error}
+                  onOpenFile={setPreviewPath}
+                />
+              )}
+              {tab === 'activity' && (
+                <Stack spacing={3}>
+                  <Card>
+                    <CardHeader title="Activity timeline" subheader="From the Temporal event history" />
+                    <CardContent>{timeline.data ? <TimelineChart timeline={timeline.data} showLegend /> : timeline.isLoading ? <Loading /> : <ErrorAlert error={timeline.error} />}</CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader title="Steps" subheader={`${state.steps.length} step(s)`} />
+                    <CardContent sx={{ pt: 0 }}>
+                      {state.steps.length === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          No steps yet.
                         </Typography>
-                      </Stack>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
-                        {s.summary}
-                      </Typography>
-                      <KeyValueList
-                        dense
-                        items={[
-                          ['Step', s.stepId],
-                          ['Time', `${formatDateTime(s.startedAt)} → ${formatDateTime(s.endedAt)}`],
-                          ['Tokens', formatNumber(s.tokens)],
-                          [
-                            'Commit',
-                            s.commit ? (
-                              <Link component="button" onClick={() => setDiff(s.commit)} sx={{ fontFamily: 'monospace' }}>
-                                {s.commit.slice(0, 10)}
-                              </Link>
-                            ) : (
-                              '–'
-                            ),
-                          ],
-                          ['Files', s.filesTouched.length ? s.filesTouched.join(', ') : '–'],
-                          ['Transcript', s.artifacts.join(', ') || '–'],
-                        ]}
-                      />
-                    </AccordionDetails>
-                  </Accordion>
-                ))}
-              </CardContent>
-            </Card>
-            {/* Git details matter for audits, less for everyday work: collapsed by default */}
-            <Accordion disableGutters variant="outlined" sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
-              <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
-                <Stack>
-                  <Typography variant="subtitle1">Commits</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Git history of this task (with trailers){commits.data ? ` · ${commits.data.length} commit(s)` : ''}
-                  </Typography>
+                      )}
+                      {state.steps.map((s) => (
+                        <Accordion key={s.stepId} disableGutters variant="outlined" sx={{ mb: 1, '&:before': { display: 'none' } }}>
+                          <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ '& .MuiAccordionSummary-content': { minWidth: 0, overflow: 'hidden' } }}>
+                            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0, width: '100%' }}>
+                              <Chip size="small" label={s.kind} color={s.kind === 'plan' ? 'secondary' : s.kind === 'fix' ? 'warning' : 'primary'} />
+                              <Typography variant="body2" noWrap sx={{ minWidth: 0, flex: 1 }}>
+                                {s.summary}
+                              </Typography>
+                            </Stack>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                              {s.summary}
+                            </Typography>
+                            <KeyValueList
+                              dense
+                              items={[
+                                ['Step', s.stepId],
+                                ['Time', `${formatDateTime(s.startedAt)} → ${formatDateTime(s.endedAt)}`],
+                                ['Tokens', formatNumber(s.tokens)],
+                                [
+                                  'Commit',
+                                  s.commit ? (
+                                    <Link component="button" onClick={() => setDiff(s.commit)} sx={{ fontFamily: 'monospace' }}>
+                                      {s.commit.slice(0, 10)}
+                                    </Link>
+                                  ) : (
+                                    '–'
+                                  ),
+                                ],
+                                ['Files', s.filesTouched.length ? s.filesTouched.join(', ') : '–'],
+                                ['Transcript', s.artifacts.join(', ') || '–'],
+                              ]}
+                            />
+                          </AccordionDetails>
+                        </Accordion>
+                      ))}
+                    </CardContent>
+                  </Card>
                 </Stack>
-              </AccordionSummary>
-              <AccordionDetails sx={{ pt: 0 }}>{commits.data ? <CommitList commits={commits.data} dense /> : <Loading />}</AccordionDetails>
-            </Accordion>
+              )}
+              {tab === 'commits' && (
+                <Card>
+                  <CardHeader title="Commits" subheader="Git history of this task (with trailers)" />
+                  <CardContent sx={{ pt: 0 }}>{commits.data ? <CommitList commits={commits.data} dense /> : <Loading />}</CardContent>
+                </Card>
+              )}
+            </Box>
           </Stack>
         </Grid>
 
@@ -311,7 +332,12 @@ export function TaskDetailPage() {
               <CardContent sx={{ pt: 0 }}>
                 <KeyValueList
                   items={[
-                    ['Task id', <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{state.taskId}</Typography>],
+                    [
+                      'Task id',
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                        {state.taskId}
+                      </Typography>,
+                    ],
                     ['Requested by', `${state.requestedBy.name} (${state.requestedBy.upn})`],
                     ['Created', <RelativeTime iso={state.createdAt} />],
                     ['Approval', state.approval],
@@ -335,12 +361,19 @@ export function TaskDetailPage() {
                 )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader title="Instructions" />
-              <CardContent sx={{ pt: 0 }}>
+            <Accordion disableGutters variant="outlined" sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
+              <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ '& .MuiAccordionSummary-content': { minWidth: 0, overflow: 'hidden' } }}>
+                <Stack sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle1">Instructions</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {state.instructions.replace(/[#*`>_]/g, '').slice(0, 90)}
+                  </Typography>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails sx={{ pt: 0 }}>
                 <Markdown>{state.instructions}</Markdown>
-              </CardContent>
-            </Card>
+              </AccordionDetails>
+            </Accordion>
           </Stack>
         </Grid>
       </Grid>
@@ -348,9 +381,7 @@ export function TaskDetailPage() {
       <FilePreviewDialog path={previewPath} onClose={() => setPreviewPath(undefined)} />
       <ConfirmDialog
         open={!!pending}
-        title={
-          pending?.kind === 'approve' ? 'Approve' : pending?.kind === 'revise' ? 'Request changes' : pending?.kind === 'reject' ? 'Reject task' : 'Cancel task'
-        }
+        title={pending?.kind === 'approve' ? 'Approve' : pending?.kind === 'revise' ? 'Request changes' : pending?.kind === 'reject' ? 'Reject task' : 'Cancel task'}
         text={
           pending?.kind === 'approve'
             ? 'The agent will continue with the approved plan. Your decision is recorded with your identity.'
@@ -373,6 +404,48 @@ export function TaskDetailPage() {
       />
       <DiffDialog hash={diff} onClose={() => setDiff(undefined)} />
     </>
+  );
+}
+
+/** Where the task stands in its lifecycle: request, plan, approval (if required), run, verification, result. */
+function TaskStepper({ state }: { state: TaskState }) {
+  const withApproval = state.approval === 'plan';
+  const steps = ['Requested', 'Plan', ...(withApproval ? ['Approval'] : []), 'Run', 'Verify', 'Result'];
+  const at = (name: string) => steps.indexOf(name);
+  const byStatus: Record<string, number> = {
+    queued: 0,
+    planning: at('Plan'),
+    awaiting_approval: state.awaiting === 'deviation' ? at('Verify') : withApproval ? at('Approval') : at('Plan'),
+    running: at('Run'),
+    fixing: at('Run'),
+    awaiting_delegations: at('Run'),
+    verifying: at('Verify'),
+    finalizing: at('Result'),
+    completed: steps.length,
+  };
+  // a task that ended early stops at the step it reached
+  const reached = state.verify ? at('Verify') : state.steps.some((x) => x.kind !== 'plan') ? at('Run') : state.steps.length ? (withApproval ? at('Approval') : at('Plan')) : 0;
+  const active = byStatus[state.status] ?? reached;
+  const failed = isTerminalStatus(state.status) && state.status !== 'completed' ? active : undefined;
+  return (
+    <Stepper activeStep={active} alternativeLabel sx={{ mb: 3 }}>
+      {steps.map((x, i) => (
+        <Step key={x} completed={i < active}>
+          <StepLabel
+            error={failed === i}
+            optional={
+              failed === i ? (
+                <Typography variant="caption" color="error">
+                  {state.status.replace('_', ' ')}
+                </Typography>
+              ) : undefined
+            }
+          >
+            {x}
+          </StepLabel>
+        </Step>
+      ))}
+    </Stepper>
   );
 }
 
@@ -427,6 +500,4 @@ function DelegationsCard({ state }: { state: TaskState }) {
 }
 
 const a2aStatus = (s: string) =>
-  ({ completed: 'completed', failed: 'failed', canceled: 'cancelled', cancelled: 'cancelled', rejected: 'rejected', submitted: 'queued', working: 'running' })[
-    s.replace(/^TASK_STATE_/, '').toLowerCase()
-  ] ?? s.toLowerCase();
+  ({ completed: 'completed', failed: 'failed', canceled: 'cancelled', cancelled: 'cancelled', rejected: 'rejected', submitted: 'queued', working: 'running' })[s.replace(/^TASK_STATE_/, '').toLowerCase()] ?? s.toLowerCase();

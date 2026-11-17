@@ -17,6 +17,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { ConfirmDialog, EmptyState, ErrorAlert, Loading, PageHeader, RelativeTime } from '@cw/ui';
 import { api, type LiquidProcess } from '../api';
+import { SectionTabs } from '../components/Sections';
 
 /*
  * Business processes (ADR-0045): the holdable workflows of namespace `business`. Holding by ontology object (e.g.
@@ -54,14 +55,30 @@ function HoldDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [objects, setObjects] = useState('Supplier:S-NORDHOLZ');
   const [reason, setReason] = useState('');
   const hold = useMutation({
-    mutationFn: () => api.holdLiquidProcesses(objects.split(',').map((x) => x.trim()).filter(Boolean), reason),
+    mutationFn: () =>
+      api.holdLiquidProcesses(
+        objects
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
+        reason,
+      ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['liquid-processes'] });
       onClose();
     },
   });
   return (
-    <ConfirmDialog open={open} title="Hold processes by object" text="Every running workflow that touches one of these objects pauses at its next step. Holding is tightening; it never runs or skips a step." confirmLabel="Hold" busy={hold.isPending} error={hold.error} onConfirm={() => hold.mutate()} onClose={onClose}>
+    <ConfirmDialog
+      open={open}
+      title="Hold processes by object"
+      text="Every running workflow that touches one of these objects pauses at its next step. Holding is tightening; it never runs or skips a step."
+      confirmLabel="Hold"
+      busy={hold.isPending}
+      error={hold.error}
+      onConfirm={() => hold.mutate()}
+      onClose={onClose}
+    >
       <Stack spacing={2} sx={{ mt: 1 }}>
         <TextField label="Objects (Class:id, comma-separated)" value={objects} onChange={(e) => setObjects(e.target.value)} />
         <TextField label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Supplier under review after a delivery incident" />
@@ -80,11 +97,31 @@ function ApprovalCard({ p }: { p: LiquidProcess }) {
   const a = p.approval!;
   return (
     <Card variant="outlined">
-      <CardHeader title={<code>{a.request.action}</code>} subheader={<>requested by {a.request.caller.agent ?? '—'}{a.request.caller.user ? ` for ${a.request.caller.user}` : ''} · <RelativeTime iso={p.startTime} /></>} action={<Chip size="small" color={STATE_COLOR[a.state] ?? 'default'} label={a.state} />} />
+      <CardHeader
+        title={<code>{a.request.action}</code>}
+        subheader={
+          <>
+            requested by {a.request.caller.agent ?? '—'}
+            {a.request.caller.user ? ` for ${a.request.caller.user}` : ''} · <RelativeTime iso={p.startTime} />
+          </>
+        }
+        action={<Chip size="small" color={STATE_COLOR[a.state] ?? 'default'} label={a.state} />}
+      />
       <CardContent>
         <Stack spacing={1.5}>
           {a.request.reason && a.request.reason !== 'allowed' && <Typography variant="body2">{a.request.reason}</Typography>}
-          <Typography component="pre" variant="caption" sx={{ fontFamily: 'monospace', m: 0, p: 1, bgcolor: 'action.hover', borderRadius: 1, overflowX: 'auto' }}>
+          <Typography
+            component="pre"
+            variant="caption"
+            sx={{
+              fontFamily: 'monospace',
+              m: 0,
+              p: 1,
+              bgcolor: 'action.hover',
+              borderRadius: 1,
+              overflowX: 'auto',
+            }}
+          >
             {JSON.stringify(a.request.args, null, 2)}
           </Typography>
           <Objects objects={a.request.objects} />
@@ -148,18 +185,51 @@ function ProcessTable({ rows, recent }: { rows: LiquidProcess[]; recent?: boolea
   );
 }
 
+/** Long lists page in steps of 15 rows. */
+function Paged({ rows, recent }: { rows: LiquidProcess[]; recent?: boolean }) {
+  const [limit, setLimit] = useState(15);
+  return (
+    <>
+      <ProcessTable rows={rows.slice(0, limit)} recent={recent} />
+      {rows.length > limit && (
+        <CardContent sx={{ py: 1 }}>
+          <Button size="small" onClick={() => setLimit(limit + 25)}>
+            Show more ({rows.length - limit} more)
+          </Button>
+        </CardContent>
+      )}
+    </>
+  );
+}
+
 export function LiquidProcessesPage() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['liquid-processes'], queryFn: api.liquidProcesses, refetchInterval: 4000 });
+  const q = useQuery({
+    queryKey: ['liquid-processes'],
+    queryFn: api.liquidProcesses,
+    refetchInterval: 4000,
+  });
   const [holding, setHolding] = useState(false);
-  const release = useMutation({ mutationFn: (ref: string) => api.releaseLiquidHold(ref), onSuccess: () => void qc.invalidateQueries({ queryKey: ['liquid-processes'] }) });
+  const release = useMutation({
+    mutationFn: (ref: string) => api.releaseLiquidHold(ref),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['liquid-processes'] }),
+  });
   const d = q.data;
   const processes = d?.running.filter((p) => p.type !== 'ApprovalWorkflow' && p.type !== 'lakeFlush') ?? [];
   const approvals = d?.running.filter((p) => p.type === 'ApprovalWorkflow' && p.approval) ?? [];
   const holds = [...new Map(processes.flatMap((p) => p.hold?.holds ?? []).map((h) => [h.ref, h])).values()];
   return (
     <>
-      <PageHeader overline="Liquid enterprise" title="Business processes" subtitle="Durable, holdable workflows started by ontology events (Temporal namespace business). Hold by object, release, decide approvals." actions={<Button variant="contained" onClick={() => setHolding(true)}>Hold by object</Button>} />
+      <PageHeader
+        overline="Liquid enterprise"
+        title="Business processes"
+        subtitle="Decide approvals, hold and release running workflows by business object"
+        actions={
+          <Button variant="contained" onClick={() => setHolding(true)}>
+            Hold by object
+          </Button>
+        }
+      />
       {q.isLoading && <Loading />}
       <ErrorAlert error={q.error} title="Could not load the business processes" />
       <ErrorAlert error={release.error} title="Release failed" />
@@ -184,32 +254,55 @@ export function LiquidProcessesPage() {
             </Grid>
           )}
           <Grid size={12}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Approvals ({approvals.length})
-            </Typography>
-            {approvals.length === 0 ? (
-              <EmptyState title="No pending approvals" text="Four-eyes requests of the ontology server (ActionApprovalRequested) appear here as approval workflows." />
-            ) : (
-              <Grid container spacing={2}>
-                {approvals.map((p) => (
-                  <Grid key={p.workflowId} size={{ xs: 12, md: 6 }}>
-                    <ApprovalCard p={p} />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </Grid>
-          <Grid size={12}>
-            <Card variant="outlined">
-              <CardHeader title={`Running (${processes.length})`} subheader={`${d.held} held`} />
-              <CardContent>{processes.length === 0 ? <EmptyState title="No running processes" text="Creating a purchase order (create_purchase_order) starts a PurchaseOrderRelease workflow." /> : <ProcessTable rows={processes} />}</CardContent>
-            </Card>
-          </Grid>
-          <Grid size={12}>
-            <Card variant="outlined">
-              <CardHeader title="Recently closed" />
-              <CardContent>{d.recent.length === 0 ? <EmptyState title="Nothing closed yet" text="Completed, cancelled and failed workflows show up here." /> : <ProcessTable rows={d.recent} recent />}</CardContent>
-            </Card>
+            {/* three lists that were stacked are tabs; approvals first when any wait (UI review LIQ-05) */}
+            <SectionTabs
+              tabs={[
+                {
+                  id: 'approvals',
+                  label: 'Approvals',
+                  badge: approvals.length,
+                  badgeColor: 'warning',
+                  render: () =>
+                    approvals.length === 0 ? (
+                      <EmptyState title="No pending approvals" text="Four-eyes requests of the ontology server (ActionApprovalRequested) appear here as approval workflows." />
+                    ) : (
+                      <Grid container spacing={2}>
+                        {approvals.map((p) => (
+                          <Grid key={p.workflowId} size={{ xs: 12, md: 6 }}>
+                            <ApprovalCard p={p} />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    ),
+                },
+                {
+                  id: 'running',
+                  label: 'Running',
+                  badge: processes.length,
+                  render: () =>
+                    processes.length === 0 ? (
+                      <EmptyState title="No running processes" text="Creating a purchase order (create_purchase_order) starts a PurchaseOrderRelease workflow." />
+                    ) : (
+                      <Card variant="outlined">
+                        <CardHeader subheader={`${processes.length} running · ${d.held} held`} />
+                        <Paged rows={processes} />
+                      </Card>
+                    ),
+                },
+                {
+                  id: 'closed',
+                  label: 'Recently closed',
+                  render: () =>
+                    d.recent.length === 0 ? (
+                      <EmptyState title="Nothing closed yet" text="Completed, cancelled and failed workflows show up here." />
+                    ) : (
+                      <Card variant="outlined">
+                        <Paged rows={d.recent} recent />
+                      </Card>
+                    ),
+                },
+              ]}
+            />
           </Grid>
         </Grid>
       )}

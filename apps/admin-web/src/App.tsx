@@ -41,6 +41,7 @@ import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
 import RateReviewOutlined from '@mui/icons-material/RateReviewOutlined';
 import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
 import { WikiPage } from './pages/WikiPage';
+import { RoleViewSwitch, forView, useRoleView } from './components/Sections';
 
 export function App() {
   const me = useMe();
@@ -51,30 +52,46 @@ export function App() {
   // Installed extensions (ADR-0039) add their pages under their own nav group while they are available
   const extensions = useQuery({ queryKey: ['extensions'], queryFn: api.extensions, enabled: !!me.data, staleTime: 15_000 });
   const liquid = extensions.data?.find((e) => e.id === 'liquid');
-  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined />, '/liquid/ontology': <HubOutlined />, '/liquid/policies': <GavelOutlined />, '/liquid/processes': <AccountTreeOutlined />, '/liquid/proposals': <RateReviewOutlined />, '/liquid/playbooks': <ShieldOutlined />, '/liquid/events': <ReceiptLongOutlined />, '/liquid/approvals': <InboxOutlined />, '/liquid/apps': <AppsOutlined /> };
-  const nav = [
-    { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
-    { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
-    { label: 'Safety & tools', icon: <ShieldOutlined />, to: '/safety' },
-    { label: 'Company wiki', icon: <MenuBookOutlined />, to: '/wiki' },
-    ...(signals.data?.available ? [{ label: 'Signals', icon: <SensorsOutlined />, to: '/signals' }] : []),
-    { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail' },
-    { label: 'Users & access', icon: <GroupOutlined />, to: '/users' },
-    { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit' },
-    { label: 'Extensions', icon: <ExtensionOutlined />, to: '/extensions' },
-    ...(liquid?.available ? liquid.uiRoutes.map((r) => ({ label: r.label, icon: LIQUID_ICONS[r.path] ?? <WaterDropOutlined />, to: r.path, group: 'Liquid enterprise' })) : []),
-  ].map((n) => ({ ...n, selected: pathname === n.to || (n.to !== '/liquid' && pathname.startsWith(`${n.to}/`)), onClick: () => navigate(n.to) }));
+  const LIQUID_ICONS: Record<string, React.ReactNode> = {
+    '/liquid': <WaterDropOutlined />,
+    '/liquid/ontology': <HubOutlined />,
+    '/liquid/policies': <GavelOutlined />,
+    '/liquid/processes': <AccountTreeOutlined />,
+    '/liquid/proposals': <RateReviewOutlined />,
+    '/liquid/playbooks': <ShieldOutlined />,
+    '/liquid/events': <ReceiptLongOutlined />,
+    '/liquid/approvals': <InboxOutlined />,
+    '/liquid/apps': <AppsOutlined />,
+  };
+  const { view } = useRoleView();
+  // navigation by task and role (UI review): IT Engineer = platform, security, configuration; Business Engineer =
+  // business model, processes, approvals, knowledge. "All" shows everything. Order and groups stay the same in every view.
+  type Item = { label: string; icon: React.ReactNode; to: string; group: string; roles?: Array<'it' | 'business'> };
+  const LIQUID_ROLES: Record<string, Array<'it' | 'business'> | undefined> = { '/liquid/ontology': ['business'], '/liquid/processes': ['business'], '/liquid/policies': ['it'], '/liquid/playbooks': ['it'], '/liquid/events': ['it'] };
+  const items: Item[] = [
+    { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard', group: 'Overview' },
+    { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents', group: 'Agents and people' },
+    { label: 'Users & access', icon: <GroupOutlined />, to: '/users', group: 'Agents and people', roles: ['it'] },
+    { label: 'Company wiki', icon: <MenuBookOutlined />, to: '/wiki', group: 'Knowledge', roles: ['business'] },
+    ...(signals.data?.available ? [{ label: 'Signals', icon: <SensorsOutlined />, to: '/signals', group: 'Knowledge', roles: ['business'] } as Item] : []),
+    { label: 'Safety & tools', icon: <ShieldOutlined />, to: '/safety', group: 'Security and operations', roles: ['it'] },
+    { label: 'Audit log', icon: <HistoryEduOutlined />, to: '/audit', group: 'Security and operations', roles: ['it'] },
+    { label: 'Mail outbox', icon: <MailOutlined />, to: '/mail', group: 'Security and operations', roles: ['it'] },
+    { label: 'Extensions', icon: <ExtensionOutlined />, to: '/extensions', group: 'Security and operations', roles: ['it'] },
+    ...(liquid?.available ? liquid.uiRoutes.map((r) => ({ label: r.label, icon: LIQUID_ICONS[r.path] ?? <WaterDropOutlined />, to: r.path, group: 'Liquid enterprise', roles: LIQUID_ROLES[r.path] })) : []),
+  ];
+  const nav = items.filter((n) => forView(view, n.roles)).map((n) => ({ ...n, selected: pathname === n.to || (n.to !== '/liquid' && pathname.startsWith(`${n.to}/`)), onClick: () => navigate(n.to) }));
 
   return (
     <AppShell
       product="Coworking Agents"
       context="Admin console · control plane"
-      navTitle="Platform"
       nav={nav}
       user={me.data?.user}
       actions={
         me.data ? (
           <>
+            <RoleViewSwitch />
             <GlobalKillSwitch />
             <Button size="small" endIcon={<OpenInNewOutlined />} href={me.data.temporalUiUrl} target="_blank" rel="noreferrer" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
               Temporal UI

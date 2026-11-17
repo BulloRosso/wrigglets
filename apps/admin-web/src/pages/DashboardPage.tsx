@@ -6,7 +6,6 @@ import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
-import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -21,6 +20,7 @@ import { AgentPortrait, EmptyState, ErrorAlert, KillSwitchChip, Loading, PageHea
 import { api, avatarSrc } from '../api';
 import { AiGatewayCard, AiNotConfiguredAlert } from '../components/Ai';
 import { SecurityAlertBanner } from '../components/Security';
+import { Section, forView, useRoleView } from '../components/Sections';
 
 function Metric({ label, value, tone }: { label: string; value: ReactNode; tone?: 'warning' | 'error' | 'success' }) {
   return (
@@ -47,50 +47,82 @@ function Service({ icon, title, state, detail }: { icon: ReactNode; title: strin
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const overview = useQuery({ queryKey: ['overview'], queryFn: api.overview, refetchInterval: 10_000 });
-  const agents = useQuery({ queryKey: ['agents'], queryFn: () => api.agents(true), refetchInterval: 10_000 });
-  const tasks = useQuery({ queryKey: ['tasks', 'all'], queryFn: () => api.tasks({ limit: 15 }), refetchInterval: 10_000 });
+  const overview = useQuery({
+    queryKey: ['overview'],
+    queryFn: api.overview,
+    refetchInterval: 10_000,
+  });
+  const agents = useQuery({
+    queryKey: ['agents'],
+    queryFn: () => api.agents(true),
+    refetchInterval: 10_000,
+  });
+  const tasks = useQuery({
+    queryKey: ['tasks', 'all'],
+    queryFn: () => api.tasks({ limit: 10 }),
+    refetchInterval: 10_000,
+  });
   const o = overview.data;
+  const { view } = useRoleView();
+  const it = forView(view, ['it']);
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="State of the platform: Temporal, identity provider, agent runtime and the work of all agents." />
-      <SecurityAlertBanner />
+      <PageHeader title="Dashboard" subtitle="What needs attention: agents, their work and approvals" />
+      {forView(view, ['it']) && <SecurityAlertBanner />}
       <AiNotConfiguredAlert />
       <ErrorAlert error={overview.error} />
       {!o ? (
         <Loading />
       ) : (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Service icon={<HubOutlined color="primary" />} title="Temporal" state={o.temporal.state} detail={`${o.temporal.address} · ${o.temporal.namespace}${o.temporal.version ? ` · v${o.temporal.version}` : ''}`} />
+        <>
+          {/* what needs attention first: one row of numbers (UI review ADM-01) */}
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid size={{ xs: 6, md: 'grow' }}>
+              <Metric label="Agents running" value={`${o.agents.running}/${o.agents.total}`} />
+            </Grid>
+            <Grid size={{ xs: 6, md: 'grow' }}>
+              <Metric label="Open tasks" value={o.tasks.open} />
+            </Grid>
+            <Grid size={{ xs: 6, md: 'grow' }}>
+              <Metric label="Awaiting approval" value={o.tasks.awaitingApproval} tone={o.tasks.awaitingApproval ? 'warning' : undefined} />
+            </Grid>
+            <Grid size={{ xs: 6, md: 'grow' }}>
+              <Metric label="Completed (24 h)" value={o.tasks.completed24h} tone="success" />
+            </Grid>
+            <Grid size={{ xs: 12, md: 'grow' }}>
+              <Metric label="Failed (24 h)" value={o.tasks.failed24h} tone={o.tasks.failed24h ? 'error' : undefined} />
+            </Grid>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Service icon={<KeyOutlined color="primary" />} title="OAuth server" state={o.oauth.state} detail={o.oauth.issuer} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Service icon={<DnsOutlined color="primary" />} title={`Runtime (${o.runtime.kind})`} state={o.runtime.state} detail={o.runtime.detail} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 2 }}>
-            <Metric label="Agents" value={`${o.agents.running}/${o.agents.total}`} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 2 }}>
-            <Metric label="Open tasks" value={o.tasks.open} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <Metric label="Awaiting approval" value={o.tasks.awaitingApproval} tone={o.tasks.awaitingApproval ? 'warning' : undefined} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 2.5 }}>
-            <Metric label="Completed (24 h)" value={o.tasks.completed24h} tone="success" />
-          </Grid>
-          <Grid size={{ xs: 12, md: 2.5 }}>
-            <Metric label="Failed (24 h)" value={o.tasks.failed24h} tone={o.tasks.failed24h ? 'error' : undefined} />
-          </Grid>
-        </Grid>
+          {forView(view, ['it']) && (
+            <Stack spacing={1} sx={{ mb: 3 }}>
+              <Section
+                title="Platform services"
+                summary={(() => {
+                  const down = [o.temporal, o.oauth, o.runtime].filter((x) => x.state !== 'up').length;
+                  return down ? `${down} of 3 need attention` : `Temporal, OAuth server and ${o.runtime.kind} runtime are up`;
+                })()}
+                defaultOpen={[o.temporal, o.oauth, o.runtime].some((x) => x.state !== 'up')}
+              >
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Service icon={<HubOutlined color="primary" />} title="Temporal" state={o.temporal.state} detail={`${o.temporal.address} · ${o.temporal.namespace}${o.temporal.version ? ` · v${o.temporal.version}` : ''}`} />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Service icon={<KeyOutlined color="primary" />} title="OAuth server" state={o.oauth.state} detail={o.oauth.issuer} />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Service icon={<DnsOutlined color="primary" />} title={`Runtime (${o.runtime.kind})`} state={o.runtime.state} detail={o.runtime.detail} />
+                  </Grid>
+                </Grid>
+              </Section>
+              <Section title="AI gateway and spend" summary="Models, budgets and token use of all agents">
+                <AiGatewayCard />
+              </Section>
+            </Stack>
+          )}
+        </>
       )}
-      <Box sx={{ mb: 3 }}>
-        <AiGatewayCard />
-      </Box>
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, xl: 5 }}>
@@ -105,7 +137,7 @@ export function DashboardPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Agent</TableCell>
-                    <TableCell>Container</TableCell>
+                    {it && <TableCell>Container</TableCell>}
                     <TableCell>Health</TableCell>
                     <TableCell>Working on</TableCell>
                   </TableRow>
@@ -127,13 +159,13 @@ export function DashboardPage() {
                           {a.killSwitch && <KillSwitchChip level={a.killSwitch.level} reason={a.killSwitch.entry?.reason} source={a.killSwitch.source === 'global' ? 'global' : 'agent'} />}
                         </Stack>
                       </TableCell>
-                      <TableCell>
-                        <StatusChip status={a.runtime.state} />
-                      </TableCell>
+                      {it && (
+                        <TableCell>
+                          <StatusChip status={a.runtime.state} />
+                        </TableCell>
+                      )}
                       <TableCell>{a.health ? <StatusChip status={a.health.status} /> : '–'}</TableCell>
-                      <TableCell>
-                        {a.lock?.holder ? <Chip size="small" color="info" label={`busy · ${a.lock.waiting.length} waiting`} /> : <Chip size="small" variant="outlined" label="idle" />}
-                      </TableCell>
+                      <TableCell>{a.lock?.holder ? <Chip size="small" color="info" label={`busy · ${a.lock.waiting.length} waiting`} /> : <Chip size="small" variant="outlined" label="idle" />}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -166,7 +198,17 @@ export function DashboardPage() {
                       <TableRow key={t.taskId} hover>
                         <TableCell>
                           {agent ? (
-                            <Typography component="a" variant="body2" href={`${agent.url}/tasks/${encodeURIComponent(t.taskId)}`} target="_blank" rel="noreferrer" sx={{ color: 'primary.main', textDecoration: 'none' }}>
+                            <Typography
+                              component="a"
+                              variant="body2"
+                              href={`${agent.url}/tasks/${encodeURIComponent(t.taskId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              sx={{
+                                color: 'primary.main',
+                                textDecoration: 'none',
+                              }}
+                            >
                               {t.title}
                             </Typography>
                           ) : (

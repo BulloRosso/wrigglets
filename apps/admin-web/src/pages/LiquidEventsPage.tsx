@@ -14,6 +14,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { EmptyState, ErrorAlert, Loading, PageHeader, RelativeTime } from '@cw/ui';
+import { usePaged } from '../components/Sections';
 import { api, type LiquidEvent } from '../api';
 
 /*
@@ -55,6 +56,7 @@ export function LiquidEventsPage() {
   const [text, setText] = useState('');
   const [open, setOpen] = useState<number | undefined>();
   const q = useQuery({ queryKey: ['liquid-events', type, actor, text], queryFn: () => api.liquidEvents({ types: type, actor, q: text, limit: '200' }), refetchInterval: 5000 });
+  const paged = usePaged(q.data?.events ?? [], 25);
   return (
     <>
       <PageHeader overline="Liquid enterprise" title="Event log" subtitle="One store for everything that happened: business events, policy decisions, approvals, playbook steps, reconcile runs, admin actions, tool calls, agent audit." />
@@ -87,7 +89,7 @@ export function LiquidEventsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {q.data.events.map((e) => (
+              {paged.rows.map((e) => (
                 <Fragment key={e.seq}>
                   <TableRow hover onClick={() => setOpen(open === e.seq ? undefined : e.seq)} sx={{ cursor: 'pointer' }}>
                     <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{e.seq}</TableCell>
@@ -121,6 +123,7 @@ export function LiquidEventsPage() {
             </TableBody>
           </Table>
         )}
+        {paged.pager}
       </Card>
     </>
   );

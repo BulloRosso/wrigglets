@@ -7,6 +7,9 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import Stepper from '@mui/material/Stepper';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
@@ -29,6 +32,7 @@ import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import SyncOutlined from '@mui/icons-material/SyncOutlined';
 import { ConfirmDialog, ErrorAlert, Loading, PageHeader, RelativeTime } from '@cw/ui';
 import type { ExtensionStatus } from '../api';
+import { Section } from '../components/Sections';
 import { api } from '../api';
 
 /*
@@ -44,7 +48,13 @@ const PHASE: Record<ExtensionStatus['phase'], { label: string; color: 'default' 
   uninstalling: { label: 'uninstalling…', color: 'info' },
 };
 
-const SERVICE_COLOR = { running: 'success', starting: 'info', unhealthy: 'error', stopped: 'warning', missing: 'default' } as const;
+const SERVICE_COLOR = {
+  running: 'success',
+  starting: 'info',
+  unhealthy: 'error',
+  stopped: 'warning',
+  missing: 'default',
+} as const;
 
 function StepIcon({ state }: { state: string }) {
   if (state === 'done') return <CheckCircleOutline fontSize="small" color="success" />;
@@ -54,44 +64,66 @@ function StepIcon({ state }: { state: string }) {
   return <HourglassEmptyOutlined fontSize="small" color="disabled" />;
 }
 
+/** The install/repair/uninstall steps as a vertical stepper; a finished, successful operation folds away (UI review ADM-09). */
 function Operation({ ext }: { ext: ExtensionStatus }) {
   const op = ext.operation;
   if (!op) return null;
-  const done = op.steps.filter((s) => s.state === 'done').length;
   const busy = !op.finishedAt;
-  return (
-    <Box>
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        Last operation: {op.kind} by {op.by} · started <RelativeTime iso={op.startedAt} />
-        {op.finishedAt && (
-          <>
-            {' '}
-            · finished <RelativeTime iso={op.finishedAt} />
-          </>
-        )}
-      </Typography>
-      {busy && <LinearProgress variant="determinate" value={(done / Math.max(op.steps.length, 1)) * 100} sx={{ mb: 1 }} />}
-      <Stack spacing={0.5}>
-        {op.steps.map((s) => (
-          <Stack key={s.id} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-            <StepIcon state={s.state} />
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="body2">{s.label}</Typography>
-              {s.error && (
+  const failedAt = op.steps.findIndex((s) => s.state === 'failed');
+  const activeAt = op.steps.findIndex((s) => s.state === 'running' || s.state === 'pending');
+  const active = failedAt >= 0 ? failedAt : activeAt >= 0 ? activeAt : op.steps.length;
+  const steps = (
+    <Stepper orientation="vertical" activeStep={active} sx={{ '& .MuiStepLabel-root': { py: 0.25 } }}>
+      {op.steps.map((s) => (
+        <Step key={s.id} completed={s.state === 'done'}>
+          <StepLabel
+            error={s.state === 'failed'}
+            icon={<StepIcon state={s.state} />}
+            optional={
+              s.error ? (
                 <Typography variant="caption" color="error" sx={{ wordBreak: 'break-word' }}>
                   {s.error}
                 </Typography>
-              )}
-            </Box>
-          </Stack>
-        ))}
-      </Stack>
-    </Box>
+              ) : s.state === 'skipped' ? (
+                <Typography variant="caption" color="text.secondary">
+                  skipped
+                </Typography>
+              ) : undefined
+            }
+          >
+            {s.label}
+          </StepLabel>
+        </Step>
+      ))}
+    </Stepper>
+  );
+  const title = `Last operation: ${op.kind} by ${op.by}`;
+  const summary = (
+    <>
+      started <RelativeTime iso={op.startedAt} />
+      {op.finishedAt && (
+        <>
+          {' '}
+          · finished <RelativeTime iso={op.finishedAt} />
+        </>
+      )}{' '}
+      · {op.steps.filter((s) => s.state === 'done').length} of {op.steps.length} steps done
+    </>
+  );
+  return (
+    <Section title={title} summary={summary} defaultOpen={busy || failedAt >= 0}>
+      {busy && <LinearProgress variant="determinate" value={(op.steps.filter((s) => s.state === 'done').length / Math.max(op.steps.length, 1)) * 100} sx={{ mb: 1 }} />}
+      {steps}
+    </Section>
   );
 }
 
 function LogsDialog({ ext, service, onClose }: { ext: string; service?: string; onClose: () => void }) {
-  const logs = useQuery({ queryKey: ['extension-logs', ext, service], queryFn: () => api.extensionLogs(ext, service!), enabled: !!service });
+  const logs = useQuery({
+    queryKey: ['extension-logs', ext, service],
+    queryFn: () => api.extensionLogs(ext, service!),
+    enabled: !!service,
+  });
   return (
     <Dialog open={!!service} onClose={onClose} fullWidth maxWidth="lg">
       <DialogTitle>Logs · {service}</DialogTitle>
@@ -99,7 +131,20 @@ function LogsDialog({ ext, service, onClose }: { ext: string; service?: string; 
         {logs.isLoading && <Loading />}
         <ErrorAlert error={logs.error} title="Could not load the logs" />
         {logs.data !== undefined && (
-          <Box component="pre" sx={{ m: 0, p: 1.5, bgcolor: 'action.hover', borderRadius: 1, fontSize: 12, maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          <Box
+            component="pre"
+            sx={{
+              m: 0,
+              p: 1.5,
+              bgcolor: 'action.hover',
+              borderRadius: 1,
+              fontSize: 12,
+              maxHeight: '60vh',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
             {logs.data || '(no output)'}
           </Box>
         )}
@@ -122,9 +167,18 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
     setDialog(undefined);
     void qc.invalidateQueries({ queryKey: ['extensions'] });
   };
-  const install = useMutation({ mutationFn: () => api.installExtension(ext.id, seedDemo), onSuccess: done });
-  const uninstall = useMutation({ mutationFn: () => api.uninstallExtension(ext.id, purgeData), onSuccess: done });
-  const repair = useMutation({ mutationFn: () => api.repairExtension(ext.id), onSuccess: done });
+  const install = useMutation({
+    mutationFn: () => api.installExtension(ext.id, seedDemo),
+    onSuccess: done,
+  });
+  const uninstall = useMutation({
+    mutationFn: () => api.uninstallExtension(ext.id, purgeData),
+    onSuccess: done,
+  });
+  const repair = useMutation({
+    mutationFn: () => api.repairExtension(ext.id),
+    onSuccess: done,
+  });
 
   const busy = ext.phase === 'installing' || ext.phase === 'uninstalling';
   const phase = PHASE[ext.phase];
@@ -159,51 +213,52 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
           {ext.blockedReason && ext.phase !== 'installed' && <Alert severity="warning">{ext.blockedReason}</Alert>}
           {ext.phase === 'installed' && !ext.available && <Alert severity="warning">Not every service is running. Its pages are hidden until it is healthy again; “Repair” re-creates missing or changed containers.</Alert>}
 
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Service</TableCell>
-                <TableCell>Image</TableCell>
-                <TableCell>State</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {ext.services.map((s) => (
-                <TableRow key={s.name}>
-                  <TableCell>
-                    <Typography variant="body2">{s.name}</Typography>
-                    {s.description && (
-                      <Typography variant="caption" color="text.secondary">
-                        {s.description}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {s.image}
-                    </Typography>
-                    {s.imagePresent === false && <Chip size="small" color={s.local ? 'warning' : 'default'} variant="outlined" label={s.local ? 'not built' : 'will be pulled'} sx={{ ml: 1 }} />}
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="small" color={SERVICE_COLOR[s.state]} label={s.state} title={s.detail} />
-                  </TableCell>
-                  <TableCell align="right">
-                    {s.state !== 'missing' && (
-                      <Button size="small" onClick={() => setLogsFor(s.name)}>
-                        Logs
-                      </Button>
-                    )}
-                  </TableCell>
+          <Section
+            title="Services"
+            summary={`${ext.services.filter((x) => x.state === 'running').length} of ${ext.services.length} running${ext.upstreams.length ? ` · gateway upstreams ${ext.upstreams.join(', ')}` : ''}`}
+            defaultOpen={ext.phase !== 'not_installed' && ext.services.some((x) => x.state !== 'running')}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Service</TableCell>
+                  <TableCell>Image</TableCell>
+                  <TableCell>State</TableCell>
+                  <TableCell />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {ext.upstreams.length > 0 && (
-            <Typography variant="body2">
-              Gateway upstreams owned by this extension: {ext.upstreams.map((u) => <Chip key={u} size="small" label={u} sx={{ mr: 0.5 }} />)}
-            </Typography>
-          )}
+              </TableHead>
+              <TableBody>
+                {ext.services.map((s) => (
+                  <TableRow key={s.name}>
+                    <TableCell>
+                      <Typography variant="body2">{s.name}</Typography>
+                      {s.description && (
+                        <Typography variant="caption" color="text.secondary">
+                          {s.description}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                        {s.image}
+                      </Typography>
+                      {s.imagePresent === false && <Chip size="small" color={s.local ? 'warning' : 'default'} variant="outlined" label={s.local ? 'not built' : 'will be pulled'} sx={{ ml: 1 }} />}
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="small" color={SERVICE_COLOR[s.state]} label={s.state} title={s.detail} />
+                    </TableCell>
+                    <TableCell align="right">
+                      {s.state !== 'missing' && (
+                        <Button size="small" onClick={() => setLogsFor(s.name)}>
+                          Logs
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Section>
           <Operation ext={ext} />
         </Stack>
       </CardContent>
@@ -223,7 +278,7 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
             Uninstall
           </Button>
         )}
-        </CardActions>
+      </CardActions>
 
       <ConfirmDialog
         open={dialog === 'install'}
@@ -266,7 +321,11 @@ function ExtensionCard({ ext }: { ext: ExtensionStatus }) {
 }
 
 function SignalsCard() {
-  const signals = useQuery({ queryKey: ['signals-available'], queryFn: api.signalsAvailable, staleTime: 60_000 });
+  const signals = useQuery({
+    queryKey: ['signals-available'],
+    queryFn: api.signalsAvailable,
+    staleTime: 60_000,
+  });
   return (
     <Card variant="outlined">
       <CardHeader
@@ -300,7 +359,9 @@ export function ExtensionsPage() {
       {list.isLoading && <Loading />}
       <ErrorAlert error={list.error} title="Could not load the extensions" />
       <Stack spacing={3}>
-        {list.data?.map((e) => <ExtensionCard key={e.id} ext={e} />)}
+        {list.data?.map((e) => (
+          <ExtensionCard key={e.id} ext={e} />
+        ))}
         <SignalsCard />
       </Stack>
     </>

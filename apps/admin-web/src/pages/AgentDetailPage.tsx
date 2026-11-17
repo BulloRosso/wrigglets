@@ -13,13 +13,11 @@ import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
-import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -31,28 +29,13 @@ import CloudSyncOutlined from '@mui/icons-material/CloudSyncOutlined';
 import PauseOutlined from '@mui/icons-material/PauseOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
 import { ALL_AGENT_ROLES, type AgentStats, type AgentSummary } from '@cw/shared';
-import {
-  AgentPortrait,
-  AgentsMdEditor,
-  ConfirmDialog,
-  KillSwitchChip,
-  EmptyState,
-  ErrorAlert,
-  KeyValueList,
-  Loading,
-  PageHeader,
-  RelativeTime,
-  Sparkline,
-  StatusChip,
-  formatBytes,
-  formatDateTime,
-  formatRelative,
-} from '@cw/ui';
+import { AgentPortrait, AgentsMdEditor, ConfirmDialog, KillSwitchChip, EmptyState, ErrorAlert, KeyValueList, Loading, PageHeader, RelativeTime, Sparkline, StatusChip, formatBytes, formatDateTime, formatRelative } from '@cw/ui';
 import { api, avatarSrc, useMe } from '../api';
 import { CollaborationTab, PortraitTab, SafetyTab } from '../components/AgentTabs';
 import { AiBudgetTab } from '../components/AiBudgetTab';
 import { IdentityTab } from '../components/IdentityTab';
 import { SignalsTab } from '../components/SignalsTab';
+import { SectionTabs } from '../components/Sections';
 
 function Overview({ a }: { a: AgentSummary }) {
   const h = a.health;
@@ -65,8 +48,18 @@ function Overview({ a }: { a: AgentSummary }) {
             <KeyValueList
               items={[
                 ['Agent id', a.spec.agentId],
-                ['URL', <Link href={a.url} target="_blank" rel="noreferrer">{a.url}</Link>],
-                ['Image', <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{a.spec.image}</Typography>],
+                [
+                  'URL',
+                  <Link href={a.url} target="_blank" rel="noreferrer">
+                    {a.url}
+                  </Link>,
+                ],
+                [
+                  'Image',
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                    {a.spec.image}
+                  </Typography>,
+                ],
                 ['Model', a.spec.model],
                 ['Resources', `${a.spec.resources.cpus} CPU · ${a.spec.resources.memoryMb} MB`],
                 ['Container', `${a.runtime.containerId ?? '–'} · ${a.runtime.detail}`],
@@ -94,7 +87,8 @@ function Overview({ a }: { a: AgentSummary }) {
                 />
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Health endpoint not reachable{a.runtime.state === 'starting' ? ' yet (starting)' : ''}.
+                  Health endpoint not reachable
+                  {a.runtime.state === 'starting' ? ' yet (starting)' : ''}.
                 </Typography>
               )}
             </CardContent>
@@ -125,7 +119,11 @@ function Overview({ a }: { a: AgentSummary }) {
 
 function Monitoring({ agentId }: { agentId: string }) {
   const [samples, setSamples] = useState<AgentStats[]>([]);
-  const q = useQuery({ queryKey: ['stats', agentId], queryFn: () => api.stats(agentId), refetchInterval: 3_000 });
+  const q = useQuery({
+    queryKey: ['stats', agentId],
+    queryFn: () => api.stats(agentId),
+    refetchInterval: 3_000,
+  });
   useEffect(() => {
     if (q.data) setSamples((s) => [...s.filter((x) => x.at !== q.data!.at), q.data!].slice(-60));
   }, [q.data]);
@@ -187,9 +185,27 @@ function Logs({ agentId }: { agentId: string }) {
         </Button>
         <Button onClick={() => setLines([])}>Clear</Button>
       </Stack>
-      <Box ref={box} sx={{ height: '60vh', overflow: 'auto', bgcolor: '#0b0f14', color: '#d6e2f0', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12, p: 1.5 }}>
+      <Box
+        ref={box}
+        sx={{
+          height: '60vh',
+          overflow: 'auto',
+          bgcolor: '#0b0f14',
+          color: '#d6e2f0',
+          fontFamily: 'ui-monospace, Consolas, monospace',
+          fontSize: 12,
+          p: 1.5,
+        }}
+      >
         {shown.map((l, i) => (
-          <Box key={i} sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: l.stream === 'stderr' ? '#ff9e9e' : undefined }}>
+          <Box
+            key={i}
+            sx={{
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+              color: l.stream === 'stderr' ? '#ff9e9e' : undefined,
+            }}
+          >
             {l.line}
           </Box>
         ))}
@@ -200,7 +216,11 @@ function Logs({ agentId }: { agentId: string }) {
 }
 
 function Tasks({ a }: { a: AgentSummary }) {
-  const q = useQuery({ queryKey: ['tasks', a.spec.agentId], queryFn: () => api.tasks({ agentId: a.spec.agentId, limit: 50 }), refetchInterval: 10_000 });
+  const q = useQuery({
+    queryKey: ['tasks', a.spec.agentId],
+    queryFn: () => api.tasks({ agentId: a.spec.agentId, limit: 50 }),
+    refetchInterval: 10_000,
+  });
   if (q.isLoading) return <Loading />;
   if (!q.data?.length) return <EmptyState title="No tasks yet" />;
   return (
@@ -243,7 +263,10 @@ function Tasks({ a }: { a: AgentSummary }) {
 
 function Access({ agentId }: { agentId: string }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['access', agentId], queryFn: () => api.access(agentId) });
+  const q = useQuery({
+    queryKey: ['access', agentId],
+    queryFn: () => api.access(agentId),
+  });
   const set = useMutation({
     mutationFn: ({ userId, roles }: { userId: string; roles: string[] }) => api.setAccess(agentId, userId, roles),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['access', agentId] }),
@@ -255,8 +278,8 @@ function Access({ agentId }: { agentId: string }) {
         title="Who may use this agent"
         subheader={
           <>
-            Roles are issued in the <code>roles</code> claim of the ID token for this agent's OIDC client. Changes apply at the next sign-in. Inherited roles come from “all agents” assignments or the
-            Platform.Admin role. Manage people on the <RouterLink to="/users">Users</RouterLink> page.
+            Roles are issued in the <code>roles</code> claim of the ID token for this agent's OIDC client. Changes apply at the next sign-in. Inherited roles come from “all agents” assignments or the Platform.Admin role. Manage people on
+            the <RouterLink to="/users">Users</RouterLink> page.
           </>
         }
       />
@@ -316,10 +339,19 @@ function Settings({ a }: { a: AgentSummary }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const images = useQuery({ queryKey: ['images'], queryFn: api.images });
-  const [f, setF] = useState({ displayName: a.spec.displayName, description: a.spec.description ?? '', image: a.spec.image, cpus: a.spec.resources.cpus, memoryMb: a.spec.resources.memoryMb });
+  const [f, setF] = useState({
+    displayName: a.spec.displayName,
+    description: a.spec.description ?? '',
+    image: a.spec.image,
+    cpus: a.spec.resources.cpus,
+    memoryMb: a.spec.resources.memoryMb,
+  });
   const [deleting, setDeleting] = useState(false);
   const [purge, setPurge] = useState(false);
-  const save = useMutation({ mutationFn: () => api.updateAgent(a.spec.agentId, f), onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent', a.spec.agentId] }) });
+  const save = useMutation({
+    mutationFn: () => api.updateAgent(a.spec.agentId, f),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent', a.spec.agentId] }),
+  });
   const del = useMutation({
     mutationFn: () => api.deleteAgent(a.spec.agentId, purge, true),
     onSuccess: () => {
@@ -398,7 +430,10 @@ function Settings({ a }: { a: AgentSummary }) {
 }
 
 function AgentAudit({ agentId }: { agentId: string }) {
-  const q = useQuery({ queryKey: ['audit', agentId], queryFn: () => api.audit(agentId) });
+  const q = useQuery({
+    queryKey: ['audit', agentId],
+    queryFn: () => api.audit(agentId),
+  });
   if (q.isLoading) return <Loading />;
   if (!q.data?.length) return <EmptyState title="No admin actions recorded" />;
   return (
@@ -427,14 +462,15 @@ function AgentAudit({ agentId }: { agentId: string }) {
   );
 }
 
-const TABS = ['Overview', 'Monitoring', 'Logs', 'Tasks', 'Access', 'AI & budget', 'Identity', 'Portrait', 'Collaboration', 'Safety', 'Signals', 'Instructions', 'Settings', 'Audit'] as const;
-
 export function AgentDetailPage() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const me = useMe();
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Overview');
-  const q = useQuery({ queryKey: ['agent', id], queryFn: () => api.agent(id), refetchInterval: 5_000 });
+  const q = useQuery({
+    queryKey: ['agent', id],
+    queryFn: () => api.agent(id),
+    refetchInterval: 5_000,
+  });
   const action = useMutation({
     mutationFn: (act: 'start' | 'stop' | 'restart' | 'redeploy') => api.agentAction(id, act),
     onSettled: () => void qc.invalidateQueries({ queryKey: ['agent', id] }),
@@ -447,7 +483,11 @@ export function AgentDetailPage() {
   return (
     <>
       <PageHeader
-        overline={<Link component={RouterLink} to="/agents">Agents</Link>}
+        overline={
+          <Link component={RouterLink} to="/agents">
+            Agents
+          </Link>
+        }
         title={
           <Stack component="span" direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <AgentPortrait src={avatarSrc(a.spec.agentId)} mood={a.killSwitch && a.killSwitch.level !== 'normal' ? 'fearful' : 'neutral'} name={a.spec.displayName} size={64} version={a.avatarVersion} />
@@ -490,28 +530,110 @@ export function AgentDetailPage() {
         }
       />
       <ErrorAlert error={action.error} />
-      <Tabs value={tab} onChange={(_, v: (typeof TABS)[number]) => setTab(v)} variant="scrollable" sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
-        {TABS.map((t) => (
-          <Tab key={t} value={t} label={t} />
-        ))}
-      </Tabs>
-      {tab === 'Overview' && <Overview a={a} />}
-      {tab === 'Monitoring' && <Monitoring agentId={id} />}
-      {tab === 'Logs' && <Logs agentId={id} />}
-      {tab === 'Tasks' && <Tasks a={a} />}
-      {tab === 'Access' && <Access agentId={id} />}
-      {tab === 'AI & budget' && <AiBudgetTab a={a} />}
-      {tab === 'Identity' && <IdentityTab a={a} />}
-      {tab === 'Portrait' && <PortraitTab a={a} />}
-      {tab === 'Collaboration' && <CollaborationTab a={a} />}
-      {tab === 'Safety' && <SafetyTab a={a} />}
-      {tab === 'Signals' && <SignalsTab a={a} />}
-      {tab === 'Instructions' && <AgentsMdEditor load={async () => (await api.agentsMd(id)).content} save={(content) => api.saveAgentsMd(id, content)} />}
-      {tab === 'Settings' && <Settings a={a} />}
-      {tab === 'Audit' && <AgentAudit agentId={id} />}
+      {/* 14 tabs became 5 groups with a second level (UI review ADM-03); IT-only groups are hidden in the Business view */}
+      <SectionTabs
+        tabs={[
+          {
+            id: 'overview',
+            label: 'Overview',
+            render: () => <Overview a={a} />,
+          },
+          {
+            id: 'work',
+            label: 'Work',
+            sub: [
+              { id: 'tasks', label: 'Tasks', render: () => <Tasks a={a} /> },
+              {
+                id: 'instructions',
+                label: 'Instructions',
+                render: () => <AgentsMdEditor load={async () => (await api.agentsMd(id)).content} save={(content) => api.saveAgentsMd(id, content)} />,
+              },
+              {
+                id: 'collaboration',
+                label: 'Collaboration',
+                render: () => <CollaborationTab a={a} />,
+              },
+              {
+                id: 'signals',
+                label: 'Signals',
+                render: () => <SignalsTab a={a} />,
+              },
+            ],
+          },
+          {
+            id: 'profile',
+            label: 'Profile',
+            sub: [
+              {
+                id: 'identity',
+                label: 'Identity',
+                render: () => <IdentityTab a={a} />,
+              },
+              {
+                id: 'portrait',
+                label: 'Portrait',
+                render: () => <PortraitTab a={a} />,
+              },
+              {
+                id: 'settings',
+                label: 'Settings',
+                roles: ['it'],
+                render: () => <Settings a={a} />,
+              },
+            ],
+          },
+          {
+            id: 'security',
+            label: 'Security & access',
+            roles: ['it'],
+            sub: [
+              {
+                id: 'access',
+                label: 'Access',
+                render: () => <Access agentId={id} />,
+              },
+              {
+                id: 'safety',
+                label: 'Safety',
+                render: () => <SafetyTab a={a} />,
+              },
+              {
+                id: 'ai',
+                label: 'AI & budget',
+                render: () => <AiBudgetTab a={a} />,
+              },
+            ],
+          },
+          {
+            id: 'operations',
+            label: 'Operations',
+            roles: ['it'],
+            sub: [
+              {
+                id: 'monitoring',
+                label: 'Monitoring',
+                render: () => <Monitoring agentId={id} />,
+              },
+              {
+                id: 'logs',
+                label: 'Logs',
+                render: () => <Logs agentId={id} />,
+              },
+              {
+                id: 'audit',
+                label: 'Audit',
+                render: () => <AgentAudit agentId={id} />,
+              },
+            ],
+          },
+        ]}
+      />
       {me.data && (
         <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 3 }}>
-          Temporal: <Link href={`${me.data.temporalUiUrl}/namespaces/${me.data.temporalNamespace}/workflows?query=${encodeURIComponent(`AgentId="${a.spec.agentId}"`)}`} target="_blank" rel="noreferrer">workflows of this agent</Link>
+          Temporal:{' '}
+          <Link href={`${me.data.temporalUiUrl}/namespaces/${me.data.temporalNamespace}/workflows?query=${encodeURIComponent(`AgentId="${a.spec.agentId}"`)}`} target="_blank" rel="noreferrer">
+            workflows of this agent
+          </Link>
         </Typography>
       )}
     </>

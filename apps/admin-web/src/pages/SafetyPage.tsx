@@ -11,7 +11,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
@@ -36,19 +35,33 @@ import { AgentPortrait, EmptyState, ErrorAlert, KILL_LEVEL_META, KillSwitchChip,
 import { api, avatarSrc } from '../api';
 import { KillSwitchDialog } from '../components/KillSwitch';
 import { GuardConfigCard, SecurityAlertsCard } from '../components/Security';
+import { SectionTabs } from '../components/Sections';
 
 const RULE_TEXT: Record<SafetyRule['kind'], { label: string; unit: string }> = {
-  permission_violation: { label: 'Harness permission requests', unit: 'requests / hour' },
+  permission_violation: {
+    label: 'Harness permission requests',
+    unit: 'requests / hour',
+  },
   tokens_per_hour: { label: 'Token spike', unit: 'tokens / hour' },
-  tool_denials: { label: 'Denied or failed tool calls', unit: 'calls / 10 min' },
+  tool_denials: {
+    label: 'Denied or failed tool calls',
+    unit: 'calls / 10 min',
+  },
   tool_rate: { label: 'Tool call rate', unit: 'calls / minute' },
   failed_streak: { label: 'Failed tasks in a row', unit: 'tasks' },
 };
 
 function KillSwitchOverview() {
   const qc = useQueryClient();
-  const ks = useQuery({ queryKey: ['killswitch'], queryFn: api.killSwitch, refetchInterval: 10_000 });
-  const agents = useQuery({ queryKey: ['agents', false], queryFn: () => api.agents(false) });
+  const ks = useQuery({
+    queryKey: ['killswitch'],
+    queryFn: api.killSwitch,
+    refetchInterval: 10_000,
+  });
+  const agents = useQuery({
+    queryKey: ['agents', false],
+    queryFn: () => api.agents(false),
+  });
   const [editing, setEditing] = useState<string | undefined>();
   if (!ks.data || !agents.data) return <Loading />;
   const g = ks.data.state.global;
@@ -71,7 +84,10 @@ function KillSwitchOverview() {
         </TableHead>
         <TableBody>
           {agents.data.map((a) => {
-            const eff = ks.data.effective[a.spec.agentId] ?? { level: 'normal', source: 'none' };
+            const eff = ks.data.effective[a.spec.agentId] ?? {
+              level: 'normal',
+              source: 'none',
+            };
             const own = ks.data.state.agents[a.spec.agentId];
             return (
               <TableRow key={a.spec.agentId} hover>
@@ -119,9 +135,17 @@ function KillSwitchOverview() {
 }
 
 function Collaboration() {
-  const agents = useQuery({ queryKey: ['agents', false], queryFn: () => api.agents(false) });
+  const agents = useQuery({
+    queryKey: ['agents', false],
+    queryFn: () => api.agents(false),
+  });
   if (!agents.data) return null;
-  const edges = agents.data.flatMap((a) => (a.spec.peers ?? []).map((p) => ({ from: a.spec, to: agents.data.find((x) => x.spec.agentId === p)?.spec })));
+  const edges = agents.data.flatMap((a) =>
+    (a.spec.peers ?? []).map((p) => ({
+      from: a.spec,
+      to: agents.data.find((x) => x.spec.agentId === p)?.spec,
+    })),
+  );
   return (
     <Card sx={{ height: '100%' }}>
       <CardHeader title="A2A discovery sets" subheader="Who may delegate to whom (one-directional). Default: isolated. Edit on the agent's Collaboration tab." />
@@ -150,13 +174,23 @@ function Collaboration() {
 
 function Rules() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['safety-rules'], queryFn: api.safetyRules, refetchInterval: 30_000 });
+  const q = useQuery({
+    queryKey: ['safety-rules'],
+    queryFn: api.safetyRules,
+    refetchInterval: 30_000,
+  });
   const [rules, setRules] = useState<SafetyRule[] | undefined>();
   useEffect(() => {
     if (q.data && !rules) setRules(q.data.rules);
   }, [q.data, rules]);
-  const save = useMutation({ mutationFn: () => api.saveSafetyRules(rules!), onSuccess: () => void qc.invalidateQueries({ queryKey: ['safety-rules'] }) });
-  const run = useMutation({ mutationFn: api.runSafety, onSuccess: () => void qc.invalidateQueries({ queryKey: ['safety-rules'] }) });
+  const save = useMutation({
+    mutationFn: () => api.saveSafetyRules(rules!),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['safety-rules'] }),
+  });
+  const run = useMutation({
+    mutationFn: api.runSafety,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['safety-rules'] }),
+  });
   if (!q.data || !rules) return <Loading />;
   const patch = (i: number, p: Partial<SafetyRule>) => setRules(rules.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const tripped = q.data.observations.filter((o) => o.tripped);
@@ -203,7 +237,11 @@ function Rules() {
                   size="small"
                   type="number"
                   value={r.threshold}
-                  onChange={(e) => patch(i, { threshold: Math.max(1, Number(e.target.value) || 1) })}
+                  onChange={(e) =>
+                    patch(i, {
+                      threshold: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
                   sx={{ width: 140 }}
                   helperText={RULE_TEXT[r.kind].unit}
                 />
@@ -223,9 +261,7 @@ function Rules() {
       </Table>
       <CardContent>
         {tripped.length ? (
-          <Alert severity="warning">
-            Tripped in the last evaluation: {tripped.map((o) => `${o.agentId} · ${o.ruleId} (${formatNumber(o.value)} ≥ ${formatNumber(o.threshold)})`).join(', ')}
-          </Alert>
+          <Alert severity="warning">Tripped in the last evaluation: {tripped.map((o) => `${o.agentId} · ${o.ruleId} (${formatNumber(o.value)} ≥ ${formatNumber(o.threshold)})`).join(', ')}</Alert>
         ) : (
           <Typography variant="body2" color="text.secondary">
             {q.data.observations.length} observation(s) in the last evaluation, none above threshold.
@@ -236,21 +272,45 @@ function Rules() {
   );
 }
 
-const emptyUpstream: UpstreamServer = { name: '', url: '', headers: {}, enabled: true, auth: 'static', oboFallback: 'deny', policy: 'none' };
+const emptyUpstream: UpstreamServer = {
+  name: '',
+  url: '',
+  headers: {},
+  enabled: true,
+  auth: 'static',
+  oboFallback: 'deny',
+  policy: 'none',
+};
 
 function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose: () => void }) {
   const qc = useQueryClient();
-  const [u, setU] = useState<UpstreamServer>({ ...initial, policy: initial.policy ?? 'none' });
+  const [u, setU] = useState<UpstreamServer>({
+    ...initial,
+    policy: initial.policy ?? 'none',
+  });
   const [headers, setHeaders] = useState(
-    Object.entries(initial.headers).map(([k, v]) => ({ name: k, value: typeof v === 'string' ? v : v.secretRef, secret: typeof v !== 'string' })),
+    Object.entries(initial.headers).map(([k, v]) => ({
+      name: k,
+      value: typeof v === 'string' ? v : v.secretRef,
+      secret: typeof v !== 'string',
+    })),
   );
   // Entra OBO is optional: offered only when a tenant is configured (or the upstream already uses it)
-  const entra = useQuery({ queryKey: ['entra'], queryFn: api.entraAvailable, staleTime: 60_000 });
+  const entra = useQuery({
+    queryKey: ['entra'],
+    queryFn: api.entraAvailable,
+    staleTime: 60_000,
+  });
   const oboOffered = entra.data?.available === true || initial.auth === 'obo';
   const obo = u.auth === 'obo';
   const save = useMutation({
     mutationFn: () =>
-      api.saveUpstream({ ...u, oboScope: obo ? u.oboScope : undefined, oboFallback: obo ? u.oboFallback : 'deny', headers: obo ? {} : Object.fromEntries(headers.filter((h) => h.name).map((h) => [h.name, h.secret ? { secretRef: h.value } : h.value])) }),
+      api.saveUpstream({
+        ...u,
+        oboScope: obo ? u.oboScope : undefined,
+        oboFallback: obo ? u.oboFallback : 'deny',
+        headers: obo ? {} : Object.fromEntries(headers.filter((h) => h.name).map((h) => [h.name, h.secret ? { secretRef: h.value } : h.value])),
+      }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['gateway'] });
       onClose();
@@ -289,7 +349,12 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
                 select
                 label="Tasks without a signed-in user (schedules, agent-to-agent)"
                 value={u.oboFallback}
-                onChange={(e) => setU({ ...u, oboFallback: e.target.value as UpstreamServer['oboFallback'] })}
+                onChange={(e) =>
+                  setU({
+                    ...u,
+                    oboFallback: e.target.value as UpstreamServer['oboFallback'],
+                  })
+                }
                 helperText="Agent-only additionally requires the agent to allow it on its Identity tab. A task with a user never falls back."
               >
                 <MenuItem value="deny">Deny</MenuItem>
@@ -308,27 +373,30 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
             <MenuItem value="opa">Policy as code (OPA)</MenuItem>
           </TextField>
           {!obo && <Typography variant="subtitle2">Headers</Typography>}
-          {!obo && headers.map((h, i) => (
-            <Stack key={i} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <TextField size="small" label="Header" value={h.name} onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-              <TextField
-                size="small"
-                sx={{ flex: 1 }}
-                label={h.secret ? 'Key Vault secret name' : 'Value (not secret)'}
-                value={h.value}
-                onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
-              />
-              <Tooltip title="Value comes from Key Vault">
-                <Switch checked={h.secret} onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, secret: e.target.checked } : x)))} />
-              </Tooltip>
-              <IconButton onClick={() => setHeaders(headers.filter((_, j) => j !== i))} aria-label="Remove header">
-                <DeleteOutlined />
-              </IconButton>
-            </Stack>
-          ))}
-          {!obo && <Button startIcon={<AddOutlined />} onClick={() => setHeaders([...headers, { name: 'Authorization', value: '', secret: true }])} sx={{ alignSelf: 'flex-start' }}>
-            Add header
-          </Button>}
+          {!obo &&
+            headers.map((h, i) => (
+              <Stack key={i} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <TextField size="small" label="Header" value={h.name} onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+                <TextField
+                  size="small"
+                  sx={{ flex: 1 }}
+                  label={h.secret ? 'Key Vault secret name' : 'Value (not secret)'}
+                  value={h.value}
+                  onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
+                />
+                <Tooltip title="Value comes from Key Vault">
+                  <Switch checked={h.secret} onChange={(e) => setHeaders(headers.map((x, j) => (j === i ? { ...x, secret: e.target.checked } : x)))} />
+                </Tooltip>
+                <IconButton onClick={() => setHeaders(headers.filter((_, j) => j !== i))} aria-label="Remove header">
+                  <DeleteOutlined />
+                </IconButton>
+              </Stack>
+            ))}
+          {!obo && (
+            <Button startIcon={<AddOutlined />} onClick={() => setHeaders([...headers, { name: 'Authorization', value: '', secret: true }])} sx={{ alignSelf: 'flex-start' }}>
+              Add header
+            </Button>
+          )}
           <Stack direction="row" sx={{ alignItems: 'center' }}>
             <Switch checked={u.enabled} onChange={(e) => setU({ ...u, enabled: e.target.checked })} />
             <Typography variant="body2">Enabled</Typography>
@@ -348,9 +416,16 @@ function UpstreamDialog({ initial, onClose }: { initial: UpstreamServer; onClose
 
 function Gateway() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['gateway'], queryFn: api.gateway, refetchInterval: 15_000 });
+  const q = useQuery({
+    queryKey: ['gateway'],
+    queryFn: api.gateway,
+    refetchInterval: 15_000,
+  });
   const [editing, setEditing] = useState<UpstreamServer | undefined>();
-  const del = useMutation({ mutationFn: api.deleteUpstream, onSuccess: () => void qc.invalidateQueries({ queryKey: ['gateway'] }) });
+  const del = useMutation({
+    mutationFn: api.deleteUpstream,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['gateway'] }),
+  });
   if (q.isLoading) return <Loading />;
   if (!q.data) return <ErrorAlert error={q.error} />;
   const status = q.data.health.status === 'ok' ? 'ok' : q.data.health.status === 'stale' ? 'degraded' : 'down';
@@ -434,7 +509,10 @@ function Secrets() {
       await qc.invalidateQueries({ queryKey: ['secrets'] });
     },
   });
-  const del = useMutation({ mutationFn: api.deleteSecret, onSuccess: () => void qc.invalidateQueries({ queryKey: ['secrets'] }) });
+  const del = useMutation({
+    mutationFn: api.deleteSecret,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['secrets'] }),
+  });
   if (q.isLoading) return <Loading />;
   if (!q.data?.enabled) return <EmptyState title="No Key Vault configured" text="Set KEYVAULT_URL for the control plane." />;
   return (
@@ -498,33 +576,53 @@ function Secrets() {
   );
 }
 
+/** Seven areas that used to be one 14,000-pixel page are tabs now (UI review ADM-04); each has a link (?tab=). */
 export function SafetyPage() {
+  const alerts = useQuery({
+    queryKey: ['security-alerts'],
+    queryFn: api.securityAlerts,
+    refetchInterval: 10_000,
+  });
   return (
     <>
-      <PageHeader title="Safety & tools" subtitle="Security alerts, kill switch, automatic triggers, exfiltration guard, MCP gateway, credentials and agent collaboration" />
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12 }}>
-          <SecurityAlertsCard />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <KillSwitchOverview />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Collaboration />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <Rules />
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <GuardConfigCard />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <Gateway />
-        </Grid>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <Secrets />
-        </Grid>
-      </Grid>
+      <PageHeader title="Safety & tools" subtitle="What stops agents, what they may use, and with which credentials" />
+      <SectionTabs
+        tabs={[
+          {
+            id: 'alerts',
+            label: 'Security alerts',
+            badge: alerts.data?.open ?? 0,
+            badgeColor: 'error',
+            render: () => <SecurityAlertsCard />,
+          },
+          {
+            id: 'kill-switch',
+            label: 'Kill switch',
+            render: () => <KillSwitchOverview />,
+          },
+          {
+            id: 'triggers',
+            label: 'Automatic triggers',
+            render: () => <Rules />,
+          },
+          {
+            id: 'guard',
+            label: 'Exfiltration guard',
+            render: () => <GuardConfigCard />,
+          },
+          { id: 'gateway', label: 'MCP gateway', render: () => <Gateway /> },
+          {
+            id: 'credentials',
+            label: 'Credentials',
+            render: () => <Secrets />,
+          },
+          {
+            id: 'collaboration',
+            label: 'Agent collaboration',
+            render: () => <Collaboration />,
+          },
+        ]}
+      />
     </>
   );
 }

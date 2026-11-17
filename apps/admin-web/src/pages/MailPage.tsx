@@ -16,6 +16,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { AgentPortrait, EmptyState, ErrorAlert, Loading, PageHeader, RelativeTime, formatDateTime } from '@cw/ui';
+import { usePaged } from '../components/Sections';
 import { api, avatarSrc, type MailRecord } from '../api';
 
 const STATUS_COLOR = { sent: 'success', written: 'info', failed: 'error' } as const;
@@ -27,6 +28,7 @@ export function MailPage() {
   const [agentId, setAgentId] = useState('');
   const q = useQuery({ queryKey: ['mail', agentId], queryFn: () => api.mails(agentId || undefined), refetchInterval: 10_000 });
   const [selected, setSelected] = useState<MailRecord>();
+  const { rows, pager } = usePaged(q.data?.mails ?? [], 20);
   useEffect(() => {
     if (q.data && (!selected || !q.data.mails.some((m) => m.id === selected.id))) setSelected(q.data.mails[0]);
   }, [q.data, selected]);
@@ -37,15 +39,7 @@ export function MailPage() {
         title="Mail outbox"
         subtitle="E-mails agents send to people, e.g. to ask for a decision. Each mail is kept as HTML for review."
         actions={
-          <TextField
-            select
-            size="small"
-            label="Agent"
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            sx={{ minWidth: 200 }}
-            slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}
-          >
+          <TextField select size="small" label="Agent" value={agentId} onChange={(e) => setAgentId(e.target.value)} sx={{ minWidth: 200 }} slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}>
             <MenuItem value="">All agents</MenuItem>
             {agents.data?.map((a) => (
               <MenuItem key={a.spec.agentId} value={a.spec.agentId}>
@@ -55,11 +49,9 @@ export function MailPage() {
           </TextField>
         }
       />
-      {q.data && (
+      {q.data && q.data.delivery !== 'api' && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          {q.data.delivery === 'api'
-            ? 'Delivery: mails are posted to the configured mail API (MAIL_API_URL) and also kept here.'
-            : 'Delivery: no mail API configured — mails are only written to the outbox (mail_out on the control-plane volume). Set MAIL_API_URL to deliver them.'}
+          Delivery: no mail API configured — mails are only written to the outbox (mail_out on the control-plane volume). Set MAIL_API_URL to deliver them.
         </Alert>
       )}
       <ErrorAlert error={q.error} />
@@ -80,7 +72,7 @@ export function MailPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {q.data.mails.map((m) => (
+                  {rows.map((m) => (
                     <TableRow key={m.id} hover selected={selected?.id === m.id} onClick={() => setSelected(m)} sx={{ cursor: 'pointer' }}>
                       <TableCell>
                         <AgentPortrait src={avatarSrc(m.agentId)} name={m.agentName} size={32} />
@@ -98,11 +90,12 @@ export function MailPage() {
                   ))}
                 </TableBody>
               </Table>
+              {pager}
             </Card>
           </Grid>
           <Grid size={{ xs: 12, lg: 7 }}>
             {selected && (
-              <Card>
+              <Card sx={{ position: { lg: 'sticky' }, top: { lg: 88 } }}>
                 <CardHeader title={selected.subject} subheader={`${formatDateTime(selected.at)} · from ${selected.agentName} · task ${selected.taskId ?? '–'}`} />
                 <CardContent sx={{ pt: 0 }}>
                   <Typography variant="body2" sx={{ mb: 1 }}>
@@ -113,13 +106,7 @@ export function MailPage() {
                       {selected.error}
                     </Alert>
                   )}
-                  <Box
-                    component="iframe"
-                    title={`Mail ${selected.id}`}
-                    src={api.mailHtmlUrl(selected.id)}
-                    sandbox=""
-                    sx={{ width: '100%', height: '65vh', border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: '#f4f6fa' }}
-                  />
+                  <Box component="iframe" title={`Mail ${selected.id}`} src={api.mailHtmlUrl(selected.id)} sandbox="" sx={{ width: '100%', height: '65vh', border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: '#f4f6fa' }} />
                   <Typography variant="caption" color="text.secondary">
                     Preview of the stored HTML (links are disabled here). File: mail_out/{selected.id}.html
                   </Typography>

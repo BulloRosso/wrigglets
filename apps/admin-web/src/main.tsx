@@ -9,6 +9,7 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 import { createAppTheme } from '@cw/ui';
 import { App } from './App';
+import { RoleViewProvider } from './components/Sections';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 3_000 } } });
 
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')!).render(
       <CssBaseline enableColorScheme />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          <RoleViewProvider>
+            <App />
+          </RoleViewProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

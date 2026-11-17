@@ -26,7 +26,7 @@ export const serviceSpec = z.object({
   /** true = built locally by `node scripts/stack.mjs build --liquid`, never pulled. */
   local: z.boolean().default(false),
   command: z.array(z.string()).optional(),
-  /** Environment; values may use {{secret:NAME}}, {{svc:NAME.url}}, {{svc:NAME.host}}, {{svc:NAME.port}}. */
+  /** Environment; values may use {{secret:NAME}}, {{svc:NAME.url}}, {{svc:NAME.host}}, {{svc:NAME.port}}, {{svc:NAME.public}} (browser URL of a service with a hostPort). */
   env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()).default({}),
   /** Port the service listens on inside the network (for {{svc:…}} and health). */
   port: z.number().int().min(1).max(65535).optional(),
@@ -131,12 +131,12 @@ export type ExtensionManifest = z.infer<typeof extensionManifest>;
 export type ExtensionManifestInput = z.input<typeof extensionManifest>;
 export type ExtensionUpstream = z.infer<typeof extensionUpstream>;
 
-type Ref = { kind: 'secret'; name: string } | { kind: 'svc'; name: string; field: 'url' | 'host' | 'port' };
-const TEMPLATE = /\{\{\s*(secret|svc):([a-z][a-z0-9_-]*)(?:\.(url|host|port))?\s*\}\}/g;
+type Ref = { kind: 'secret'; name: string } | { kind: 'svc'; name: string; field: 'url' | 'host' | 'port' | 'public' };
+const TEMPLATE = /\{\{\s*(secret|svc):([a-z][a-z0-9_-]*)(?:\.(url|host|port|public))?\s*\}\}/g;
 
 /** The {{…}} references in a template string. */
 export function templateRefs(value: string): Ref[] {
-  return [...value.matchAll(TEMPLATE)].map((m) => (m[1] === 'secret' ? { kind: 'secret', name: m[2]! } : { kind: 'svc', name: m[2]!, field: (m[3] ?? 'url') as 'url' | 'host' | 'port' }));
+  return [...value.matchAll(TEMPLATE)].map((m) => (m[1] === 'secret' ? { kind: 'secret', name: m[2]! } : { kind: 'svc', name: m[2]!, field: (m[3] ?? 'url') as 'url' | 'host' | 'port' | 'public' }));
 }
 
 /** Services sorted so that every service comes after the services it depends on (stable; throws on a cycle). */
@@ -166,6 +166,8 @@ export interface RenderContext {
   /** Network host name of a service (its container alias). */
   host: (service: string) => string;
   port: (service: string) => number | undefined;
+  /** URL under which the browser reaches a service with a hostPort (public host of the platform). */
+  publicUrl?: (service: string) => string | undefined;
 }
 
 /** Fills the {{…}} templates of an environment. Throws on an unknown reference, so a broken manifest never starts. */
@@ -177,6 +179,11 @@ export function renderEnv(env: Record<string, string>, ctx: RenderContext): Reco
         const s = ctx.secrets[name];
         if (s === undefined) throw new Error(`${k}: secret "${name}" is not available`);
         return s;
+      }
+      if (field === 'public') {
+        const u = ctx.publicUrl?.(name);
+        if (!u) throw new Error(`${k}: service "${name}" has no public URL (hostPort)`);
+        return u;
       }
       const port = ctx.port(name);
       if (field === 'host') return ctx.host(name);

@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:31:39.115Z",
+  "startedAt": "2026-11-17T01:56:00.018Z",
   "checks": [
     {
       "name": "starts not installed and not available",
@@ -48,7 +48,7 @@
         "cw-ext-liquid-ontology-compiler Up 10 seconds (healthy)",
         "cw-ext-liquid-forgejo Up 16 seconds (healthy)",
         "cw-ext-liquid-ontology-server Up 23 seconds (healthy)",
-        "cw-ext-liquid-ontology-db Up 30 seconds (healthy)"
+        "cw-ext-liquid-ontology-db Up 29 seconds (healthy)"
       ]
     },
     {
@@ -118,5 +118,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:32:36.265Z"
+  "finishedAt": "2026-11-17T01:56:39.413Z"
 }

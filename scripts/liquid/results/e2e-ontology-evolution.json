@@ -1,10 +1,10 @@
 {
-  "startedAt": "2026-11-17T01:37:08.168Z",
+  "startedAt": "2026-11-17T02:01:28.073Z",
   "checks": [
     {
       "name": "the running ontology",
       "ok": true,
-      "detail": "sofa@6.0.0, 20 classes, 34 actions"
+      "detail": "sofa@7.0.0, 20 classes, 34 actions"
     },
     {
       "name": "config__validate: compiles, compatibility minor, existing data fits, policy tests pass",
@@ -30,8 +30,8 @@
       "name": "the agent proposes the extension; validated, compatibility minor",
       "ok": true,
       "detail": {
-        "id": "cp-mwk0ve15-98b6",
-        "version": "6.1.0"
+        "id": "cp-mwk1qogu-9d25",
+        "version": "7.1.0"
       }
     },
     {
@@ -39,15 +39,15 @@
       "ok": true
     },
     {
-      "name": "live in 2 s: ontology 6.1.0, class Carrier, actions present",
+      "name": "live in 3 s: ontology 7.1.0, class Carrier, actions present",
       "ok": true
     },
     {
       "name": "the version is recorded as minor",
       "ok": true,
       "detail": [
-        "6.1.0:minor",
-        "6.0.0:minor"
+        "7.1.0:minor",
+        "7.0.0:minor"
       ]
     },
     {
@@ -109,7 +109,7 @@
       "name": "the breaking change went live by rebuilding the projection",
       "ok": true,
       "detail": {
-        "version": "7.0.0",
+        "version": "8.0.0",
         "note": "Carrier objects stay in the event log; the projection is rebuilt without them."
       }
     },
@@ -123,5 +123,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:37:29.915Z"
+  "finishedAt": "2026-11-17T02:02:01.224Z"
 }

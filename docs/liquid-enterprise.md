@@ -627,6 +627,13 @@ without domain code:
 
 ## Operations runbook
 
+**Start here:** *Liquid enterprise → Overview → Control loop health*, or from the shell
+`node scripts/liquid/doctor.mjs` (exit code 0 ok, 1 warnings, 2 failures). Every item names what is wrong and where to
+fix it ([ADR-0051](adr/0051-control-loop-health-robustness.md)):
+
+![Overview with the control loop health](images/liquid/liquid-overview.png)
+
+
 All `/internal` routes of the ontology server need its token; from the host, run them inside the container:
 
 ```bash
@@ -1124,6 +1131,52 @@ Open
   and agent UI via Entra with mapped roles" waits for `ENTRA_TENANT_ID` and two app registrations.
 - Apps sign in at the local OAuth server also in Entra mode; per-app Entra registrations are not automated.
 - Entra Agent ID is not adopted (license and tenant; see the ADR).
+
+### Optimisation run — health view and robustness rules (2026-11-17)
+
+The question: what can be simplified without losing a feature, and what makes the setup more robust and controllable?
+Evidence: every failure the complete runtime test found on fresh installs. They were either concurrency between
+independent loops or state that outlived its context, and none was visible before a check failed.
+
+Done ([ADR-0051](adr/0051-control-loop-health-robustness.md))
+- **Control loop health:** one endpoint, the Overview card (it replaces the static layer list) and
+  `scripts/liquid/doctor.mjs`. Nine probes cover services, policy distribution, core dispatcher and lake, reconciler,
+  Git host, audit forwarding, pending decisions, tightening in force, and apps. Each probe has its own timeout.
+  The first run found that reconcile runs with nothing to do were not recorded, so a healthy reconciler looked
+  stalled; every run is now recorded.
+- **Robustness rules:**
+  - edits in flight defer the reconciler;
+  - pending proposals are settled from the Git host;
+  - Git host reads retry, and writes retry only when nothing was sent;
+  - a simulation reset cancels the old world's release workflows;
+  - no reconcile writes the stores while an extension operation runs (an uninstall raced a webhook-triggered
+    reconcile, which re-added the gateway upstream `onto`);
+  - browser URLs come from the public host (the Forgejo `ROOT_URL` and pull request links were hard-coded to
+    localhost; `{{svc:NAME.public}}` in manifests).
+- **Test suites:** independent (pre-clean, release in `finally`, policy convergence), one command for all of them.
+
+Simplified (no feature lost)
+- The Overview shows live health instead of a hand-maintained layer list.
+- Earlier in this refactoring: one approval inbox, one sensing path, policy engine embedded, worker inside the core,
+  audit as a query over the event log, runtime ontology (ADR-0049).
+
+Proposed, not done (decisions for the operator; see ADR-0051)
+- **Purge scope:** *delete data* keeps `DATA_DIR/liquid` (config repository, proposals, app registry). Option: archive
+  and remove it.
+- **One review path:** add Forgejo to the compose overlay and drop the console review of overlay mode.
+- **Approvals of a replaced world:** withdraw pending four-eyes approvals on a simulation reset.
+- **Test helpers:** one shared module for the eleven suites (Git host, core, SQL, checks), a pure refactor.
+- **Ontology version inflation from test runs** (the stack is at 7.x): a baseline reset command, or suites that revert
+  their ontology changes through one helper.
+
+Verified
+- Unit tests: health (4), extensions template `{{svc:NAME.public}}`, settling of proposals.
+- Complete runtime test after the changes, uninterrupted on a fresh install: M0b 11, M1 10, M2 7, M3 13, M4 14, M5 19,
+  M6 25, M7 18, M8 19, M9 20 — **156/156**. `doctor.mjs` afterwards: all nine items ok.
+- The first full run with the health view found one more race: an uninstall raced a webhook-triggered reconcile, which
+  re-added the extension's gateway upstream. Fixed with the gate (unit test), then the run above.
+- Right after a fresh install the health view honestly shows *fail* for a few seconds (no policy package yet, so
+  everything is denied) until the first build.
 
 ### Later
 

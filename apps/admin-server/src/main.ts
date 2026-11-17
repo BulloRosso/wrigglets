@@ -15,6 +15,7 @@ import { LIQUID_ID, liquidBootstrap, liquidManifest, liquidOverlay, ontologyCall
 import { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import { AppRegistry } from './liquid/apps.js';
 import { createAppHost } from './liquid/appHost.js';
+import { liquidHealth } from './liquid/health.js';
 import { DockerExtensionRuntime } from './extensions/runtime.js';
 import { ExtensionService, vaultSecretRef } from './extensions/service.js';
 import { createAdminApp } from './api.js';
@@ -123,7 +124,7 @@ async function main() {
   const signals = new SignalsControlService(config.DATA_DIR, registry, runtime, killSwitch, audit);
   await signals.load();
   // Optional extensions installed from the admin console (ADR-0039)
-  const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit });
+  const extensions = new ExtensionService(config.DATA_DIR, config.RUNTIME === 'docker' ? new DockerExtensionRuntime(config.DOCKER_SOCKET, config.DOCKER_NETWORK) : undefined, { gateway, secretStore: secrets, audit, publicHost: new URL(config.PUBLIC_URL).hostname });
   // Liquid Enterprise policy as code (ADR-0044/0049): overlays + the policy package (Rego → WASM) for gateway and core
   const here = path.dirname(fileURLToPath(import.meta.url));
   const policyDir = [config.LIQUID_POLICY_DIR, path.resolve(here, '../../../policies/liquid')].find((p) => !!p && existsSync(p)) ?? config.LIQUID_POLICY_DIR;
@@ -165,7 +166,10 @@ async function main() {
   const FORGE = { org: 'liquid', repo: 'config', bot: 'liquid-bot', reviewer: 'reviewer', team: 'reviewers' };
   const forge = new Forge({
     baseUrl: () => extensions.url(LIQUID_ID, 'forgejo'),
-    publicUrl: 'http://localhost:3300',
+    // links to pull requests are opened by people: the Git host's browser URL (PUBLIC_URL's host, published port)
+    get publicUrl() {
+      return extensions.publicUrl(LIQUID_ID, 'forgejo') ?? 'http://localhost:3300';
+    },
     bot: { user: FORGE.bot, password: () => extensions.secret(LIQUID_ID, 'forgejo_bot_password') },
     owner: FORGE.org,
     repo: FORGE.repo,
@@ -253,7 +257,7 @@ async function main() {
         for (const h of hooks.filter((x) => x.config.url === hookUrl)) await forge.api('DELETE', `${forge.repoPath}/hooks/${h.id}`);
         await forge.api('POST', `${forge.repoPath}/hooks`, { type: 'forgejo', active: true, events: ['push', 'pull_request'], config: { url: hookUrl, content_type: 'json', secret: ctx.secret('forgejo_webhook_secret') } });
         await configRepo.markForgeReady();
-        ctx.log(`Git host ready: http://localhost:3300/${FORGE.org}/${FORGE.repo} (reviewer account "${FORGE.reviewer}")`);
+        ctx.log(`Git host ready: ${forge.cfg.publicUrl}/${FORGE.org}/${FORGE.repo} (reviewer account "${FORGE.reviewer}")`);
       },
     },
     liquidOverlay(config),
@@ -359,6 +363,22 @@ async function main() {
   });
   await appRegistry.load();
   appRegistry.start(3_600_000, () => extensions.isInstalled(LIQUID_ID));
+  // health of the control loop in one place (ADR-0051)
+  const health = () =>
+    liquidHealth({
+      services: async () => (await extensions.status(LIQUID_ID)).services.map((x) => ({ name: x.name, state: x.state })),
+      policy: () => liquidPolicy.status(),
+      core: () => ontologyCall(liquidCtx, 'GET', '/internal/health/loop'),
+      config: () => configRepo.status(),
+      gitHost: async () => ({ ready: await forge.ready(), setUp: configRepo.forgeReady, overlay: (await extensions.status(LIQUID_ID)).mode === 'overlay', stats: forge.stats }),
+      eventFeed: () => eventFeed.last,
+      inbox: () => approvals.inbox(),
+      held: async () => (await liquidProcesses.list()).running.filter((r) => r.hold?.held).map((r) => ({ workflowId: r.workflowId, refs: (r.hold?.holds ?? []).map((h: { ref: string }) => h.ref) })),
+      killSwitch: () => killSwitch.get().global,
+      playbookRuns: () => playbooks.runs(),
+      apps: () => appRegistry.list(),
+    });
+
   const appHost = createAppHost({
     registry: appRegistry,
     appsPublicUrl: config.appsPublicUrl,
@@ -386,7 +406,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, liquidApps: appRegistry, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, liquidApps: appRegistry, liquidHealth: health, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).

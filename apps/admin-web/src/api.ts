@@ -42,6 +42,13 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+/** Health of the Liquid control loop (ADR-0051). */
+export interface LiquidHealth {
+  status: 'ok' | 'warn' | 'fail';
+  checkedAt: string;
+  items: Array<{ id: string; label: string; status: 'ok' | 'warn' | 'fail'; detail: string; hint?: string; link?: string }>;
+}
+
 /** A registered app of Liquid Enterprise (ADR-0050). */
 export interface LiquidApp {
   id: string;
@@ -425,6 +432,7 @@ export const api = {
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
   liquidInbox: () => apiFetch<InboxItem[]>('/api/liquid/inbox'),
   liquidApps: () => apiFetch<LiquidApp[]>('/api/liquid/apps'),
+  liquidHealth: () => apiFetch<LiquidHealth>('/api/liquid/health'),
   liquidAppAccess: (appId: string) => apiFetch<Array<{ id: string; email: string; name: string; admin: boolean; allowed: boolean; via: 'admin' | 'all agents' | 'app' | null }>>(`/api/liquid/apps/${id(appId)}/access`),
   setLiquidAppAccess: (appId: string, userId: string, allowed: boolean) => apiFetch<unknown>(`/api/liquid/apps/${id(appId)}/access/${id(userId)}`, { method: 'PUT', json: { allowed } }),
   registerLiquidApp: (body: Record<string, unknown>) => apiFetch<LiquidApp>('/api/liquid/apps', { method: 'POST', json: body }),

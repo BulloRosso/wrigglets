@@ -34,6 +34,9 @@ import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 import { extensionsAdminRouter } from './extensions/api.js';
 import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
 import type { AppRegistry } from './liquid/apps.js';
+import type { LiquidHealth } from './liquid/health.js';
+import { requireExtension } from './extensions/api.js';
+import { LIQUID_ID } from './extensions/liquid.js';
 import { appsRouter } from './liquid/appsApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { LiquidProcesses } from './extensions/liquidProcesses.js';
@@ -73,6 +76,7 @@ export interface ExtensionDeps {
   /** One approval mechanism and inbox (ADR-0049). */
   liquidApprovals?: ApprovalService;
   liquidApps?: AppRegistry;
+  liquidHealth?: () => Promise<LiquidHealth>;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -379,6 +383,10 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   if (d.liquidConfig) r.use(liquidConfigRouter(d.extensions, d.liquidConfig, by));
   if (d.liquidPlaybooks) r.use(playbooksRouter(d.extensions, d.liquidPlaybooks, by, d.audit, d.liquidApprovals));
   if (d.liquidApps) r.use(appsRouter(d.extensions, d.liquidApps, by, d.oauth, d.audit));
+  if (d.liquidHealth) {
+    const health = d.liquidHealth;
+    r.get('/liquid/health', requireExtension(d.extensions, LIQUID_ID), async (_req, res, next) => health().then((h) => res.json(h), next));
+  }
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

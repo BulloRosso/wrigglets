@@ -180,6 +180,17 @@ describe('config repository', () => {
     expect((await svc.get(gone.id)).comment).toMatch(/no longer exists/);
   });
 
+  it('while the gate is closed (uninstall running) no reconcile writes the stores, whoever triggers it', async () => {
+    await svc.init(seed, 'ada@example.local');
+    t.s.allowedTools['sofa-max'] = ['erp__get_kpi', 'crm__list_customers']; // e.g. an upstream the uninstall just removed
+    svc.gate = () => false;
+    expect(await svc.reconcile('git host')).toMatchObject({ unchanged: true, skipped: expect.stringMatching(/paused/) });
+    expect(t.s.allowedTools['sofa-max']).toEqual(['erp__get_kpi', 'crm__list_customers']);
+    svc.gate = () => true;
+    await svc.reconcile();
+    expect(t.s.allowedTools['sofa-max']).not.toEqual(['erp__get_kpi', 'crm__list_customers']); // main restored once open
+  });
+
   it('a console edit in flight is not reverted by a reconcile (it is captured instead)', async () => {
     await svc.init(seed, 'ada@example.local');
     svc.beginEdit(); // the request started; the store changes before the capture

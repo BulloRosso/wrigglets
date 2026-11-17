@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:36:16.932Z",
+  "startedAt": "2026-11-17T02:00:35.436Z",
   "checks": [
     {
       "name": "the example playbook is in the config repository and valid",
@@ -25,9 +25,9 @@
       "ok": true,
       "detail": [
         {
-          "runId": "pr-mwk0ub4c-8470",
+          "runId": "pr-mwk1pkg2-109d",
           "playbook": "third-party-upstream-vulnerability",
-          "workflowId": "PlaybookRun-pr-mwk0ub4c-8470"
+          "workflowId": "PlaybookRun-pr-mwk1pkg2-109d"
         }
       ]
     },
@@ -50,7 +50,7 @@
       "detail": {
         "tools": 23,
         "writeActions": 10,
-        "workflows": 13
+        "workflows": 10
       }
     },
     {
@@ -58,13 +58,13 @@
       "ok": true,
       "detail": {
         "overlays": "[\"ov-1\"]",
-        "held": "ApprovalWorkflow-0ea11eb0-073b-439c-a4fb-6f032d3f95eb,ApprovalWorkflow-2eeed63b-6f5f-402f-998f-816c1b5d2d16,ApprovalWorkflow-58f6f215-9428-44c7-a0b7-bcc21dac6233,ApprovalWorkflow-76d269cc-e218-4477-abdf-ec76302595da,ApprovalWorkflow-cdd8fbca-6b17-45de-b7c6-0efe17f468e5,ApprovalWorkflow-d3479e21-99d6-4bdf-be92-0126dd08988e,ApprovalWorkflow-efb4f681-36c6-426c-a371-f12326cb60ba,ApprovalWorkflow-fa981eb4-9998-4d39-9f49-d00f69589b83,PurchaseOrderRelease-2183949e-d897-4d19-a23c-359883fbd1eb"
+        "held": "ApprovalWorkflow-0ea11eb0-073b-439c-a4fb-6f032d3f95eb,ApprovalWorkflow-274cb121-6da9-4af9-b09c-cf252789a8fe,ApprovalWorkflow-2eeed63b-6f5f-402f-998f-816c1b5d2d16,ApprovalWorkflow-58f6f215-9428-44c7-a0b7-bcc21dac6233,ApprovalWorkflow-76d269cc-e218-4477-abdf-ec76302595da,ApprovalWorkflow-8fb642e9-b89e-48cd-a799-15b3fe1ab0d8,ApprovalWorkflow-b623a9ef-149f-4d64-9865-9700ca7ea0b0,ApprovalWorkflow-cdd8fbca-6b17-45de-b7c6-0efe17f468e5,ApprovalWorkflow-d3479e21-99d6-4bdf-be92-0126dd08988e,PurchaseOrderRelease-715e114a-2753-43d8-afbd-822c43a39eed"
       }
     },
     {
       "name": "shadow replay reported on the last 7 days",
       "ok": true,
-      "detail": "replayed 1105 events: 8 action(s) would need approval or be blocked, 5 diverged"
+      "detail": "replayed 1112 events: 8 action(s) would need approval or be blocked, 5 diverged"
     },
     {
       "name": "the reconciler keeps the tightening (it was committed to the config repository)",
@@ -85,7 +85,7 @@
     {
       "name": "after approval everything is back to baseline (upstreams, overlays, held workflows, repository)",
       "ok": true,
-      "detail": "9 workflow(s) released; overlay ov-1 removed; upstream erp enabled"
+      "detail": "10 workflow(s) released; overlay ov-1 removed; upstream erp enabled"
     },
     {
       "name": "restore was approved by the signed-in person",
@@ -116,5 +116,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:37:08.129Z"
+  "finishedAt": "2026-11-17T02:01:28.031Z"
 }

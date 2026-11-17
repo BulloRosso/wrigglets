@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:32:36.327Z",
+  "startedAt": "2026-11-17T01:56:39.482Z",
   "checks": [
     {
       "name": "installed and available",
@@ -70,13 +70,13 @@
       "ok": true,
       "detail": {
         "first": {
-          "flushed": 1009,
-          "hwm": 1009,
+          "flushed": 1011,
+          "hwm": 1011,
           "waiting": 0
         },
         "second": {
           "flushed": 0,
-          "hwm": 1009,
+          "hwm": 1011,
           "waiting": 0
         },
         "rows": {
@@ -125,14 +125,14 @@
     }
   ],
   "lake": {
-    "hwm": 1009,
+    "hwm": 1011,
     "snapshots": 7,
-    "lastSnapshotAt": "2026-11-17 01:32:41.646217+00",
+    "lastSnapshotAt": "2026-11-17 01:56:44.728675+00",
     "extracts": [
       {
         "id": "sofa-T0",
         "source": "sofa-company mock (scripts/sofa-company/mock-mcp.mjs), initial state",
-        "at": "2026-11-17 01:32:29.468+00",
+        "at": "2026-11-17 01:56:28.915+00",
         "tables": {
           "erp_factories": 2,
           "erp_machines": 6,
@@ -153,10 +153,10 @@
       }
     ],
     "lastFlush": {
-      "at": "2026-11-17T01:32:41.918Z",
+      "at": "2026-11-17T01:56:44.946Z",
       "result": {
         "flushed": 0,
-        "hwm": 1009,
+        "hwm": 1011,
         "waiting": 0
       }
     },
@@ -180,8 +180,8 @@
       "events": 2
     },
     "eventLog": {
-      "count": 1009,
-      "maxSeq": 1009
+      "count": 1011,
+      "maxSeq": 1011
     },
     "counts": {
       "crm_campaigns": 1,
@@ -199,9 +199,9 @@
       "erp_purchase_orders": 4,
       "erp_suppliers": 7,
       "erp_workers": 4,
-      "events": 1009
+      "events": 1011
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-17T01:32:43.095Z"
+  "finishedAt": "2026-11-17T01:56:51.427Z"
 }

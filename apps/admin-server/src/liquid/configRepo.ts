@@ -107,6 +107,11 @@ export class ConfigRepoService {
   private chain: Promise<unknown> = Promise.resolve();
   /** Console edits whose capture is still to come: a reconcile must not take them for drift and revert them. */
   private editsInFlight = 0;
+  /** Last reconcile run of any outcome (also "nothing to do"), for the health view; not persisted. */
+  private lastRunAt?: string;
+  /** When the stores may be written at all (installed, no extension operation running). Checked by every reconcile,
+   *  whoever triggers it (timer, webhook, deferred edit), and again right before applying (ADR-0051). */
+  gate: () => boolean = () => true;
   private timer?: NodeJS.Timeout;
   /** Called after main changed through a proposal or a reconcile applied something (e.g. to rebuild the OPA bundle). */
   onApplied?: () => void;
@@ -228,6 +233,8 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
   async reconcile(by = 'reconciler', force = false) {
     if (!(await this.initialized())) return { ok: false, skipped: 'repository not initialised' } as const;
     return this.serial(async () => {
+      this.lastRunAt = new Date().toISOString();
+      if (!this.gate()) return { ok: true, head: null, changes: [] as string[], unchanged: true, skipped: 'paused (not installed or an extension operation is running)' };
       if (this.forge) {
         await this.syncUnlocked().catch(() => undefined);
         await this.settleFromHost().catch(() => undefined);
@@ -248,6 +255,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
         this.onReconciled?.({ head, ok: false, changes: [], errors });
         return { ok: false, head, errors };
       }
+      if (!this.gate()) return { ok: true, head, changes: [] as string[], unchanged: true, skipped: 'paused (an extension operation started)' };
       const changes = await this.targets.apply(state, by);
       // ontology versions (M8): a changed domain is compiled and applied to the ontology server while it runs
       if (this.onOntology) {
@@ -285,6 +293,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
   }
 
   start(intervalMs = 60_000, enabled: () => boolean = () => true) {
+    this.gate = enabled;
     const tick = async () => {
       try {
         if (enabled()) await this.reconcile();
@@ -317,6 +326,7 @@ ${trailers({ 'Requested-By': by, 'Change-Id': randomUUID() })}`, author: personA
       applied: this.meta.applied,
       inSync: !!head && head === this.meta.applied,
       lastReconcile: this.meta.lastReconcile,
+      lastRunAt: this.lastRunAt ?? null,
       pendingProposals: this.meta.proposals.filter((p) => p.status === 'pending').length,
       log: init ? await this.git.log('main', 15) : [],
       files: head ? (await this.git.paths(head)).sort() : [],

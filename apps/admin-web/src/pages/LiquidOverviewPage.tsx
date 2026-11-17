@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -17,20 +18,47 @@ import { ErrorAlert, KeyValueList, Loading, PageHeader, RelativeTime } from '@cw
 import { api } from '../api';
 
 /*
- * Liquid Enterprise (ADR-0038) overview: what is installed and which layers are live. The layer list grows with the
- * milestones of docs/liquid-enterprise-extension.md.
+ * Liquid Enterprise (ADR-0038) overview: what is installed, the health of the control loop (ADR-0051), the lake.
  */
 
-const LAYERS: Array<{ name: string; role: string; milestone: string; service?: string }> = [
-  { name: 'Event log', role: 'append-only events in Postgres (ontology-db)', milestone: 'M1', service: 'ontology-db' },
-  { name: 'Data lake', role: 'raw zone as Parquet files (DuckLake), written by DuckDB 2', milestone: 'M1', service: 'ontology-server' },
-  { name: 'Ontology and compiler', role: 'LinkML schema compiled into every layer', milestone: 'M2' },
-  { name: 'Ontology server', role: 'the only write path: typed, validated, audited actions', milestone: 'M3' },
-  { name: 'Policy as code', role: 'OPA at the gateway and the ontology server', milestone: 'M4' },
-  { name: 'Business workflows', role: 'holdable Temporal workflows (namespace business)', milestone: 'M5' },
-  { name: 'Config repository', role: 'desired state in Git, reviewed proposals', milestone: 'M6' },
-  { name: 'Playbooks', role: 'tighten automatically, loosen only with approval', milestone: 'M7' },
-];
+const DOT: Record<'ok' | 'warn' | 'fail', 'success' | 'warning' | 'error'> = { ok: 'success', warn: 'warning', fail: 'error' };
+
+/** Every part of the control loop with its status and what to do about it (ADR-0051). */
+function HealthCard() {
+  const navigate = useNavigate();
+  const q = useQuery({ queryKey: ['liquid-health'], queryFn: api.liquidHealth, refetchInterval: 10_000 });
+  return (
+    <Card variant="outlined">
+      <CardHeader title="Control loop health" subheader={q.data ? <>checked <RelativeTime iso={q.data.checkedAt} /></> : 'services, policy distribution, dispatcher, reconciler, Git host, decisions, tightening'} action={q.data && <Chip size="small" color={DOT[q.data.status]} label={q.data.status} />} />
+      <CardContent>
+        <ErrorAlert error={q.error} title="Could not check the health" />
+        {q.isLoading && <Loading />}
+        <Stack spacing={1.25}>
+          {(q.data?.items ?? []).map((i) => (
+            <Stack key={i.id} direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+              <Chip size="small" color={DOT[i.status]} label={i.status} sx={{ minWidth: 52 }} />
+              <Stack sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {i.link ? (
+                    <Box component="span" sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} onClick={() => navigate(i.link!)}>
+                      {i.label}
+                    </Box>
+                  ) : (
+                    i.label
+                  )}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                  {i.detail}
+                  {i.status !== 'ok' && i.hint ? ` — ${i.hint}` : ''}
+                </Typography>
+              </Stack>
+            </Stack>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
 
 function LakeCard() {
   const lake = useQuery({ queryKey: ['liquid-lake'], queryFn: api.liquidLake, refetchInterval: 15_000 });
@@ -106,29 +134,7 @@ export function LiquidOverviewPage() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 7 }}>
-            <Card variant="outlined">
-              <CardHeader title="Layers" subheader="Delivered milestone by milestone" />
-              <CardContent>
-                <Stack spacing={1.5}>
-                  {LAYERS.map((l) => {
-                    const svc = l.service ? ext.data.services.find((s) => s.name === l.service) : undefined;
-                    const live = !!svc && svc.state === 'running';
-                    return (
-                      <Stack key={l.name} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                        <Chip size="small" variant="outlined" label={l.milestone} sx={{ minWidth: 44 }} />
-                        <Stack sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2">{l.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {l.role}
-                          </Typography>
-                        </Stack>
-                        <Chip size="small" color={live ? 'success' : 'default'} label={live ? 'running' : svc ? svc.state : 'planned'} />
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              </CardContent>
-            </Card>
+            <HealthCard />
           </Grid>
           {ext.data.available && (
             <Grid size={{ xs: 12, md: 5 }}>

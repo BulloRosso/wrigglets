@@ -45,16 +45,47 @@ export class Forge {
     return `Basic ${Buffer.from(`${user}:${password}`).toString('base64')}`;
   }
 
+  /** Last outcome of an API call, for the health view of the control loop. */
+  readonly stats: { okAt?: string; errorAt?: string; error?: string; retries: number } = { retries: 0 };
+
+  /**
+   * One API call. Reads are retried on network errors and 502/503/504 (a busy or restarting host); writes only when
+   * the connection was refused, i.e. nothing reached the host — a retried POST could otherwise open a second PR.
+   */
   async api<T>(method: string, path: string, body?: unknown, as?: { user: string; password: string }): Promise<T> {
-    const res = await fetch(`${this.cfg.baseUrl()}/api/v1${path}`, {
-      method,
-      headers: { authorization: as ? this.auth(as.user, as.password) : this.auth(), 'content-type': 'application/json', accept: 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new ForgeError(res.status, `${method} ${path}: HTTP ${res.status} ${text.slice(0, 300)}`);
-    return (text ? JSON.parse(text) : undefined) as T;
+    const read = method === 'GET' || method === 'HEAD';
+    for (let attempt = 1; ; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(`${this.cfg.baseUrl()}/api/v1${path}`, {
+          method,
+          headers: { authorization: as ? this.auth(as.user, as.password) : this.auth(), 'content-type': 'application/json', accept: 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: AbortSignal.timeout(20_000),
+        });
+      } catch (err) {
+        const code = (err as { cause?: { code?: string } }).cause?.code;
+        if (attempt < 3 && (read || code === 'ECONNREFUSED')) {
+          this.stats.retries++;
+          await new Promise((r) => setTimeout(r, 500 * attempt));
+          continue;
+        }
+        Object.assign(this.stats, { errorAt: new Date().toISOString(), error: `${method} ${path}: ${(err as Error).message}${code ? ` (${code})` : ''}` });
+        throw new ForgeError(503, `the Git host is not reachable: ${(err as Error).message}`);
+      }
+      if (read && attempt < 3 && [502, 503, 504].includes(res.status)) {
+        this.stats.retries++;
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+        continue;
+      }
+      const text = await res.text();
+      if (!res.ok) {
+        if (res.status >= 500) Object.assign(this.stats, { errorAt: new Date().toISOString(), error: `${method} ${path}: HTTP ${res.status}` });
+        throw new ForgeError(res.status, `${method} ${path}: HTTP ${res.status} ${text.slice(0, 300)}`);
+      }
+      this.stats.okAt = new Date().toISOString();
+      return (text ? JSON.parse(text) : undefined) as T;
+    }
   }
 
   async ready(): Promise<boolean> {

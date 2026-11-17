@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:32:46.748Z",
+  "startedAt": "2026-11-17T01:57:00.143Z",
   "checks": [
     {
       "name": "repair applied the new image and registered the owned upstream onto",
@@ -12,7 +12,7 @@
     {
       "name": "erp/crm now point at the ontology server",
       "ok": true,
-      "detail": "02:32:54 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp | 02:32:54 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp"
+      "detail": "02:57:07 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp | 02:57:07 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp"
     },
     {
       "name": "the gateway lists 34 onto__ and 31 erp__/crm__ tools from the ontology server",
@@ -64,7 +64,7 @@
       "ok": true,
       "detail": {
         "events": 3,
-        "hash": "be9e4256dc41"
+        "hash": "053fd45b1e15"
       }
     },
     {
@@ -76,8 +76,8 @@
       "name": "action events reach the lake (flush)",
       "ok": true,
       "detail": {
-        "flush": "{\"flushed\":0,\"hwm\":1023,\"waiting\":0}",
-        "hwm": 1023
+        "flush": "{\"flushed\":17,\"hwm\":1034,\"waiting\":0}",
+        "hwm": 1034
       }
     }
   ],
@@ -104,5 +104,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:33:01.062Z"
+  "finishedAt": "2026-11-17T01:57:14.515Z"
 }

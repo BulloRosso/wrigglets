@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T01:33:46.005Z",
+  "startedAt": "2026-11-17T01:57:59.689Z",
   "checks": [
     {
       "name": "repair: all services running (business worker inside the enterprise core)",
@@ -18,15 +18,15 @@
     {
       "name": "processes API answers (namespace business reachable)",
       "ok": true,
-      "detail": "8 running"
+      "detail": "9 running"
     },
     {
       "name": "create_purchase_order starts one PurchaseOrderRelease per order",
       "ok": true,
       "detail": [
-        "PurchaseOrderRelease-018ce7f9-1cf3-401b-9fb6-499fbfb962ef",
-        "PurchaseOrderRelease-a7062cca-a409-4bdc-9713-9453f52b8218",
-        "PurchaseOrderRelease-949c16d0-bb26-4ef9-b3c2-3981fbde9637"
+        "PurchaseOrderRelease-f55333e8-2296-4b1f-8ae6-1d5442f3830c",
+        "PurchaseOrderRelease-f120afcb-b64e-451c-a808-da6126a71a3f",
+        "PurchaseOrderRelease-ef7d3e2f-347f-44ec-91de-9210925900b3"
       ]
     },
     {
@@ -35,7 +35,7 @@
       "detail": {
         "held": 3,
         "others": [
-          "ApprovalWorkflow-fa981eb4-9998-4d39-9f49-d00f69589b83"
+          "ApprovalWorkflow-b623a9ef-149f-4d64-9865-9700ca7ea0b0"
         ]
       }
     },
@@ -59,7 +59,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "02:34:30 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
+      "detail": "02:58:45 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa)"
     },
     {
       "name": "payment-critical write outside an approved task waits for four eyes",
@@ -70,7 +70,7 @@
       "name": "the request became an ApprovalWorkflow",
       "ok": true,
       "detail": {
-        "workflowId": "ApprovalWorkflow-0718cbb4-a76f-486f-b114-cc300653b9d5",
+        "workflowId": "ApprovalWorkflow-aff6770b-5d23-47cc-bfb3-69f587ad0a83",
         "objects": [
           "Supplier:S-BALTIC",
           "Material:BEAM-PINE-80"
@@ -88,7 +88,7 @@
     {
       "name": "events after the restart are dispatched",
       "ok": true,
-      "detail": "PurchaseOrderRelease-cfb340f4-dfed-46ac-b4a1-73a34f8dc95e"
+      "detail": "PurchaseOrderRelease-8d81282b-821d-4e7c-b2e6-072ee80de341"
     },
     {
       "name": "approval accepted (decided by the signed-in person)",
@@ -133,15 +133,15 @@
       "name": "lake-flush schedule flushes the event log into the lake",
       "ok": true,
       "detail": {
-        "at": "2026-11-17T01:35:00.212Z",
+        "at": "2026-11-17T01:59:00.219Z",
         "result": {
-          "flushed": 11,
-          "hwm": 1075,
+          "flushed": 14,
+          "hwm": 1077,
           "waiting": 0
         }
       }
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T01:35:05.146Z"
+  "finishedAt": "2026-11-17T01:59:09.938Z"
 }

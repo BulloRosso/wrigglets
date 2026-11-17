@@ -81,6 +81,12 @@ describe('environment rendering', () => {
       { kind: 'svc', name: 'x', field: 'url' },
     ]);
   });
+
+  it('renders the browser URL of a published service ({{svc:NAME.public}}), and refuses one without a hostPort', () => {
+    const ctx = { secrets: {}, host: (s: string) => s, port: () => 3000, publicUrl: (s: string) => (s === 'forge' ? 'http://apps.example:3300' : undefined) };
+    expect(renderEnv({ ROOT_URL: '{{svc:forge.public}}/' }, ctx)).toEqual({ ROOT_URL: 'http://apps.example:3300/' });
+    expect(() => renderEnv({ X: '{{svc:db.public}}' }, ctx)).toThrow(/no public URL/);
+  });
 });
 
 describe('install plan', () => {

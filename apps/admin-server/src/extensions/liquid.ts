@@ -95,7 +95,7 @@ export const liquidManifest: ExtensionManifestInput = {
         FORGEJO__database__NAME: 'forgejo',
         FORGEJO__database__USER: 'forgejo',
         FORGEJO__database__PASSWD: '{{secret:forgejo_db_password}}',
-        FORGEJO__server__ROOT_URL: 'http://localhost:3300/',
+        FORGEJO__server__ROOT_URL: '{{svc:forgejo.public}}/',
         FORGEJO__server__HTTP_PORT: '3000',
         FORGEJO__server__DISABLE_SSH: 'true',
         FORGEJO__server__OFFLINE_MODE: 'true',

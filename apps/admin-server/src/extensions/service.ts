@@ -77,6 +77,8 @@ interface Deps {
   gateway: { upstreams: UpstreamServer[]; setUpstream(u: UpstreamServer): Promise<void>; deleteUpstream(name: string): Promise<void> };
   secretStore?: Pick<SecretStore, 'set' | 'remove'>;
   audit: { write(e: { by: string; action: string; target: string; details?: Record<string, unknown> }): Promise<void> };
+  /** Host name under which the browser reaches published service ports (127.0.0.1-bound), default localhost. */
+  publicHost?: string;
 }
 
 export interface Timing {
@@ -101,6 +103,12 @@ export class ExtensionService {
   private readonly stateFile: string;
   private readonly secretsFile: string;
   private readonly timing: Timing;
+
+  /** Browser URL of a service that has a hostPort (e.g. the Git host's web UI), or undefined. */
+  publicUrl(id: string, service: string): string | undefined {
+    const s = this.reg(id).manifest.services.find((x) => x.name === service);
+    return s?.hostPort ? `http://${this.deps.publicHost ?? 'localhost'}:${s.hostPort}` : undefined;
+  }
 
   constructor(
     dataDir: string,
@@ -354,7 +362,9 @@ export class ExtensionService {
     this.availability.delete(id);
     await this.persist();
     await this.deps.audit.write({ by: op.by, action: `extension.${op.kind}.done`, target: id });
-    await this.onOperationDone?.(id, op.kind, op.by)?.catch?.((err: unknown) => logger.warn({ extension: id, err: String(err) }, 'onOperationDone failed'));
+    // after the operation is no longer registered as running (busy() false), so follow-ups such as a reconcile run
+    const hook = this.onOperationDone;
+    if (hook) setImmediate(() => void Promise.resolve(hook(id, op.kind, op.by)).catch((err: unknown) => logger.warn({ extension: id, err: String(err) }, 'onOperationDone failed')));
   }
 
   /** Called after an install/repair/uninstall finished (e.g. to record owned upstreams in the config repository). */
@@ -425,7 +435,7 @@ export class ExtensionService {
     if (step.id.startsWith('service:')) {
       const svc = m.services.find((s) => s.name === step.id.slice('service:'.length));
       if (!svc) throw new Error(`unknown service in ${step.id}`);
-      const rctx = { secrets: this.secrets[id] ?? {}, host: (s: string) => s, port: (s: string) => m.services.find((x) => x.name === s)?.port };
+      const rctx = { secrets: this.secrets[id] ?? {}, host: (s: string) => s, port: (s: string) => m.services.find((x) => x.name === s)?.port, publicUrl: (s: string) => this.publicUrl(id, s) };
       const env = renderEnv(svc.env, rctx);
       const command = svc.command?.map((c, i) => renderEnv({ [`ARG${i}`]: c }, rctx)[`ARG${i}`]!);
       // The image id is part of the fingerprint, so a rebuilt :local image re-creates the container on repair.

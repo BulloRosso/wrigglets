@@ -1,11 +1,11 @@
 {
-  "startedAt": "2026-11-17T01:31:39.081Z",
+  "startedAt": "2026-11-17T01:55:59.983Z",
   "suites": [
     {
       "name": "M0b extension (fresh install, resume after restart)",
       "script": "e2e-extension.mjs",
       "ok": true,
-      "seconds": 57,
+      "seconds": 39,
       "checks": {
         "ok": 11,
         "total": 11
@@ -15,7 +15,7 @@
       "name": "M1 event log and lake",
       "script": "e2e-lake.mjs",
       "ok": true,
-      "seconds": 7,
+      "seconds": 12,
       "checks": {
         "ok": 10,
         "total": 10
@@ -25,10 +25,10 @@
       "name": "M2 ontology and editor",
       "script": "e2e-ontology.mjs",
       "ok": true,
-      "seconds": 4,
+      "seconds": 9,
       "checks": {
-        "ok": 4,
-        "total": 4
+        "ok": 7,
+        "total": 7
       }
     },
     {
@@ -55,7 +55,7 @@
       "name": "M5 business workflows",
       "script": "e2e-processes.mjs",
       "ok": true,
-      "seconds": 79,
+      "seconds": 70,
       "checks": {
         "ok": 19,
         "total": 19
@@ -65,7 +65,7 @@
       "name": "M6 config repository (Git host)",
       "script": "e2e-config.mjs",
       "ok": true,
-      "seconds": 72,
+      "seconds": 85,
       "checks": {
         "ok": 25,
         "total": 25
@@ -75,7 +75,7 @@
       "name": "M7 playbooks",
       "script": "e2e-playbooks.mjs",
       "ok": true,
-      "seconds": 51,
+      "seconds": 53,
       "checks": {
         "ok": 18,
         "total": 18
@@ -85,7 +85,7 @@
       "name": "M8 ontology evolution",
       "script": "e2e-ontology-evolution.mjs",
       "ok": true,
-      "seconds": 22,
+      "seconds": 33,
       "checks": {
         "ok": 19,
         "total": 19
@@ -95,13 +95,13 @@
       "name": "M9 apps (registry, app host, sample app)",
       "script": "e2e-apps.mjs",
       "ok": true,
-      "seconds": 3,
+      "seconds": 10,
       "checks": {
         "ok": 20,
         "total": 20
       }
     }
   ],
-  "finishedAt": "2026-11-17T01:37:32.627Z",
+  "finishedAt": "2026-11-17T02:02:11.396Z",
   "ok": true
 }

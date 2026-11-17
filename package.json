@@ -1,6 +1,7 @@
 {
   "name": "coworking-agents",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.8",
   "engines": {

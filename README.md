@@ -288,12 +288,28 @@ OpenAI's own materials before relying on details.
 > `docker run --rm --entrypoint python litellm/litellm:v1.102.0 -c "import importlib.metadata as m; print(m.version('litellm'))"`
 > (prints `1.102.0`).
 
+## Liquid enterprise (optional)
+
+An installable extension adds the data half to the agent half:
+- business data as an append-only event log and an open-format lake;
+- its meaning in a versioned LinkML ontology that is the only write path;
+- rules as code (embedded policy engine);
+- holdable business workflows;
+- a config repository reviewed on a Git host;
+- playbooks that tighten automatically and loosen only with a person;
+- small apps on a generated SDK.
+
+Install it from the admin console: **Extensions → Liquid Enterprise → Install**. Then check it with
+`node scripts/liquid/doctor.mjs`. Read [docs/liquid-enterprise.md](docs/liquid-enterprise.md) for the guide, the results
+of the demonstrations D1–D3, and the operations runbook.
+
 ## Documentation
 
 - [Guided tour](guided-tour.md): set up an agent and work with it, step by step with screenshots
 - [Technical documentation](docs/architecture.md) (architecture, diagrams, APIs, configuration, verification)
 - [Exfiltration guard](docs/exfiltration-guard.md): protection against multi-turn prompt injection
 - [Signals](docs/signals.md): optional module, agents notice open loops in incoming mails and messages
+- [Liquid enterprise](docs/liquid-enterprise.md): optional extension — event log, ontology, policy as code, business workflows, config repository, playbooks, apps
 - [Azure target and resource types](docs/azure.md)
 - [Runbook](docs/runbook.md)
 - [Architecture Decision Records](docs/adr/README.md)
@@ -324,3 +340,7 @@ corepack pnpm install && corepack pnpm -r build && corepack pnpm test
 88 tests: workflow behaviour against a local Temporal test server (approvals, lock, cancellation, budget,
 continue-as-new, kill-switch suspend/resume, delegation wait), replay of recorded histories, timeline mapping, Git
 conventions, path safety, OIDC roles, codec, gateway policy, safety rules, approval mails, LiteLLM spend and status.
+
+## License
+
+[MIT](LICENSE)

@@ -128,6 +128,12 @@ try {
   if (restoreTools) await api('PUT', '/agents/sofa-horst/tools', { allowedTools: restoreTools }).catch(() => undefined);
   if (overlayId) await api('DELETE', `/liquid/policy/overlays/${overlayId}`).catch(() => undefined);
   if (!args.has('--keep-onto')) spawnSync(process.execPath, [path.join(root, 'scripts/liquid/setup.mjs'), '--restore'], { encoding: 'utf8' });
+  // the next suite must not meet a tightening of this one: wait until gateway and core run the current package
+  await until('policy converged (gateway and core on the current package)', async () => {
+    const st = await api('GET', '/liquid/policy');
+    const rev = st.bundle?.revision;
+    return rev && st.overlays.length === 0 && ['gateway', 'core'].every((c) => st.consumers?.[c]?.revision === rev) ? true : undefined;
+  }, 60_000, 1000).catch((err) => log(`warning: ${String(err)}`));
   result.finishedAt = new Date().toISOString();
   mkdirSync(path.join(root, 'scripts/liquid/results'), { recursive: true });
   writeFileSync(path.join(root, 'scripts/liquid/results/m4-policy-e2e.json'), JSON.stringify(result, null, 2));

@@ -42,6 +42,31 @@ import type {
 export type { ExtensionStatus } from '@cw/extensions';
 
 /** A tightening policy overlay (ADR-0044). */
+/** A registered app of Liquid Enterprise (ADR-0050). */
+export interface LiquidApp {
+  id: string;
+  name: string;
+  description: string;
+  owner: string;
+  actions: string[];
+  reads: string[];
+  source?: string;
+  version: number;
+  status: 'registered' | 'rejected' | 'active' | 'disabled' | 'expired';
+  registeredBy: string;
+  registeredAt: string;
+  expiresAt: string;
+  checks: Array<{ name: string; ok: boolean; errors?: string[] }>;
+  checkedAt: string;
+  ontologyVersion: string;
+  activatedBy?: string;
+  activatedAt?: string;
+  statusNote?: string;
+  files: number;
+  bytes: number;
+  url: string;
+}
+
 export interface InboxItem {
   id: string;
   kind: 'action' | 'playbook-step' | 'wiki' | 'config' | 'plan';
@@ -399,6 +424,11 @@ export const api = {
   liquidLake: () => apiFetch<LiquidLakeStatus>('/api/liquid/lake'),
   liquidOntology: () => apiFetch<OntologyIr>('/api/liquid/ontology'),
   liquidInbox: () => apiFetch<InboxItem[]>('/api/liquid/inbox'),
+  liquidApps: () => apiFetch<LiquidApp[]>('/api/liquid/apps'),
+  liquidAppAccess: (appId: string) => apiFetch<Array<{ id: string; email: string; name: string; admin: boolean; allowed: boolean; via: 'admin' | 'all agents' | 'app' | null }>>(`/api/liquid/apps/${id(appId)}/access`),
+  setLiquidAppAccess: (appId: string, userId: string, allowed: boolean) => apiFetch<unknown>(`/api/liquid/apps/${id(appId)}/access/${id(userId)}`, { method: 'PUT', json: { allowed } }),
+  registerLiquidApp: (body: Record<string, unknown>) => apiFetch<LiquidApp>('/api/liquid/apps', { method: 'POST', json: body }),
+  liquidAppAction: (appId: string, action: 'activate' | 'disable' | 'recheck' | 'extend', json: Record<string, unknown> = {}) => apiFetch<LiquidApp>(`/api/liquid/apps/${id(appId)}/${action}`, { method: 'POST', json }),
   liquidEvents: (params: Record<string, string>) => apiFetch<{ events: LiquidEvent[]; types: Array<{ type: string; n: number }> }>(`/api/liquid/events?${new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString()}`),
   liquidPlaybooks: () => apiFetch<PlaybookList>('/api/liquid/playbooks'),
   liquidPlaybookRuns: () => apiFetch<PlaybookRunView[]>('/api/liquid/playbooks/runs'),

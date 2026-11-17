@@ -1,11 +1,11 @@
 {
-  "startedAt": "2026-11-17T00:29:25.384Z",
+  "startedAt": "2026-11-17T01:35:05.186Z",
   "checks": [
     {
       "name": "config repository initialised from the running platform; main applied, no drift",
       "ok": true,
       "detail": {
-        "head": "69af1f4bd8e8",
+        "head": "f4b973a2930f",
         "files": 30
       }
     },
@@ -18,7 +18,7 @@
       "ok": true,
       "detail": {
         "secrets": 37,
-        "revisions": 213,
+        "revisions": 309,
         "hits": 0
       }
     },
@@ -49,7 +49,7 @@
       "name": "agent proposal is validated immediately",
       "ok": true,
       "detail": {
-        "id": "cp-mwjygrbh-2adf",
+        "id": "cp-mwk0tlcx-8a96",
         "approvers": [
           {
             "for": "gateway/allow-lists.yaml",
@@ -68,13 +68,13 @@
       "name": "it is a pull request on the Git host with the required check liquid/validate = success",
       "ok": true,
       "detail": {
-        "pr": "http://localhost:3300/liquid/config/pulls/10"
+        "pr": "http://localhost:3300/liquid/config/pulls/1"
       }
     },
     {
       "name": "the console no longer decides: review and merge happen on the Git host",
       "ok": true,
-      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/proposals/cp-mwjygrbh-2adf/decide → 409 {\"error\":\"this "
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/proposals/cp-mwk0tlcx-8a96/decide → 409 {\"error\":\"this "
     },
     {
       "name": "an invalid proposal cannot be merged: required check failed (branch protection)",
@@ -109,7 +109,7 @@
       "name": "the agent sees the decision",
       "ok": true,
       "detail": {
-        "id": "cp-mwjygrbh-2adf",
+        "id": "cp-mwk0tlcx-8a96",
         "title": "sofa-max may call erp__file_incident_report",
         "status": "approved",
         "valid": true,
@@ -124,8 +124,8 @@
           }
         ],
         "decidedBy": "reviewer",
-        "decidedAt": "2026-11-17T00:30:01.668Z",
-        "mergedAs": "8f9ee0a374f1b59622e545151d8ce659779ffb10"
+        "decidedAt": "2026-11-17T01:35:53.696Z",
+        "mergedAs": "caf61e11fb65b4c7fee48db882529df0a769817a"
       }
     },
     {
@@ -144,12 +144,12 @@
     {
       "name": "an invalid draft operation is rejected",
       "ok": true,
-      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/ontology/drafts/dr-mwjyh5rd-6ca6/op"
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/ontology/drafts/dr-mwk0tvj8-2bac/op"
     },
     {
       "name": "E4: compatibility minor, the suggested version is set",
       "ok": true,
-      "detail": "4.1.0"
+      "detail": "6.1.0"
     },
     {
       "name": "submitted as a proposal: compiled, with ontology diff and owners",
@@ -176,7 +176,7 @@
     {
       "name": "the ontology proposal is a pull request too",
       "ok": true,
-      "detail": "http://localhost:3300/liquid/config/pulls/14"
+      "detail": "http://localhost:3300/liquid/config/pulls/5"
     },
     {
       "name": "restart with empty gateway/safety stores reproduces allow-lists and safety rules from the repository",
@@ -201,5 +201,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T00:30:33.994Z"
+  "finishedAt": "2026-11-17T01:36:16.888Z"
 }

@@ -42,6 +42,11 @@ describe('dispatcher', () => {
     expect(commandsFor(ev({ type: 'BusinessNotification', payload: {} }), actions, cfg)).toEqual([]);
   });
 
+  it('a simulation reset cancels the running release workflows of the old world', () => {
+    const c = commandsFor(ev({ type: 'SimulationReset', objectType: 'Company', objectId: 'sofa', payload: { changes: [] } }), actions, cfg);
+    expect(c).toEqual([{ kind: 'signal', workflowType: 'PurchaseOrderRelease', query: "WorkflowType = 'PurchaseOrderRelease' AND ExecutionStatus = 'Running'", signal: 'cancel', payload: { reason: 'simulation reset (event 10)' } }]);
+  });
+
   it('objectsOf resolves class-typed and multi-valued inputs', () => {
     expect(objectsOf(actions.get('send_customer_notice'), { customerId: 'C-01', orderIds: ['SO-1', 'SO-2'] })).toEqual(['Customer:C-01', 'SalesOrder:SO-1', 'SalesOrder:SO-2']);
   });

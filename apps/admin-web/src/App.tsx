@@ -34,6 +34,8 @@ import { LiquidProposalsPage } from './pages/LiquidProposalsPage';
 import { LiquidPlaybooksPage } from './pages/LiquidPlaybooksPage';
 import { LiquidEventsPage } from './pages/LiquidEventsPage';
 import { LiquidApprovalsPage } from './pages/LiquidApprovalsPage';
+import { LiquidAppsPage } from './pages/LiquidAppsPage';
+import AppsOutlined from '@mui/icons-material/AppsOutlined';
 import InboxOutlined from '@mui/icons-material/InboxOutlined';
 import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
 import RateReviewOutlined from '@mui/icons-material/RateReviewOutlined';
@@ -49,7 +51,7 @@ export function App() {
   // Installed extensions (ADR-0039) add their pages under their own nav group while they are available
   const extensions = useQuery({ queryKey: ['extensions'], queryFn: api.extensions, enabled: !!me.data, staleTime: 15_000 });
   const liquid = extensions.data?.find((e) => e.id === 'liquid');
-  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined />, '/liquid/ontology': <HubOutlined />, '/liquid/policies': <GavelOutlined />, '/liquid/processes': <AccountTreeOutlined />, '/liquid/proposals': <RateReviewOutlined />, '/liquid/playbooks': <ShieldOutlined />, '/liquid/events': <ReceiptLongOutlined />, '/liquid/approvals': <InboxOutlined /> };
+  const LIQUID_ICONS: Record<string, React.ReactNode> = { '/liquid': <WaterDropOutlined />, '/liquid/ontology': <HubOutlined />, '/liquid/policies': <GavelOutlined />, '/liquid/processes': <AccountTreeOutlined />, '/liquid/proposals': <RateReviewOutlined />, '/liquid/playbooks': <ShieldOutlined />, '/liquid/events': <ReceiptLongOutlined />, '/liquid/approvals': <InboxOutlined />, '/liquid/apps': <AppsOutlined /> };
   const nav = [
     { label: 'Dashboard', icon: <DashboardOutlined />, to: '/dashboard' },
     { label: 'Agents', icon: <SmartToyOutlined />, to: '/agents' },
@@ -105,6 +107,7 @@ export function App() {
           <Route path="/liquid/playbooks" element={<LiquidPlaybooksPage />} />
           <Route path="/liquid/events" element={<LiquidEventsPage />} />
           <Route path="/liquid/approvals" element={<LiquidApprovalsPage />} />
+          <Route path="/liquid/apps" element={<LiquidAppsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       )}

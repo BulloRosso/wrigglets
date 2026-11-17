@@ -72,7 +72,7 @@ describe('AgentService Entra OBO (optional)', () => {
   it('resolves the credential in the control plane and hands it over as env (never a Key Vault reference)', async () => {
     const { svc, deployed } = harness({ get: async (n) => (n === 'agent-max-entra' ? 'the-secret' : Promise.reject(new Error('nf'))) });
     await svc.setEntra('max', entra);
-    expect(deployed[0]).toMatchObject({ ENTRA_ENABLED: 'true', ENTRA_CLIENT_ID: entra.clientId, ENTRA_TENANT_ID: entra.tenantId, ENTRA_CLIENT_SECRET: 'the-secret', ENTRA_ALLOW_AGENT_ONLY: 'false' });
+    expect(deployed[0]).toMatchObject({ ENTRA_ENABLED: 'true', ENTRA_CLIENT_ID: entra.clientId, ENTRA_TENANT_ID: entra.tenantId, ENTRA_CLIENT_SECRET: 'the-secret', ENTRA_ALLOW_AGENT_ONLY: 'false', OIDC_ISSUER: `https://login.microsoftonline.com/${entra.tenantId}/v2.0` });
     expect(Object.keys(deployed[0]!)).not.toContain('ENTRA_CREDENTIAL_REF');
     expect(Object.keys(deployed[0]!).some((k) => k.startsWith('KEYVAULT'))).toBe(false);
   });

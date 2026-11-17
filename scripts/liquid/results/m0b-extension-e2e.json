@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T00:23:15.152Z",
+  "startedAt": "2026-11-17T01:31:39.115Z",
   "checks": [
     {
       "name": "starts not installed and not available",
@@ -105,6 +105,10 @@
         {
           "label": "Event log",
           "path": "/liquid/events"
+        },
+        {
+          "label": "Apps",
+          "path": "/liquid/apps"
         }
       ]
     },
@@ -114,5 +118,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T00:24:21.523Z"
+  "finishedAt": "2026-11-17T01:32:36.265Z"
 }

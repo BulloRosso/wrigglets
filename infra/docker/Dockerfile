@@ -38,6 +38,7 @@ COPY apps/mcp-web/package.json apps/mcp-web/
 COPY apps/mcp-wiki/package.json apps/mcp-wiki/
 COPY apps/signals-hub/package.json apps/signals-hub/
 COPY apps/ontology-server/package.json apps/ontology-server/
+COPY apps/liquid-app-due-diligence/package.json apps/liquid-app-due-diligence/
 COPY packages/shared/package.json packages/shared/
 COPY packages/workflows/package.json packages/workflows/
 COPY packages/signals/package.json packages/signals/

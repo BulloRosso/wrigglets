@@ -22,6 +22,7 @@ const suites = [
   ['M6 config repository (Git host)', 'e2e-config.mjs', shots, 'e2e-config.json'],
   ['M7 playbooks', 'e2e-playbooks.mjs', shots, 'e2e-playbooks.json'],
   ['M8 ontology evolution', 'e2e-ontology-evolution.mjs', shots, 'e2e-ontology-evolution.json'],
+  ['M9 apps (registry, app host, sample app)', 'e2e-apps.mjs', shots.length ? [] : ['--shots'], 'm9-apps-e2e.json'],
 ];
 const start = from ? Math.max(0, suites.findIndex((s) => s[1].includes(from))) : 0;
 const out = { startedAt: new Date().toISOString(), suites: [] };

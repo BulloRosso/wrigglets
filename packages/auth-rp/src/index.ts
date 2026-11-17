@@ -2,6 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Express, NextFunction, Request, RequestHandler, Response } from 'express';
 import { EncryptJWT, createRemoteJWKSet, jwtDecrypt, jwtVerify, type JWTPayload } from 'jose';
 import type { Principal } from '@cw/shared';
+import type { RoleMapper } from './roles.js';
+
+export { entraIssuer, parseRoleMap, roleMapper, type RoleMapper } from './roles.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -46,6 +49,8 @@ export interface OidcRpOptions {
   /** Receives the tokens of a successful sign-in (never stored in the session cookie by this library). */
   onTokens?: (user: Principal, tokens: SignInTokens) => void | Promise<void>;
   onSignOut?: (user: Principal) => void | Promise<void>;
+  /** Platform roles from the ID token's claims (default: the `roles` claim as it is). See roleMapper (Entra app roles, groups). */
+  mapRoles?: RoleMapper;
 }
 
 export interface SignInTokens {
@@ -84,6 +89,8 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
   const base = o.publicBaseUrl.replace(/\/$/, '');
   const secure = base.startsWith('https://');
   const redirectUri = `${base}/auth/callback`;
+  // mounted below a path (e.g. an app at /apps/<id>, ADR-0050): the browser-facing redirects stay inside it
+  const bp = new URL(base).pathname.replace(/\/$/, '');
   let discovery: Discovery | undefined;
   let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
@@ -106,8 +113,10 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
       return undefined;
     }
   }
-  const cookieOpts = (maxAge: number) => ({ httpOnly: true, sameSite: 'lax' as const, secure, path: '/', maxAge });
-  const safeReturnTo = (v: unknown) => (typeof v === 'string' && v.startsWith('/') && !v.startsWith('//') ? v : '/');
+  // below a path the cookies are scoped to it, so apps on one host do not see each other's sessions
+  const cookiePath = bp ? `${bp}/` : '/';
+  const cookieOpts = (maxAge: number) => ({ httpOnly: true, sameSite: 'lax' as const, secure, path: cookiePath, maxAge });
+  const safeReturnTo = (v: unknown) => (typeof v === 'string' && v.startsWith(`${bp}/`) && !v.startsWith('//') ? v : `${bp}/`);
 
   async function sessionUser(req: Request): Promise<Principal | undefined> {
     const s = await unseal<Principal>(req.cookies?.[o.cookieName]);
@@ -146,11 +155,11 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
       app.get('/auth/callback', async (req, res, next) => {
         try {
           const flow = await unseal<{ state: string; nonce: string; verifier: string; returnTo: string }>(req.cookies?.[flowCookie]);
-          res.clearCookie(flowCookie, { path: '/' });
+          res.clearCookie(flowCookie, { path: cookiePath });
           if (req.query.error) {
-            return res.status(401).type('html').send(`<p>Sign-in was not completed: ${escapeHtml(String(req.query.error_description ?? req.query.error))}</p><p><a href="/auth/login">Try again</a></p>`);
+            return res.status(401).type('html').send(`<p>Sign-in was not completed: ${escapeHtml(String(req.query.error_description ?? req.query.error))}</p><p><a href="${bp}/auth/login">Try again</a></p>`);
           }
-          if (!flow || flow.state !== req.query.state || typeof req.query.code !== 'string') return res.redirect('/auth/login');
+          if (!flow || flow.state !== req.query.state || typeof req.query.code !== 'string') return res.redirect(`${bp}/auth/login`);
           const d = await discover();
           const tokenRes = await fetch(toInternal(d.token_endpoint), {
             method: 'POST',
@@ -175,10 +184,10 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
             upn: String(payload.preferred_username ?? payload.email ?? payload.sub).toLowerCase(),
             name: String(payload.name ?? payload.preferred_username ?? payload.sub),
             oid: String(payload.oid ?? payload.sub),
-            roles: Array.isArray(payload.roles) ? payload.roles.map(String) : [],
+            roles: o.mapRoles ? o.mapRoles(payload) : Array.isArray(payload.roles) ? payload.roles.map(String) : [],
           };
           if (o.requiredRole && !user.roles.includes(o.requiredRole)) {
-            return res.status(403).type('html').send(o.accessDenied?.(user) ?? `<p>Access denied (role ${escapeHtml(o.requiredRole)} required).</p><p><a href="/auth/logout">Sign out</a></p>`);
+            return res.status(403).type('html').send(o.accessDenied?.(user) ?? `<p>Access denied (role ${escapeHtml(o.requiredRole)} required).</p><p><a href="${bp}/auth/logout">Sign out</a></p>`);
           }
           await o.onTokens?.(user, {
             accessToken: tokens.access_token,
@@ -196,9 +205,9 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
       app.get('/auth/logout', async (req, res) => {
         const current = o.onSignOut ? await sessionUser(req) : undefined;
         if (current) await Promise.resolve(o.onSignOut?.(current)).catch(() => undefined);
-        res.clearCookie(o.cookieName, { path: '/' });
+        res.clearCookie(o.cookieName, { path: cookiePath });
         const d = await discover().catch(() => undefined);
-        if (!d?.end_session_endpoint) return res.redirect('/');
+        if (!d?.end_session_endpoint) return res.redirect(`${bp}/`);
         const url = new URL(toPublic(d.end_session_endpoint));
         url.search = new URLSearchParams({ client_id: o.clientId, post_logout_redirect_uri: `${base}/` }).toString();
         res.redirect(url.toString());
@@ -209,7 +218,7 @@ export function createOidcRp(o: OidcRpOptions): OidcRp {
       const user = await sessionUser(req);
       if (!user) {
         if (isApi(req) || req.method !== 'GET') return res.status(401).json({ error: 'unauthenticated' });
-        return res.redirect(`/auth/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
+        return res.redirect(`${bp}/auth/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
       }
       req.user = user;
       next();

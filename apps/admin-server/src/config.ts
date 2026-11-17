@@ -1,3 +1,4 @@
+import { entraIssuer, parseRoleMap } from '@cw/auth-rp';
 import { z } from 'zod';
 
 const bool = (def: string) =>
@@ -32,6 +33,16 @@ const schema = z.object({
   ADMIN_CLIENT_SECRET: z.string().min(16),
   SESSION_SECRET: z.string().min(32),
   SESSION_TTL_HOURS: z.coerce.number().positive().default(8),
+  /** Sign-in of the admin console (ADR-0050): the local OAuth server (default) or Microsoft Entra ID. */
+  ADMIN_AUTH_MODE: z.enum(['local', 'entra']).default('local'),
+  ADMIN_ENTRA_CLIENT_ID: z.string().optional(),
+  ADMIN_ENTRA_CLIENT_SECRET: z.string().optional(),
+  /** Entra app-role values / group ids → platform roles, e.g. "Admins=Platform.Admin" (unset: role values used as they are). */
+  ENTRA_ROLE_MAP: z.string().optional(),
+
+  /* App host for registered UIs of Liquid Enterprise (ADR-0050): its own origin, never the console's */
+  APPS_PORT: z.coerce.number().int().positive().default(8090),
+  APPS_PUBLIC_URL: z.string().url().default('http://localhost:8090'),
 
   /* Agent runtime */
   RUNTIME: z.enum(['docker', 'azure-app-service']).default('docker'),
@@ -139,7 +150,18 @@ export function loadConfig(env = process.env) {
   }
   const c = r.data;
   const [portFrom, portTo] = c.AGENT_PORT_RANGE.split('-').map(Number) as [number, number];
+  if (c.ADMIN_AUTH_MODE === 'entra') {
+    const missing = (['ENTRA_TENANT_ID', 'ADMIN_ENTRA_CLIENT_ID', 'ADMIN_ENTRA_CLIENT_SECRET'] as const).filter((k) => !c[k]);
+    if (missing.length) throw new Error(`Invalid configuration: ADMIN_AUTH_MODE=entra needs ${missing.join(', ')}`);
+    parseRoleMap(c.ENTRA_ROLE_MAP); // fail at start, not at the first sign-in
+  }
+  const adminAuth =
+    c.ADMIN_AUTH_MODE === 'entra'
+      ? { mode: 'entra' as const, issuer: entraIssuer(c.ENTRA_TENANT_ID!, c.ENTRA_AUTHORITY_HOST), internalUrl: undefined, clientId: c.ADMIN_ENTRA_CLIENT_ID!, clientSecret: c.ADMIN_ENTRA_CLIENT_SECRET!, roleMap: c.ENTRA_ROLE_MAP }
+      : { mode: 'local' as const, issuer: c.OAUTH_ISSUER, internalUrl: (c.OAUTH_INTERNAL_URL ?? c.OAUTH_ISSUER).replace(/\/$/, ''), clientId: c.ADMIN_CLIENT_ID, clientSecret: c.ADMIN_CLIENT_SECRET, roleMap: undefined };
   return {
+    adminAuth,
+    appsPublicUrl: c.APPS_PUBLIC_URL.replace(/\/$/, ''),
     ...c,
     publicUrl: c.PUBLIC_URL.replace(/\/$/, ''),
     oauthInternal: (c.OAUTH_INTERNAL_URL ?? c.OAUTH_ISSUER).replace(/\/$/, ''),

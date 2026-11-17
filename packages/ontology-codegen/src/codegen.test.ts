@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import ts from 'typescript';
 import { irHash, verifyIr, type OntologyIr } from '@cw/ontology-ir';
-import { dqChecks, generateAll, genSql, genTypes, mcpTools, opaData, snake } from './index.js';
+import { dqChecks, generateAll, genAppSdk, genSql, genTypes, mcpTools, opaData, snake } from './index.js';
 
 /* Generators on a tiny synthetic ontology: the rules, independent of the sofa company. */
 
@@ -120,5 +121,20 @@ describe('generators', () => {
     const a = generateAll(ir);
     expect(generateAll(mini())).toEqual(a);
     for (const [p, c] of Object.entries(a)) expect(c, p).toMatch(/GENERATED from ontology mini@1\.2\.3 \(aaaaaaaaaaaa\)|GENERATED from ontology mini@1\.2\.3/);
+  });
+
+  it('app SDK (ADR-0050): standalone, typed, only relative same-origin calls, deterministic', () => {
+    const sdk = genAppSdk(mini());
+    expect(sdk).toBe(genAppSdk(mini()));
+    expect(sdk).not.toMatch(/^import /m);
+    expect(sdk).not.toMatch(/https?:\/\//);
+    expect(sdk.match(/fetch\(/g)).toHaveLength(1);
+    expect(sdk).toContain("credentials: 'same-origin'");
+    // the generated file is valid TypeScript (syntax)
+    const out = ts.transpileModule(sdk, { reportDiagnostics: true, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
+    expect((out.diagnostics ?? []).map((d) => ts.flattenDiagnosticMessageText(d.messageText, ' '))).toEqual([]);
+    expect(sdk).toContain(['export interface OrderLine {', '  id: string;', '  product: string;', '  colors?: Array<Color> | null;'].join(String.fromCharCode(10)));
+    expect(sdk).toContain('export type Color = "red" | "blue";');
+    expect(sdk).toContain("addLine: (input: AddLineInput) => call<ActionResult>('POST', '/actions/add_line', input),");
   });
 });

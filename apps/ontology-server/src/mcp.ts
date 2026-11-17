@@ -58,6 +58,7 @@ export async function rpc(svc: OntologyService, group: Group, msg: RpcMessage) {
         const { args, caller } = OntologyService.splitCaller(params?.arguments ?? {});
         // approvals and workflow identity never come from an agent's tool call
         delete caller.approvedBy;
+        delete caller.app;
         delete caller.workflow;
         const out = await svc.execute(name, args, caller);
         return { jsonrpc: '2.0', id, result: text(out.text, out.isError) };

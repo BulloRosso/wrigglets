@@ -560,7 +560,70 @@ that is in flight the reconciler defers instead of taking the change for drift.
 
 ## Identity and apps
 
-*(planned, M9)*
+Decision record: [ADR-0050](adr/0050-entra-option-app-registry.md).
+
+<img src="diagrams/30-liquid-apps.svg" alt="Apps: registry, static check, app host on its own origin, enterprise core" width="100%">
+
+### Entra ID as identity provider (option)
+
+The local OAuth server stays the default. To sign administrators in at Entra ID:
+
+```bash
+ADMIN_AUTH_MODE=entra
+ENTRA_TENANT_ID=<tenant id (GUID)>
+ADMIN_ENTRA_CLIENT_ID=<app registration of the admin console>
+ADMIN_ENTRA_CLIENT_SECRET=<its secret>
+ENTRA_ROLE_MAP="Admins=Platform.Admin"   # optional: app-role values or group ids → platform roles
+```
+
+The admin console's app registration needs the redirect URI `<PUBLIC_URL>/auth/callback`, ID tokens, and an app role
+whose value is `Platform.Admin` (then no map is needed) or one mapped to it. Agents with an Entra identity (ADR-0032)
+sign their users in at the same tenant; `ENTRA_ROLE_MAP` is passed to them as well. Without these variables
+everything runs on the local OAuth server. Entra Agent ID is not used (see the ADR): each agent keeps its own Entra
+app registration.
+
+### App registry and app host
+
+Many small UIs, each on the generated SDK, each with an owner, the actions it may use, and an expiry date.
+**Liquid enterprise → Apps** lists them:
+
+![Apps page: the sample app active with its checks and who may use it; a leaky variant rejected](images/liquid/liquid-apps.png)
+
+1. **Build on the app SDK.** *Download the app SDK* (or `GET /api/liquid/ontology/sdk?kind=app`) gives one
+   TypeScript file for the ontology in force: typed objects (`client.objects.supplier.list()`) and actions
+   (`client.actions.submitDueDiligenceStatement({...})`). Put it at `src/liquid-sdk.ts` unchanged. Use React and Vite
+   with `base: './'`, and use hash routing if the app has routes.
+2. **Register** with the owner, the actions it may run, the classes it may read, and the expiry (default 180 days),
+   from the page (*Choose app folder*) or with the script:
+
+   ```bash
+   node scripts/liquid/app-register.mjs apps/liquid-app-due-diligence --id supplier-due-diligence      --name "Supplier due diligence" --owner stefan.lang@sofaworks.example      --actions submit_due_diligence_statement --reads Supplier,DueDiligenceStatement --activate
+   ```
+
+   The check runs at once. It enforces pinned, allow-listed dependencies, and requires the SDK file to be identical to
+   the current one. No other code may make network calls or run dynamic code, and nothing may be loaded from
+   elsewhere. A failed app is *rejected* and cannot be activated; its card lists what failed.
+3. **Activate.** The app gets its OIDC client and is served at `http://localhost:8090/apps/<id>/`. That is the app
+   host, a separate origin from the console.
+4. **Grant access** under *Who may use it*: the role `Agent.User` on the app. Administrators, and users with
+   `Agent.User` on all agents, inherit it.
+
+What the app host guarantees at runtime:
+- **Content Security Policy:** scripts and connections only to its own origin.
+- **Forwarding:** only the app's registered actions and classes are forwarded to the enterprise core. The person
+  becomes the actor of the event and the app is recorded with it (`payload.app`).
+- **Caller fields:** caller fields sent by the browser are dropped.
+- **Calls:** calls must come from the app's own pages.
+- **Lifecycle:** *Disable* or expiry removes the OIDC client (410 for everyone); *Extend* and *Activate* bring it
+  back with the same access list. A new ontology version that changes the SDK makes *Check again* fail. The owner
+  then downloads the new SDK, rebuilds and registers a new version.
+
+The sample app **Supplier due diligence** (`apps/liquid-app-due-diligence`) records suppliers' due-diligence
+statements. Its action came in through a reviewed pull request (class `DueDiligenceStatement`, actions
+`submit_due_diligence_statement` and `list_due_diligence_statements`) and runs generically in the enterprise core,
+without domain code:
+
+![The sample app: a statement form on the SDK, the recorded statements](images/liquid/liquid-app-due-diligence.png)
 
 ## Operations runbook
 
@@ -594,6 +657,9 @@ docker exec -it cw-ext-liquid-ontology-db psql -U onto -d onto -c "SELECT seq, t
 - **Git host:** `http://localhost:3300` (only from this machine), user `reviewer`. If it is down, proposals cannot be
   opened or merged; the reconciler keeps applying the local `main`. *Repair* on the Extensions page re-runs the
   bootstrap (accounts, repository, branch protection, webhook) idempotently.
+- **Apps:** the app host listens on `127.0.0.1:8090` (`APPS_PORT`, `APPS_PUBLIC_URL` for another host name). Registry
+  data is in `DATA_DIR/liquid/apps*` (secrets of the OIDC clients in `apps-secrets.json`, 0600). After an ontology
+  change, *Check again* shows which apps need a new SDK; their owners re-register. The expiry job runs hourly.
 - **Complete runtime test:** `node scripts/liquid/e2e-all.mjs` runs every milestone's end-to-end check in order
   (`--from <suite>` to continue, `--shots` to refresh the screenshots); results in `scripts/liquid/results/`.
 - *(planned)* Replaying a window, restoring after a playbook run, rotating the ontology DB credentials.
@@ -1005,6 +1071,59 @@ Verified
 Deviations
 - Plan approvals stay with the agent app (its approver policy); the safety engine still enforces in-process; the wiki
   keeps its own review page (mirrored into the inbox); overlay mode keeps the console review.
+
+### M9 — Identity (Entra option) and apps (2026-11-17)
+
+Done
+- [ADR-0050](adr/0050-entra-option-app-registry.md).
+- **Entra option:**
+  - `ADMIN_AUTH_MODE=entra` for the admin console;
+  - `roleMapper` in `@cw/auth-rp` maps Entra app roles and groups to platform roles (`ENTRA_ROLE_MAP`, `OIDC_ROLE_MAP` for agents);
+  - agents with an Entra identity sign users in at the tenant (their `OIDC_ISSUER` is set to it);
+  - the relying party works below a path (redirects and cookies scoped to it).
+- **App SDK** (`genAppSdk`): standalone, typed, same-origin only, no token.
+- **App registry** (`/liquid/apps`, API, page):
+  - static check: layout, pinned and allow-listed dependencies, SDK identical to the one in force, no network or dynamic code, actions and classes exist, bundle self-contained;
+  - lifecycle: activation with an OIDC client per app, per-person access, expiry job, disable, extend, re-check;
+  - every change is an event (`App`).
+- **App host** (port 8090, own origin): strict CSP, sign-in per app, forwarding of registered actions and reads
+  only, caller set by the host, own-page requirement for API calls, 410 for inactive apps.
+- **Sample app** `apps/liquid-app-due-diligence`. Its ontology change (`DueDiligenceStatement`, two actions) came in
+  as a reviewed pull request and runs generically. `scripts/liquid/app-register.mjs` registers it.
+- Enterprise core: caller field `_app` (trusted REST only, dropped from MCP).
+
+Verified
+- Unit tests:
+  - role mapping with Entra claim fixtures (6);
+  - app check (7: a `fetch` to another host is rejected, as are other escapes, foreign imports, a modified SDK,
+    unpinned dependencies and install scripts);
+  - registry (4: expiry removes the OIDC client, rejected apps cannot be activated, new versions need activation);
+  - app host (3);
+  - app SDK is valid TypeScript;
+  - Entra issuer for OBO agents;
+  - the config repository settles lost webhooks.
+- **End to end** (`node scripts/liquid/e2e-apps.mjs`, `scripts/liquid/results/m9-apps-e2e.json`): 20/20.
+  - A leaky variant is rejected; the sample passes, is listed with owner and expiry (180 days) and answers 410 until
+    it is activated.
+  - Stefan is refused by the OAuth server until he has the role on the app, then the app loads with the strict CSP.
+  - API calls without the app's own page are refused (403), as are reads and actions outside the registration.
+  - A statement is recorded as `DueDiligenceStatementSubmitted` with Stefan as actor and the app in the payload;
+    spoofed `_approvedBy` / `_requestedBy` / `_agent` fields are dropped.
+  - Disable gives 410; re-activation works with a new client secret and the same access list.
+- **Complete runtime test** `node scripts/liquid/e2e-all.mjs`, now including M9, uninterrupted on a fresh install:
+  M0b 11, M1 10, M2 4, M3 13, M4 14, M5 19, M6 25, M7 18, M8 19, M9 20 — **153/153**.
+- Found on the way:
+  - a simulation reset left the release workflows of the old world running, and they released the new orders with
+    the same ids (now cancelled on `SimulationReset`);
+  - suites left a tightening (the docs-example overlay) or a hold behind when a check failed (now converged or
+    released in `finally`);
+  - removing an app's OIDC client also removed its access list (assignments now stay with the app).
+
+Open
+- **Entra sign-in with a real tenant has not been tested** (no tenant available): the exit criterion "sign-in to admin
+  and agent UI via Entra with mapped roles" waits for `ENTRA_TENANT_ID` and two app registrations.
+- Apps sign in at the local OAuth server also in Entra mode; per-app Entra registrations are not automated.
+- Entra Agent ID is not adopted (license and tenant; see the ADR).
 
 ### Later
 

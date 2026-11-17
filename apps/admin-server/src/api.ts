@@ -3,7 +3,7 @@ import path from 'node:path';
 import express, { Router, type ErrorRequestHandler, type Express } from 'express';
 import cookieParser from 'cookie-parser';
 import { ZodError, z } from 'zod';
-import { createOidcRp, requireRole } from '@cw/auth-rp';
+import { createOidcRp, roleMapper, requireRole } from '@cw/auth-rp';
 import { handleCodecRequest } from '@cw/codec';
 import { ALL_AGENT_ROLES, PLATFORM_ROLES, createAgentBody, createUserBody, updateAgentBody, updateUserBody, type PlatformOverview } from '@cw/shared';
 import { q } from '@cw/shared/search-attributes';
@@ -36,11 +36,13 @@ export function createAdminApp(deps: AdminDeps): Express {
   if (config.TRUST_PROXY) app.set('trust proxy', true);
   app.use(cookieParser());
 
+  // the local OAuth server, or Entra ID (ADMIN_AUTH_MODE=entra, ADR-0050) with app roles mapped to the platform roles
   const rp = createOidcRp({
-    issuer: config.OAUTH_ISSUER,
-    internalUrl: config.oauthInternal,
-    clientId: config.ADMIN_CLIENT_ID,
-    clientSecret: config.ADMIN_CLIENT_SECRET,
+    issuer: config.adminAuth.issuer,
+    internalUrl: config.adminAuth.internalUrl,
+    clientId: config.adminAuth.clientId,
+    clientSecret: config.adminAuth.clientSecret,
+    mapRoles: config.adminAuth.mode === 'entra' ? roleMapper(config.adminAuth.roleMap) : undefined,
     sessionSecret: config.SESSION_SECRET,
     sessionTtlMs: config.sessionTtlMs,
     cookieName: 'cw_admin',
@@ -79,7 +81,9 @@ export function createAdminApp(deps: AdminDeps): Express {
 
   /* ------------------------------------------------- API (Platform.Admin only) */
   const api = Router();
-  api.use(rp.apiMiddleware, requireRole(PLATFORM_ROLES.admin), express.json({ limit: '256kb' }));
+  const jsonSmall = express.json({ limit: '256kb' });
+  const jsonUpload = express.json({ limit: '8mb' }); // an app registration carries its files (ADR-0050)
+  api.use(rp.apiMiddleware, requireRole(PLATFORM_ROLES.admin), (req, res, next) => (req.method === 'POST' && /^\/liquid\/apps\/?$/.test(req.path) ? jsonUpload : jsonSmall)(req, res, next));
   const by = (req: express.Request) => req.user!.upn;
   // Safety, gateway, secrets and portraits first: their paths (e.g. /agents/:id/avatar) would otherwise match /agents/:id/:action.
   api.use(extensionRouter(ext, by));

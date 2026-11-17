@@ -13,6 +13,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LIQUID_ID, liquidBootstrap, liquidManifest, liquidOverlay, ontologyCall } from './extensions/liquid.js';
 import { LiquidPolicyService } from './extensions/liquidPolicy.js';
+import { AppRegistry } from './liquid/apps.js';
+import { createAppHost } from './liquid/appHost.js';
 import { DockerExtensionRuntime } from './extensions/runtime.js';
 import { ExtensionService, vaultSecretRef } from './extensions/service.js';
 import { createAdminApp } from './api.js';
@@ -339,6 +341,35 @@ async function main() {
   });
   await approvals.load();
   approvals.start(() => extensions.isInstalled(LIQUID_ID) && !!temporal.client);
+
+  // App registry and app host (ADR-0050): registered UIs on their own origin, expiry job hourly
+  const appRegistry = new AppRegistry({
+    dataDir: config.DATA_DIR,
+    appsPublicUrl: config.appsPublicUrl,
+    oauth,
+    ontology: async () => {
+      const ir = await ontologyCall<{ version: string; actions: Array<{ name: string }>; classes: Array<{ name: string }> }>(liquidCtx, 'GET', '/internal/ontology');
+      const r = await fetch(`${liquidCtx.url('ontology-server')}/internal/ontology/app-sdk.ts`, { headers: { authorization: `Bearer ${liquidCtx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
+      if (!r.ok) throw new Error(`enterprise core: app SDK HTTP ${r.status}`);
+      return { version: ir.version, actions: ir.actions.map((x) => x.name), classes: ir.classes.map((x) => x.name), sdk: await r.text() };
+    },
+    events: async (events) => void (await ontologyCall(liquidCtx, 'POST', '/internal/events', { events })),
+    audit,
+    log: logger,
+  });
+  await appRegistry.load();
+  appRegistry.start(3_600_000, () => extensions.isInstalled(LIQUID_ID));
+  const appHost = createAppHost({
+    registry: appRegistry,
+    appsPublicUrl: config.appsPublicUrl,
+    issuer: config.OAUTH_ISSUER,
+    internalUrl: config.oauthInternal,
+    sessionSecret: config.SESSION_SECRET,
+    core: { url: () => liquidCtx.url('ontology-server'), token: () => liquidCtx.secret('ontology_internal_token') },
+    enabled: () => extensions.isInstalled(LIQUID_ID),
+    log: logger,
+  });
+  appHost.listen(config.APPS_PORT, () => logger.info({ port: config.APPS_PORT, url: config.appsPublicUrl }, 'app host listening'));
   // one sensing path (ADR-0049): Signals observations are events, playbooks subscribe (trigger kind signal)
   signals.onObservation = (o) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'signal', data: o }, 'signals-hub') : undefined);
   safety.onTrip = (t) => (extensions.isInstalled(LIQUID_ID) ? playbooks.sense({ kind: 'safety_metric', data: t }, 'safety-rules') : undefined);
@@ -355,7 +386,7 @@ async function main() {
   void killSwitch.reconcile().catch(() => undefined);
   logger.info({ keyVault: !!secrets, portraits: avatars.enabled, model: config.AVATAR_IMAGE_MODEL }, 'safety services ready');
 
-  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
+  const app = createAdminApp({ config, registry, runtime, oauth, temporal, devServer, agents, audit, ext: { config, registry, audit, avatars, killSwitch, gateway, safety, guard, secrets, oauth, ai, spendLimit: (spec) => agents.spendLimit(spec), agents, smallModel: config.AI_GATEWAY_SMALL_MODEL, signals, extensions, liquidPolicy, liquidConfig: { repo: configRepo, drafts: new DraftStore(path.join(config.DATA_DIR, 'admin', 'liquid-drafts')), validators, audit, logger }, liquidProcesses, liquidPlaybooks: playbooks, liquidApprovals: approvals, liquidApps: appRegistry, mail: new MailService(config.DATA_DIR, config.MAIL_API_URL || undefined, config.MAIL_API_KEY || undefined) } });
   const server = app.listen(config.PORT, () => logger.info({ port: config.PORT, url: config.publicUrl }, 'admin console listening'));
 
   // Make sure every registered agent has its OIDC client (e.g. after the OAuth data volume was reset).
@@ -378,6 +409,7 @@ async function main() {
         })
         .catch((err) => logger.warn({ agentId: spec.agentId, err: String(err) }, 'could not reconcile OIDC client'));
     }
+    await appRegistry.reconcileClients().catch((err) => logger.warn({ err: String(err) }, 'could not reconcile the OIDC clients of apps'));
   })();
 
   // Agents created before LiteLLM (ADR-0029) have no virtual key and may use a model LiteLLM does not know (e.g. the

@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import { z, ZodError } from 'zod';
 import type { EventStore, Lake } from '@cw/lake';
-import { opaData, genSdk } from '@cw/ontology-codegen';
+import { opaData, genAppSdk, genSdk } from '@cw/ontology-codegen';
 import { freshWorld, sofaExtract } from '@cw/sofa-domain';
 import { identifierIn } from './runtime.js';
 import { GROUPS, rpc, type Group } from './mcp.js';
@@ -213,6 +213,23 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/policy/engine', (_req, res) => res.json(d.engine ?? { loaded: false }));
+  /** Health of the core's part of the control loop (ADR-0051): dispatcher and lake lag, policy engine, ontology. */
+  internal.get(
+    '/health/loop',
+    wrap(async (_req, res) => {
+      const st = await d.store.stats();
+      const cur = (await d.store.query<Record<string, unknown>>("SELECT seq, updated_at FROM dispatch_cursor WHERE id = 'business'").catch(() => [] as Array<Record<string, unknown>>))[0];
+      const lake = await d.lake.status().catch((err: Error) => ({ error: err.message }) as { error: string; hwm?: number; lastFlush?: unknown });
+      const eng = d.engine as { revision?: string; loadedAt?: string } | undefined;
+      res.json({
+        events: { maxSeq: st.maxSeq },
+        dispatcher: cur ? { cursor: Number(cur.seq), updatedAt: cur.updated_at, lag: st.maxSeq - Number(cur.seq) } : null,
+        lake: { hwm: lake.hwm ?? null, lag: lake.hwm == null ? null : st.maxSeq - lake.hwm, lastFlush: lake.lastFlush ?? null, error: 'error' in lake ? lake.error : null },
+        policy: eng?.revision ? { revision: eng.revision, loadedAt: eng.loadedAt } : null,
+        ontology: { name: d.svc.ir.name, version: d.svc.ir.version },
+      });
+    }),
+  );
   // ontology evolution (ADR-0048): versions, check and live apply of a new IR, the SDK of the version in force
   internal.get('/ontology/versions', wrap(async (_req, res) => res.json(await d.svc.versions())));
   internal.post('/ontology/check', wrap(async (req, res) => res.json(await d.svc.check(req.body?.ir))));
@@ -224,6 +241,8 @@ export function createApp(d: AppDeps) {
     }),
   );
   internal.get('/ontology/sdk.ts', (_req, res) => res.type('text/plain').send(genSdk(d.svc.ir)));
+  // the standalone SDK registered apps must use, byte for byte (ADR-0050)
+  internal.get('/ontology/app-sdk.ts', (_req, res) => res.type('text/plain').send(genAppSdk(d.svc.ir)));
 
   // parity runner (the mock's control surface)
   internal.get('/sim/kpi', (_req, res) => res.json(d.svc.company.kpi()));

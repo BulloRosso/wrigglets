@@ -54,3 +54,4 @@ The implementation specification (`agent-implementation-spec.md`) requires ambig
 | [0047](0047-playbooks-tighten-only.md) | Playbooks, autonomy tiers and the tighten-only rule | Accepted |
 | [0048](0048-ontology-evolution-runtime.md) | Ontology evolution: runtime interpretation, compatibility, live migration | Accepted |
 | [0049](0049-liquid-simplification.md) | Simplification: event log as truth, embedded policy, enterprise core, Git host, one approval mechanism | Accepted |
+| [0050](0050-entra-option-app-registry.md) | Entra ID as identity provider option; app registry and app host for generated UIs | Accepted |

@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Roboto, 'Segoe UI', Arial, sans-serif">
+  <title>Apps: registry, static check, app host on its own origin</title>
+  <style>
+    .t { font-size: 22px; font-weight: 600; fill: #1d2733; }
+    .st { font-size: 13px; fill: #5b6777; }
+    .h { font-size: 15px; font-weight: 600; fill: #1d2733; }
+    .h2 { font-size: 13px; font-weight: 600; fill: #1d2733; }
+    .d { font-size: 12px; fill: #37414f; }
+    .mono { font-size: 11px; fill: #37414f; font-family: Consolas, monospace; }
+    .lbl { font-size: 11px; fill: #37414f; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .ln { fill: none; stroke: #5b6777; stroke-width: 1.6; }
+    .lnr { fill: none; stroke: #c62828; stroke-width: 1.6; stroke-dasharray: 5 4; }
+    .lnb { fill: none; stroke: #1f5fad; stroke-width: 2; }
+    .usr { fill: #f1eafb; stroke: #6a3fb4; stroke-width: 1.5; }
+    .gw { fill: #fdecea; stroke: #c62828; stroke-width: 1.5; }
+    .cp { fill: #e8f0fb; stroke: #1f5fad; stroke-width: 1.5; }
+    .opa { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; }
+    .ok { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.2; }
+    .db { fill: #f4f6fa; stroke: #5b6777; stroke-width: 1.5; }
+    .bd { fill: #1d2733; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6777"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f5fad"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c62828"/></marker>
+  </defs>
+  <rect width="1200" height="640" fill="#ffffff"/>
+  <text x="40" y="44" class="t">Apps (M9): registered, checked, served on their own origin, expiring</text>
+  <text x="40" y="68" class="st">An app is built on the generated SDK, checked statically, activated with its own OIDC client and may only use the actions it was registered for.</text>
+
+  <!-- builder -->
+  <rect x="40" y="100" width="240" height="170" rx="12" class="usr"/>
+  <text x="58" y="128" class="h">App builder (person or agent)</text>
+  <circle cx="68" cy="154" r="10" class="bd"/><text x="68" y="158" class="num">1</text>
+  <text x="86" y="158" class="d">download the app SDK</text>
+  <text x="86" y="174" class="mono">src/liquid-sdk.ts</text>
+  <circle cx="68" cy="200" r="10" class="bd"/><text x="68" y="204" class="num">2</text>
+  <text x="86" y="204" class="d">React + Vite, build dist/</text>
+  <circle cx="68" cy="230" r="10" class="bd"/><text x="68" y="234" class="num">3</text>
+  <text x="86" y="234" class="d">register: owner, actions,</text>
+  <text x="86" y="250" class="d">reads, expiry (180 d)</text>
+
+  <!-- registry -->
+  <rect x="330" y="100" width="380" height="250" rx="12" class="cp"/>
+  <text x="350" y="128" class="h">App registry (control plane, /liquid/apps)</text>
+  <text x="350" y="150" class="h2">static check</text>
+  <rect x="350" y="160" width="160" height="22" rx="5" class="ok"/><text x="358" y="175" class="lbl">layout, size, safe paths</text>
+  <rect x="520" y="160" width="170" height="22" rx="5" class="ok"/><text x="528" y="175" class="lbl">pinned, allow-listed deps</text>
+  <rect x="350" y="188" width="160" height="22" rx="5" class="ok"/><text x="358" y="203" class="lbl">SDK = SDK in force</text>
+  <rect x="520" y="188" width="170" height="22" rx="5" class="ok"/><text x="528" y="203" class="lbl">no fetch, URLs, eval…</text>
+  <rect x="350" y="216" width="160" height="22" rx="5" class="ok"/><text x="358" y="231" class="lbl">actions + classes exist</text>
+  <rect x="520" y="216" width="170" height="22" rx="5" class="ok"/><text x="528" y="231" class="lbl">nothing from elsewhere</text>
+  <circle cx="360" cy="264" r="10" class="bd"/><text x="360" y="268" class="num">4</text>
+  <text x="378" y="268" class="d">activate → OIDC client app-&lt;id&gt;</text>
+  <text x="378" y="286" class="d">access: role Agent.User on the app</text>
+  <text x="350" y="312" class="lbl">expiry (hourly) · disable · new version → client removed</text>
+  <text x="350" y="330" class="lbl">every change is an event (App) and audited</text>
+  <path d="M282,185 L328,185" class="ln" marker-end="url(#a)"/>
+
+  <!-- oauth -->
+  <rect x="760" y="100" width="200" height="110" rx="12" class="db"/>
+  <text x="778" y="128" class="h">OAuth server</text>
+  <text x="778" y="150" class="d">client app-&lt;id&gt;</text>
+  <text x="778" y="168" class="d">refuses people without</text>
+  <text x="778" y="184" class="d">Agent.User on the app</text>
+  <path d="M712,264 L860,264 L860,212" class="lnb" marker-end="url(#b)"/>
+
+  <!-- person -->
+  <rect x="40" y="410" width="200" height="120" rx="12" class="usr"/>
+  <text x="58" y="438" class="h">Person (browser)</text>
+  <text x="58" y="460" class="d">e.g. Stefan, buyer</text>
+  <text x="58" y="480" class="d">opens</text>
+  <text x="58" y="496" class="mono">:8090/apps/&lt;id&gt;/</text>
+  <path d="M242,470 L328,470" class="ln" marker-end="url(#a)"/>
+
+  <!-- app host -->
+  <rect x="330" y="380" width="380" height="220" rx="12" class="gw"/>
+  <text x="350" y="408" class="h">App host (own origin, port 8090)</text>
+  <circle cx="360" cy="434" r="10" class="bd"/><text x="360" y="438" class="num">5</text>
+  <text x="378" y="438" class="d">sign-in per app, cookie scoped to /apps/&lt;id&gt;/</text>
+  <circle cx="360" cy="464" r="10" class="bd"/><text x="360" y="468" class="num">6</text>
+  <text x="378" y="468" class="d">static files with CSP: script + connect 'self'</text>
+  <circle cx="360" cy="494" r="10" class="bd"/><text x="360" y="498" class="num">7</text>
+  <text x="378" y="498" class="d">api/*: only registered actions and reads;</text>
+  <text x="378" y="514" class="d">header + Referer of the app's own pages</text>
+  <circle cx="360" cy="540" r="10" class="bd"/><text x="360" y="544" class="num">8</text>
+  <text x="378" y="544" class="d">drops _-fields, sets _requestedBy, _app</text>
+  <text x="350" y="580" class="lbl">not active (registered, disabled, expired) → 410</text>
+  <path d="M520,352 L520,378" class="ln" marker-end="url(#a)"/>
+  <text x="530" y="370" class="lbl">files, rules, client</text>
+  <path d="M712,430 L860,430 L860,212" class="lnr" marker-end="url(#r)"/>
+  <text x="740" y="424" class="lbl">sign-in</text>
+
+  <!-- core -->
+  <rect x="760" y="460" width="400" height="140" rx="12" class="opa"/>
+  <text x="780" y="488" class="h">Enterprise core (internal token)</text>
+  <text x="780" y="510" class="mono">POST /actions/submit_due_diligence_statement</text>
+  <text x="780" y="532" class="d">validate · policy · run (generic, from the IR) · event</text>
+  <text x="780" y="554" class="d">event: actor_user = the person, payload.app = the app</text>
+  <text x="780" y="576" class="d">the SDK is generated from the IR in force</text>
+  <path d="M712,520 L758,520" class="lnb" marker-end="url(#b)"/>
+
+  <!-- note -->
+  <rect x="1000" y="100" width="160" height="250" rx="12" class="db"/>
+  <text x="1016" y="128" class="h">Why an own origin</text>
+  <text x="1016" y="152" class="d">app code never runs</text>
+  <text x="1016" y="168" class="d">next to the console:</text>
+  <text x="1016" y="184" class="d">no access to its API</text>
+  <text x="1016" y="200" class="d">with an admin cookie</text>
+  <text x="1016" y="232" class="d">the browser never</text>
+  <text x="1016" y="248" class="d">holds a token of the</text>
+  <text x="1016" y="264" class="d">enterprise core</text>
+  <text x="1016" y="296" class="d">check = signal,</text>
+  <text x="1016" y="312" class="d">CSP + host rules =</text>
+  <text x="1016" y="328" class="d">enforcement</text>
+</svg>

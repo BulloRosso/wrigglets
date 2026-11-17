@@ -81,6 +81,8 @@ const schema = z
     OIDC_CLIENT_ID: z.string().optional(),
     OIDC_CLIENT_SECRET: z.string().optional(),
     OIDC_SCOPES: z.string().default('openid profile email'),
+    /** Entra app-role values / group ids → roles, e.g. "Users=Agent.User" (ADR-0050); unset = the roles claim as it is. */
+    OIDC_ROLE_MAP: z.string().optional(),
     SESSION_SECRET: z.string().min(32).optional(),
     SESSION_TTL: duration.default('8h'),
     ROLE_USER: z.string().default('Agent.User'),

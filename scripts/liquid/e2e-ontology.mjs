@@ -43,8 +43,10 @@ try {
     return Object.entries(main).every(([f, t]) => x.source.files[f] === sha(t)) ? x : undefined;
   }, 90_000, 3000).catch(() => ir);
   check('the enterprise core runs the ontology of the config repository (source hashes of main)', Object.entries(main).every(([f, t]) => ir.source.files[f] === sha(t)), `${ir.name}@${ir.version} ${ir.hash.slice(0, 12)}`);
-  const names = (x) => JSON.stringify([x.classes.map((c) => c.name).sort(), x.actions.map((a) => a.name).sort()]);
-  check('same classes and actions as the built-in sofa ontology', names(ir) === names(committed), { classes: ir.classes.length, actions: ir.actions.length, links: ir.links.length, builtIn: committed.version });
+  // every built-in class and action is served; additions came through reviewed changes (e.g. M9's DueDiligenceStatement)
+  const missing = [...committed.classes.filter((c) => !ir.classes.some((x) => x.name === c.name)).map((c) => c.name), ...committed.actions.filter((a) => !ir.actions.some((x) => x.name === a.name)).map((a) => a.name)];
+  const added = [...ir.classes.filter((c) => !committed.classes.some((x) => x.name === c.name)).map((c) => c.name), ...ir.actions.filter((a) => !committed.actions.some((x) => x.name === a.name)).map((a) => a.name)];
+  check('every class and action of the built-in sofa ontology is served (additions only through reviewed changes)', missing.length === 0, { classes: ir.classes.length, actions: ir.actions.length, links: ir.links.length, builtIn: committed.version, added });
 
   if (!args.has('--no-shots')) {
     const { Shots } = await import('../sofa-company/shots.mjs');

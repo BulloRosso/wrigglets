@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T00:24:21.592Z",
+  "startedAt": "2026-11-17T01:32:36.327Z",
   "checks": [
     {
       "name": "installed and available",
@@ -127,12 +127,12 @@
   "lake": {
     "hwm": 1009,
     "snapshots": 7,
-    "lastSnapshotAt": "2026-11-17 00:24:26.847276+00",
+    "lastSnapshotAt": "2026-11-17 01:32:41.646217+00",
     "extracts": [
       {
         "id": "sofa-T0",
         "source": "sofa-company mock (scripts/sofa-company/mock-mcp.mjs), initial state",
-        "at": "2026-11-17 00:24:09.007+00",
+        "at": "2026-11-17 01:32:29.468+00",
         "tables": {
           "erp_factories": 2,
           "erp_machines": 6,
@@ -153,7 +153,7 @@
       }
     ],
     "lastFlush": {
-      "at": "2026-11-17T00:24:27.056Z",
+      "at": "2026-11-17T01:32:41.918Z",
       "result": {
         "flushed": 0,
         "hwm": 1009,
@@ -203,5 +203,5 @@
     }
   },
   "ok": true,
-  "finishedAt": "2026-11-17T00:24:33.782Z"
+  "finishedAt": "2026-11-17T01:32:43.095Z"
 }

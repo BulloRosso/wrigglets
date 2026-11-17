@@ -1,0 +1,4 @@
+dist/
+node_modules/
+# downloaded from the app registry (the SDK of the ontology in force)
+src/liquid-sdk.ts

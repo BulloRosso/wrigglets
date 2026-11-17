@@ -1,3 +1,4 @@
+import { entraIssuer } from '@cw/auth-rp';
 import type { SecretStore } from '@cw/secrets';
 import type { AgentEntra, AgentSpec, AgentSummary, CreateAgentBody, HealthReport, UpdateAgentBody } from '@cw/shared';
 import type { Config } from './config.js';
@@ -148,6 +149,10 @@ export class AgentService {
       ...(e.credential.kind === 'secret' && credential ? { ENTRA_CLIENT_SECRET: credential } : {}),
       ...(e.credential.kind === 'cert' && credential ? { ENTRA_CLIENT_CERT_PEM: credential } : {}),
       ENTRA_ALLOW_AGENT_ONLY: String(e.allowAgentOnly),
+      // the sign-in client of an OBO agent is its Entra application, so users sign in at Entra (ADR-0050)
+      OIDC_ISSUER: entraIssuer(e.tenantId ?? this.config.ENTRA_TENANT_ID ?? '', this.config.ENTRA_AUTHORITY_HOST),
+      OIDC_INTERNAL_URL: entraIssuer(e.tenantId ?? this.config.ENTRA_TENANT_ID ?? '', this.config.ENTRA_AUTHORITY_HOST),
+      ...(this.config.ENTRA_ROLE_MAP ? { OIDC_ROLE_MAP: this.config.ENTRA_ROLE_MAP } : {}),
     };
   }
 

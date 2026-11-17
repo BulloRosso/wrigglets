@@ -1,10 +1,10 @@
 {
-  "startedAt": "2026-11-17T00:31:17.585Z",
+  "startedAt": "2026-11-17T01:37:08.168Z",
   "checks": [
     {
       "name": "the running ontology",
       "ok": true,
-      "detail": "sofa@4.0.0, 19 classes, 32 actions"
+      "detail": "sofa@6.0.0, 20 classes, 34 actions"
     },
     {
       "name": "config__validate: compiles, compatibility minor, existing data fits, policy tests pass",
@@ -30,8 +30,8 @@
       "name": "the agent proposes the extension; validated, compatibility minor",
       "ok": true,
       "detail": {
-        "id": "cp-mwjyipq6-b353",
-        "version": "4.1.0"
+        "id": "cp-mwk0ve15-98b6",
+        "version": "6.1.0"
       }
     },
     {
@@ -39,15 +39,15 @@
       "ok": true
     },
     {
-      "name": "live in 4 s: ontology 4.1.0, class Carrier, actions present",
+      "name": "live in 2 s: ontology 6.1.0, class Carrier, actions present",
       "ok": true
     },
     {
       "name": "the version is recorded as minor",
       "ok": true,
       "detail": [
-        "4.1.0:minor",
-        "4.0.0:patch"
+        "6.1.0:minor",
+        "6.0.0:minor"
       ]
     },
     {
@@ -66,7 +66,7 @@
     {
       "name": "the SDK is regenerated from the new version",
       "ok": true,
-      "detail": "12049 chars"
+      "detail": "12677 chars"
     },
     {
       "name": "the agent creates a carrier through the new tool",
@@ -109,7 +109,7 @@
       "name": "the breaking change went live by rebuilding the projection",
       "ok": true,
       "detail": {
-        "version": "5.0.0",
+        "version": "7.0.0",
         "note": "Carrier objects stay in the event log; the projection is rebuilt without them."
       }
     },
@@ -123,5 +123,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T00:31:51.835Z"
+  "finishedAt": "2026-11-17T01:37:29.915Z"
 }

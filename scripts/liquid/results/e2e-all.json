@@ -1,11 +1,71 @@
 {
-  "startedAt": "2026-11-17T00:29:25.349Z",
+  "startedAt": "2026-11-17T01:31:39.081Z",
   "suites": [
+    {
+      "name": "M0b extension (fresh install, resume after restart)",
+      "script": "e2e-extension.mjs",
+      "ok": true,
+      "seconds": 57,
+      "checks": {
+        "ok": 11,
+        "total": 11
+      }
+    },
+    {
+      "name": "M1 event log and lake",
+      "script": "e2e-lake.mjs",
+      "ok": true,
+      "seconds": 7,
+      "checks": {
+        "ok": 10,
+        "total": 10
+      }
+    },
+    {
+      "name": "M2 ontology and editor",
+      "script": "e2e-ontology.mjs",
+      "ok": true,
+      "seconds": 4,
+      "checks": {
+        "ok": 4,
+        "total": 4
+      }
+    },
+    {
+      "name": "M3 backend swap",
+      "script": "e2e-backend.mjs",
+      "ok": true,
+      "seconds": 19,
+      "checks": {
+        "ok": 13,
+        "total": 13
+      }
+    },
+    {
+      "name": "M4 policy (embedded)",
+      "script": "e2e-policy.mjs",
+      "ok": true,
+      "seconds": 41,
+      "checks": {
+        "ok": 14,
+        "total": 14
+      }
+    },
+    {
+      "name": "M5 business workflows",
+      "script": "e2e-processes.mjs",
+      "ok": true,
+      "seconds": 79,
+      "checks": {
+        "ok": 19,
+        "total": 19
+      }
+    },
     {
       "name": "M6 config repository (Git host)",
       "script": "e2e-config.mjs",
       "ok": true,
-      "seconds": 69,
+      "seconds": 72,
       "checks": {
         "ok": 25,
         "total": 25
@@ -15,7 +75,7 @@
       "name": "M7 playbooks",
       "script": "e2e-playbooks.mjs",
       "ok": true,
-      "seconds": 44,
+      "seconds": 51,
       "checks": {
         "ok": 18,
         "total": 18
@@ -25,13 +85,23 @@
       "name": "M8 ontology evolution",
       "script": "e2e-ontology-evolution.mjs",
       "ok": true,
-      "seconds": 34,
+      "seconds": 22,
       "checks": {
         "ok": 19,
         "total": 19
       }
+    },
+    {
+      "name": "M9 apps (registry, app host, sample app)",
+      "script": "e2e-apps.mjs",
+      "ok": true,
+      "seconds": 3,
+      "checks": {
+        "ok": 20,
+        "total": 20
+      }
     }
   ],
-  "finishedAt": "2026-11-17T00:31:51.908Z",
+  "finishedAt": "2026-11-17T01:37:32.627Z",
   "ok": true
 }

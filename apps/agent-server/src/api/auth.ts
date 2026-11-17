@@ -1,5 +1,5 @@
 import type { Express, RequestHandler } from 'express';
-import { createOidcRp, escapeHtml } from '@cw/auth-rp';
+import { createOidcRp, escapeHtml, roleMapper } from '@cw/auth-rp';
 import type { Principal } from '@cw/shared';
 import type { Config } from '../config.js';
 import { logger } from '../logger.js';
@@ -91,6 +91,7 @@ function oidcAuth(config: Config, obo?: Obo): Auth {
         }
       : undefined,
     onSignOut: obo ? (user) => obo.service.signOut(user.oid) : undefined,
+    mapRoles: config.OIDC_ROLE_MAP ? roleMapper(config.OIDC_ROLE_MAP) : undefined,
     sessionSecret: config.SESSION_SECRET!,
     sessionTtlMs: config.sessionTtlMs,
     cookieName: `cw_${config.AGENT_ID.replace(/-/g, '_')}`,

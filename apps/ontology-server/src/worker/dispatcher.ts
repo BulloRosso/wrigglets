@@ -7,6 +7,7 @@ import { BSA, objectRef, type ApprovalInput, type PurchaseOrderReleaseInput } fr
  *   - an action with `starts_workflow` (ontology) → start that workflow
  *   - an action with `signals_workflow` → signal the running workflows of the action's object
  *   - ActionApprovalRequested (four eyes, ADR-0044) → start an ApprovalWorkflow
+ *   - SimulationReset → cancel the running PurchaseOrderRelease workflows (their orders belong to the old world)
  */
 
 export interface DispatchEvent {
@@ -74,6 +75,12 @@ export function commandsFor(e: DispatchEvent, actions: Map<string, IrActionLite>
       expireMs: cfg.approvalExpireMs,
     };
     out.push({ kind: 'start', workflowType: 'ApprovalWorkflow', workflowId: `ApprovalWorkflow-${e.eventId}`, args: [input], objects: input.objects });
+    return out;
+  }
+  // a simulation reset replaces the world: release workflows of the old one must not release the new orders that
+  // get the same ids (PO numbering restarts) — they are cancelled; they write nothing on cancel
+  if (e.type === 'SimulationReset') {
+    out.push({ kind: 'signal', workflowType: 'PurchaseOrderRelease', query: "WorkflowType = 'PurchaseOrderRelease' AND ExecutionStatus = 'Running'", signal: 'cancel', payload: { reason: `simulation reset (event ${e.seq})` } });
     return out;
   }
   const a = e.action ? actions.get(e.action) : undefined;

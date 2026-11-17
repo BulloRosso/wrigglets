@@ -149,6 +149,7 @@ export const liquidManifest: ExtensionManifestInput = {
     { label: 'Proposals', path: '/liquid/proposals' },
     { label: 'Playbooks', path: '/liquid/playbooks' },
     { label: 'Event log', path: '/liquid/events' },
+    { label: 'Apps', path: '/liquid/apps' },
   ],
 };
 

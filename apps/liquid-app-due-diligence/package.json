@@ -1,0 +1,22 @@
+{
+  "name": "@cw/liquid-app-due-diligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sample app for Liquid Enterprise (ADR-0050): supplier due-diligence statements, built only on the generated app SDK and served by the app host. Not part of the repo build: the SDK depends on the ontology in force; scripts/liquid/app-register.mjs downloads it, builds and registers.",
+  "scripts": {
+    "build:app": "vite build",
+    "typecheck:app": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  }
+}

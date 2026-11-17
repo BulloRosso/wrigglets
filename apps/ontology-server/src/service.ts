@@ -24,6 +24,8 @@ export interface Caller {
   step?: string;
   /** Person who approved a four-eyes request (ApprovalWorkflow). Accepted only from trusted callers (REST + internal token), never from MCP. */
   approvedBy?: string;
+  /** Registered app the person used (app host of the control plane, ADR-0050). Trusted callers only, never from MCP. */
+  app?: string;
 }
 
 export type PolicyHook = (input: { action: string; target?: string; readOnly: boolean; destructive: boolean; caller: Caller; args: Args; company: SofaCompany; ir: OntologyIr; objects: Objects }) => Promise<{ allow: boolean; reason?: string; obligations?: string[] }>;
@@ -135,6 +137,7 @@ export class OntologyService {
       else if (k === '_step') caller.step = String(v);
       else if (k === '_workflow') caller.workflow = String(v);
       else if (k === '_approvedBy') caller.approvedBy = String(v);
+      else if (k === '_app') caller.app = String(v);
       else rest[k] = v;
     }
     return { args: rest, caller };
@@ -211,7 +214,7 @@ export class OntologyService {
           actorUser: e.caller.user,
           taskId: e.caller.task,
           workflowId: e.caller.workflow,
-          payload: { ...e.payload, ...(e.caller.approvedBy ? { approvedBy: e.caller.approvedBy } : {}), changes, meta },
+          payload: { ...e.payload, ...(e.caller.approvedBy ? { approvedBy: e.caller.approvedBy } : {}), ...(e.caller.app ? { app: e.caller.app } : {}), changes, meta },
           ontologyVersion: this.ir.version,
         },
       ]);

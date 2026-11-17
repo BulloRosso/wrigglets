@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-17T00:25:02.260Z",
+  "startedAt": "2026-11-17T01:33:05.383Z",
   "checks": [
     {
       "name": "all services running, no OPA container (policy embedded)",
@@ -15,7 +15,7 @@
       "name": "gateway and enterprise core load the same compiled policy (WASM) from the control plane",
       "ok": true,
       "detail": {
-        "revision": "33137dd81fcfac0c",
+        "revision": "2ffa91d43f43b9dc",
         "files": [
           "liquid/common.rego",
           "liquid/gateway.rego",
@@ -31,7 +31,7 @@
     {
       "name": "erp/crm point at the ontology server with policy: opa",
       "ok": true,
-      "detail": "01:25:09 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 01:25:09 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
+      "detail": "02:33:13 erp: http://mcp-sofa:7660/erp/mcp → http://ontology-server:7710/erp/mcp (policy: opa) | 02:33:13 crm: http://mcp-sofa:7660/crm/mcp → http://ontology-server:7710/crm/mcp (policy: opa)"
     },
     {
       "name": "a read through gateway + embedded policy works",
@@ -83,5 +83,5 @@
     }
   ],
   "ok": true,
-  "finishedAt": "2026-11-17T00:25:45.030Z"
+  "finishedAt": "2026-11-17T01:33:45.965Z"
 }

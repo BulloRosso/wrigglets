@@ -11,6 +11,7 @@ export { dqChecks, type DqCheck } from './gen-dq.js';
 export { mcpTools, type McpToolDef } from './gen-mcp.js';
 export { opaData } from './gen-opa.js';
 export { genDq, genMcp, genOpaData, genOpaTest, genSdk, genSql, genTypes };
+export { genAppSdk, appSdkHeader, APP_SDK_PATH } from './gen-app-sdk.js';
 export { snake, tableOf, camel, pascal, type Files } from './util.js';
 
 /**

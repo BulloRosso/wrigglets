@@ -55,6 +55,7 @@ function agentCall(agent, tool, a) {
 
 const runningFor = (procs, poId) => procs.running.find((p) => p.type === 'PurchaseOrderRelease' && p.objects.includes(`PurchaseOrder:${poId}`));
 let swapped = false;
+let holdRef; // released in finally also when a check fails (a hold must never outlive the test)
 try {
   await s.signIn(ADMIN, env.BOOTSTRAP_ADMIN_EMAIL, env.BOOTSTRAP_ADMIN_PASSWORD);
   await api('POST', '/extensions/liquid/repair', {});
@@ -82,8 +83,13 @@ try {
 
   // 2. hold by supplier pauses exactly those
   const hold = await api('POST', '/liquid/processes/hold', { objects: ['Supplier:S-NORDHOLZ'], reason: 'Supplier under review (e2e)' });
+  holdRef = hold.ref;
   const nordWf = nord.map((id) => runningFor(started, id).workflowId).sort();
-  check('hold on Supplier:S-NORDHOLZ reaches exactly its workflows', JSON.stringify(hold.workflows) === JSON.stringify(nordWf), hold.workflows);
+  // of this run's orders exactly the Nordholz ones; other running workflows that touch S-NORDHOLZ (e.g. a pending
+  // approval left by an earlier run) are held too, which is correct
+  const balticWf = runningFor(started, baltic).workflowId;
+  const ours = hold.workflows.filter((w) => nordWf.includes(w) || w === balticWf).sort();
+  check('hold on Supplier:S-NORDHOLZ reaches exactly its workflows (of this run’s orders)', JSON.stringify(ours) === JSON.stringify(nordWf), { held: hold.workflows.length, others: hold.workflows.filter((w) => !ours.includes(w)) });
   await until(`${baltic} released after the release window`, async () => releaseOf(po(baltic)) || undefined, 90_000, 2000);
   await sleep(3000);
   check('the other supplier\'s order is released on time; the held ones are not', !!releaseOf(po(baltic)) && nord.every((id) => !releaseOf(po(id))), { [baltic]: releaseOf(po(baltic)), ...Object.fromEntries(nord.map((id) => [id, releaseOf(po(id))])) });
@@ -140,7 +146,7 @@ try {
 
   // 6. release resumes the held workflows
   const rel = await api('POST', '/liquid/processes/release', { ref: hold.ref });
-  check('release reaches the held workflows', JSON.stringify(rel.workflows) === JSON.stringify(nordWf), rel.workflows);
+  check('release reaches the held workflows', JSON.stringify(rel.workflows.filter((w) => ours.includes(w)).sort()) === JSON.stringify(nordWf) && JSON.stringify([...rel.workflows].sort()) === JSON.stringify([...hold.workflows].sort()), { released: rel.workflows.length, held: hold.workflows.length });
   await until('held orders released', async () => nord.every((id) => releaseOf(po(id))) || undefined, 30_000, 1000);
   check('released workflows resume: the orders get released', nord.every((id) => releaseOf(po(id))), Object.fromEntries(nord.map((id) => [id, releaseOf(po(id))])));
 
@@ -156,6 +162,7 @@ try {
   result.error = String(err);
   log(String(err));
 } finally {
+  if (holdRef) await api('POST', '/liquid/processes/release', { ref: holdRef }).catch(() => undefined);
   if (swapped) {
     const back = spawnSync(process.execPath, [path.join(root, 'scripts/liquid/setup.mjs'), '--restore'], { encoding: 'utf8' });
     log(back.status === 0 ? 'erp/crm restored to the mock' : `restore failed: ${back.stderr}`);

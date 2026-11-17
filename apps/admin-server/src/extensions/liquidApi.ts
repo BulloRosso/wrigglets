@@ -53,9 +53,11 @@ export function liquidAdminRouter(ext: ExtensionService, audit?: Audit, by: (req
   r.get('/liquid/ontology/versions', pass('GET', () => '/internal/ontology/versions'));
   /** Audit is a query over the event log (ADR-0049): filter by type, actor, object, text. */
   r.get('/liquid/events', pass('GET', (req) => `/internal/events/query?${new URLSearchParams(Object.entries(req.query).filter(([, v]) => typeof v === 'string') as Array<[string, string]>).toString()}`));
-  r.get('/liquid/ontology/sdk', async (_req, res, next) => {
+  r.get('/liquid/ontology/sdk', async (req, res, next) => {
     try {
-      const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/sdk.ts`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
+      // ?kind=app: the standalone SDK for registered apps (ADR-0050); default: the SDK for server-side code
+      const file = req.query.kind === 'app' ? 'app-sdk.ts' : 'sdk.ts';
+      const out = await fetch(`${ctx.url('ontology-server')}/internal/ontology/${file}`, { headers: { authorization: `Bearer ${ctx.secret('ontology_internal_token')}` }, signal: AbortSignal.timeout(20_000) });
       if (!out.ok) throw new HttpError(502, `ontology server: HTTP ${out.status}`);
       res.type('text/plain').send(await out.text());
     } catch (err) {

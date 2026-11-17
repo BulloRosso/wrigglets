@@ -95,10 +95,10 @@
   <text x="814" y="303" class="d">tighten-only rule,</text>
   <text x="814" y="319" class="d">blast radius, replay</text>
   <!-- M9 -->
-  <rect x="800" y="400" width="150" height="76" rx="10" class="wip"/>
+  <rect x="800" y="400" width="150" height="76" rx="10" class="done"/>
   <text x="814" y="423" class="id">M9</text><text x="848" y="423" class="h">Identity and UIs</text>
-  <text x="814" y="443" class="d">Entra option, SDK,</text>
-  <text x="814" y="459" class="d">app registry</text>
+  <text x="814" y="443" class="d">Entra option, app SDK,</text>
+  <text x="814" y="459" class="d">registry, app host</text>
   <!-- M8 -->
   <rect x="990" y="260" width="150" height="76" rx="10" class="done"/>
   <text x="1004" y="283" class="id">M8</text><text x="1038" y="283" class="h">Ontology change</text>

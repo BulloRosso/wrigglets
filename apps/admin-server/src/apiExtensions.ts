@@ -33,6 +33,8 @@ import type { SignalsControlService } from './signals.js';
 import { signalsAdminRouter, signalsInternalRouter } from './signalsApi.js';
 import { extensionsAdminRouter } from './extensions/api.js';
 import { liquidAdminRouter, liquidInternalRouter } from './extensions/liquidApi.js';
+import type { AppRegistry } from './liquid/apps.js';
+import { appsRouter } from './liquid/appsApi.js';
 import type { LiquidPolicyService } from './extensions/liquidPolicy.js';
 import type { LiquidProcesses } from './extensions/liquidProcesses.js';
 import { playbooksInternalRouter, playbooksRouter } from './liquid/playbooksApi.js';
@@ -56,7 +58,7 @@ export interface ExtensionDeps {
   spendLimit: (spec: AgentSummary['spec']) => number;
   agents: Pick<import('./agents.js').AgentService, 'update' | 'rotateAiKey' | 'aiModels' | 'setEntra' | 'syncAiKeys'>;
   smallModel: string;
-  oauth: Pick<OAuthAdmin, 'users'>;
+  oauth: Pick<OAuthAdmin, 'users' | 'setAgentRoles'>;
   /** Signals (optional module, ADR-0037). */
   signals: SignalsControlService;
   /** Optional extensions installed from the admin console (ADR-0039). */
@@ -70,6 +72,7 @@ export interface ExtensionDeps {
   liquidPlaybooks?: PlaybookService;
   /** One approval mechanism and inbox (ADR-0049). */
   liquidApprovals?: ApprovalService;
+  liquidApps?: AppRegistry;
 }
 
 const SECRET_NAME = /^[0-9a-zA-Z-]{1,127}$/;
@@ -375,6 +378,7 @@ export function extensionRouter(d: ExtensionDeps, by: (req: Request) => string):
   r.use(liquidAdminRouter(d.extensions, d.audit, by, d.liquidPolicy, d.liquidProcesses));
   if (d.liquidConfig) r.use(liquidConfigRouter(d.extensions, d.liquidConfig, by));
   if (d.liquidPlaybooks) r.use(playbooksRouter(d.extensions, d.liquidPlaybooks, by, d.audit, d.liquidApprovals));
+  if (d.liquidApps) r.use(appsRouter(d.extensions, d.liquidApps, by, d.oauth, d.audit));
 
   r.get('/mail', async (req, res) => {
     const agentId = req.query.agentId ? String(req.query.agentId) : undefined;

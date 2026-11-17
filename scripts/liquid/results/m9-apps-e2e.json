@@ -1,0 +1,137 @@
+{
+  "startedAt": "2026-11-17T01:37:29.962Z",
+  "checks": [
+    {
+      "name": "the app host listens on its own origin (port 8090)",
+      "ok": true,
+      "detail": 200
+    },
+    {
+      "name": "the ontology the app needs is live (reviewed pull request, minor change)",
+      "ok": true,
+      "detail": {
+        "version": "7.0.0",
+        "proposed": false
+      }
+    },
+    {
+      "name": "an app that sends data to another host is rejected (static check)",
+      "ok": true,
+      "detail": [
+        "src/leak.ts: fetch (use the SDK)",
+        "src/leak.ts: an absolute URL"
+      ]
+    },
+    {
+      "name": "a rejected app cannot be activated",
+      "ok": true,
+      "detail": "Error: POST http://127.0.0.1:8080/api/liquid/apps/dd-leaky/activate → 409 {\"error\":\"app dd-leaky does not pass the check"
+    },
+    {
+      "name": "the sample app passes every check (layout, pinned dependencies, only the SDK, actions, bundle)",
+      "ok": true,
+      "detail": [
+        "layout=true",
+        "dependencies pinned and allowed=true",
+        "uses only the SDK=true",
+        "actions and classes exist=true",
+        "bundle loads nothing from elsewhere=true"
+      ]
+    },
+    {
+      "name": "registered with owner and expiry (default 180 days)",
+      "ok": true,
+      "detail": {
+        "owner": "stefan.lang@sofaworks.example",
+        "expiresAt": "2027-05-16T01:37:31.493Z"
+      }
+    },
+    {
+      "name": "before activation the app host answers 410",
+      "ok": true,
+      "detail": 410
+    },
+    {
+      "name": "activation: active, listed with its expiry",
+      "ok": true,
+      "detail": "http://127.0.0.1:8090/apps/supplier-due-diligence/"
+    },
+    {
+      "name": "anonymous: redirected to the app’s own sign-in",
+      "ok": true,
+      "detail": "/apps/supplier-due-diligence/auth/login?returnTo=%2Fapps%2Fsupplier-due-diligence%2F"
+    },
+    {
+      "name": "without the role on the app, sign-in is refused (by the OAuth server, before the app sees anyone)",
+      "ok": true,
+      "detail": "Supplier due diligence. Ask an administrator to grant you access."
+    },
+    {
+      "name": "with the role: the app loads, with the strict CSP of the app host",
+      "ok": true,
+      "detail": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    },
+    {
+      "name": "the SDK sees who is signed in",
+      "ok": true,
+      "detail": {
+        "upn": "stefan.lang@sofaworks.example",
+        "name": "Stefan Lang",
+        "app": "supplier-due-diligence"
+      }
+    },
+    {
+      "name": "API calls must come from the app’s own pages (header + Referer)",
+      "ok": true,
+      "detail": {
+        "noReferer": 403,
+        "otherApp": 403
+      }
+    },
+    {
+      "name": "reads and actions outside the registration are refused",
+      "ok": true,
+      "detail": {
+        "suppliers": 7,
+        "purchaseOrders": 403,
+        "createPurchaseOrder": 403
+      }
+    },
+    {
+      "name": "the person submits a statement through the app",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "result": "{\n  \"id\": \"DDS-001\",\n  \"supplier\": \"S-BALTIC\",\n  \"statement\": \"No conflict minerals; ILO core labour standards met; audit 2026 on file. (e2e)\",\n  \"sanctions_checked\": true,\n  \"signed_by\": \"Stefan Lang\"\n}",
+        "seq": 1167
+      }
+    },
+    {
+      "name": "the event has the person and the app as actors; caller fields from the browser were dropped",
+      "ok": true,
+      "detail": "DueDiligenceStatementSubmitted|stefan.lang@sofaworks.example||supplier-due-diligence|-"
+    },
+    {
+      "name": "the statement is an object of the ontology (projection)",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "a disabled app answers 410, also for a signed-in person (its OIDC client is gone)",
+      "ok": true,
+      "detail": 410
+    },
+    {
+      "name": "activated again: sign-in works with a new client secret",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "registry changes are events (App)",
+      "ok": true,
+      "detail": "AppDisabled,AppActivated"
+    }
+  ],
+  "ok": true,
+  "finishedAt": "2026-11-17T01:37:32.619Z"
+}

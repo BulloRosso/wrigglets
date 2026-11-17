@@ -28,6 +28,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080" # admin console
+      - "127.0.0.1:8090:8090" # app host of Liquid Enterprise (registered apps, own origin; ADR-0050)
       - "127.0.0.1:8233:8233" # Temporal Web UI
       - "127.0.0.1:7233:7233" # Temporal gRPC (CLI access from the host)
     volumes:
@@ -38,6 +39,7 @@ services:
       keyvault: { condition: service_started }
     environment:
       PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8080
+      APPS_PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8090
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-agent-dev}
       TEMPORAL_UI_PUBLIC_URL: http://${PUBLIC_HOST:-localhost}:8233
       PAYLOAD_CODEC_KEYS: ${PAYLOAD_CODEC_KEYS:?run scripts/stack.mjs to create .env}
